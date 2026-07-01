@@ -1,0 +1,84 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on: [api, frontend]
+    networks: [clutchnet]
+
+  frontend:
+    build: ./frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules          # keep container's node_modules, don't shadow with host
+    environment:
+      - VITE_API_URL=/api
+    networks: [clutchnet]
+
+  api:
+    build: ./api
+    command: php artisan serve --host=0.0.0.0 --port=8000
+    volumes:
+      - ./api:/var/www/html
+    env_file: .env
+    depends_on: [postgres, redis, minio]
+    networks: [clutchnet]
+
+  worker:
+    build: ./worker
+    volumes:
+      - ./worker:/app
+    env_file: .env
+    depends_on: [redis, minio, postgres]
+    networks: [clutchnet]
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"                # optional: connect a DB GUI from host
+    networks: [clutchnet]
+
+  redis:
+    image: redis:7-alpine
+    networks: [clutchnet]
+
+  # One-shot: waits for MinIO, then creates the demos bucket so the first upload
+  # doesn't 404. Replaces the manual "create the bucket in the console" step.
+  minio-init:
+    image: minio/mc
+    depends_on: [minio]
+    env_file: .env
+    entrypoint: >
+      sh -c "until mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do echo 'waiting for minio'; sleep 2; done;
+             mc mb -p local/$$AWS_BUCKET || true;
+             echo 'bucket ready'"
+    networks: [clutchnet]
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - miniodata:/data
+    ports:
+      - "9000:9000"                # S3 API
+      - "9001:9001"                # web console
+    networks: [clutchnet]
+
+volumes:
+  pgdata:
+  miniodata:
+
+networks:
+  clutchnet:
+    driver: bridge

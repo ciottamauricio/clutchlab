@@ -1,0 +1,29 @@
+# --- Secrets ---
+.env
+
+# --- Laravel (api/) ---
+api/vendor/
+api/node_modules/
+api/public/storage
+api/storage/*.key
+api/storage/framework/cache/*
+api/storage/framework/sessions/*
+api/storage/framework/views/*
+api/storage/logs/*
+api/.env
+api/.phpunit.result.cache
+
+# --- Frontend (frontend/) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# --- Go worker (worker/) ---
+worker/tmp/
+worker/*.exe
+
+# --- Editor / OS ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
