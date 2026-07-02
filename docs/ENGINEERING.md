@@ -8,7 +8,7 @@ Service-specific depth lives in each service's own guide:
 
 - **Backend (Laravel):** [`../api/docs/ENGINEERING.md`](../api/docs/ENGINEERING.md)
 - **Frontend (React):** [`../frontend/ENGINEERING.md`](../frontend/ENGINEERING.md)
-- **Worker (Go):** no dedicated guide yet — see [`../worker/`](../worker/) (`main.go`, `parser.go`).
+- **Go services (worker, realtime):** [`../worker/docs/ENGINEERING.md`](../worker/docs/ENGINEERING.md).
 
 Domain business rules: [`../api/docs/domains/`](../api/docs/domains/).
 

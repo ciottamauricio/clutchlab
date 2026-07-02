@@ -11,10 +11,12 @@ features. Solo learning project, monorepo.
 - **Why the services are split** (boundaries, async, polyglot queue): [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - **What comes next** (ordered so each step teaches one concept): [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - **Per-service notes:** each service has its own `CLAUDE.md` —
-  [`api/CLAUDE.md`](api/CLAUDE.md) and [`frontend/CLAUDE.md`](frontend/CLAUDE.md).
+  [`api/CLAUDE.md`](api/CLAUDE.md), [`frontend/CLAUDE.md`](frontend/CLAUDE.md), and
+  [`worker/CLAUDE.md`](worker/CLAUDE.md).
   The api's domain business rules live in [`api/docs/domains/`](api/docs/domains/) (read the
   relevant one before changing a domain); the frontend deep-dive is
-  [`frontend/ENGINEERING.md`](frontend/ENGINEERING.md).
+  [`frontend/ENGINEERING.md`](frontend/ENGINEERING.md) and the Go one is
+  [`worker/docs/ENGINEERING.md`](worker/docs/ENGINEERING.md).
 
 ## Services
 

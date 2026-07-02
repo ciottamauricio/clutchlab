@@ -1,4 +1,7 @@
-package main
+// Package parser turns a CS2 demo stream into a per-player scoreboard via
+// demoinfocs. This is the single "analysis pass" the roadmap grows later
+// (heatmaps, clutch detection) by adding more event handlers here.
+package parser
 
 import (
 	"fmt"
@@ -31,9 +34,6 @@ type ParseResult struct {
 	Players     []*PlayerStat
 }
 
-// ParseDemo streams a CS2 demo through demoinfocs and tallies a per-player
-// scoreboard. This is the single "analysis pass" the roadmap grows later
-// (heatmaps, clutch detection) by adding more event handlers here.
 func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 	// demoinfocs panics (not just errors) on some corrupt/unsupported demos, so
 	// recover here and turn it into a normal error — one bad upload must not take
@@ -117,7 +117,6 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		TName:       t.ClanName(),
 		TotalRounds: ct.Score() + t.Score(),
 	}
-
 	for _, s := range byID {
 		res.Players = append(res.Players, s)
 	}
