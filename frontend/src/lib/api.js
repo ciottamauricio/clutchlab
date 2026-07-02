@@ -1,4 +1,11 @@
 const BASE = import.meta.env.VITE_API_URL ?? '/api'
+const TOKEN_KEY = 'clutchlab_token'
+
+export const tokenStore = {
+  get: () => localStorage.getItem(TOKEN_KEY),
+  set: (t) => localStorage.setItem(TOKEN_KEY, t),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+}
 
 export class ApiError extends Error {
   constructor(code, status) {
@@ -8,30 +15,46 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path, options) {
-  const res = await fetch(`${BASE}${path}`, options)
+// The backend speaks error codes, never sentences (docs/ARCHITECTURE.md). Pull the
+// first code out of Laravel's validation shape, or fall back to message/error.
+function firstCode(body) {
+  const errors = body?.errors
+  if (errors) {
+    const first = Object.values(errors)[0]
+    if (Array.isArray(first) && first[0]) return first[0]
+  }
+  return body?.message ?? body?.error ?? 'error.unknown'
+}
+
+async function request(path, { auth = true, headers = {}, ...options } = {}) {
+  const finalHeaders = { Accept: 'application/json', ...headers }
+  const token = tokenStore.get()
+  if (auth && token) finalHeaders.Authorization = `Bearer ${token}`
+
+  const res = await fetch(`${BASE}${path}`, { ...options, headers: finalHeaders })
   const body = await res.json().catch(() => null)
 
   if (!res.ok) {
-    // The backend speaks error codes, never sentences (docs/ARCHITECTURE.md).
-    // Surface the code; the i18n layer turns it into words.
-    const code = body?.errors?.demo?.[0] ?? body?.message ?? body?.error ?? 'error.unknown'
-    throw new ApiError(code, res.status)
+    if (res.status === 401) {
+      // Token missing/expired — drop it and let the app fall back to login.
+      tokenStore.clear()
+      window.dispatchEvent(new Event('auth:unauthorized'))
+    }
+    throw new ApiError(firstCode(body), res.status)
   }
 
   return body?.data
 }
 
-export function listMatches() {
-  return request('/matches')
-}
-
-export function getMatch(id) {
-  return request(`/matches/${id}`)
-}
-
-export function uploadDemo(file) {
-  const form = new FormData()
-  form.append('demo', file)
-  return request('/matches', { method: 'POST', body: form })
+export const api = {
+  get: (path) => request(path),
+  post: (path, data, opts) =>
+    request(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data ?? {}),
+      ...opts,
+    }),
+  postForm: (path, formData) => request(path, { method: 'POST', body: formData }),
+  delete: (path) => request(path, { method: 'DELETE' }),
 }

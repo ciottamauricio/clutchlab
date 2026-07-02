@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import { listMatches, getMatch, uploadDemo } from '../../lib/api'
+import { api } from '../../lib/api'
+
+const listMatches = () => api.get('/matches')
+const getMatch = (id) => api.get(`/matches/${id}`)
+const uploadDemo = (file) => {
+  const form = new FormData()
+  form.append('demo', file)
+  return api.postForm('/matches', form)
+}
 
 // Data hooks for the matches feature. Plain useState/useEffect for now; TanStack
 // Query is the intended direction once caching/invalidation is worth the dependency

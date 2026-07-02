@@ -18,6 +18,22 @@ const MESSAGES = {
   'demo.file_too_large': 'That demo is too large (max 500 MB)',
   'demo.storage_failed': 'Uploading to storage failed',
 
+  'auth.name_required': 'Please enter your name',
+  'auth.email_required': 'Please enter your email',
+  'auth.email_invalid': 'That email looks invalid',
+  'auth.email_taken': 'That email is already registered',
+  'auth.password_required': 'Please enter a password',
+  'auth.password_mismatch': "Passwords don't match",
+  'auth.password_too_short': 'Password must be at least 8 characters',
+  'auth.invalid_credentials': 'Wrong email or password',
+
+  'team.name_required': 'Please name the team',
+  'team.email_required': 'Please enter an email',
+  'team.user_not_found': 'No user with that email',
+  'team.role_required': 'Please pick a role',
+  'team.role_invalid': 'That role is not allowed',
+  'team.already_member': 'That user is already on the team',
+
   'error.unknown': 'Something went wrong',
 }
 

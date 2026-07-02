@@ -16,14 +16,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="app">
-      <header className="app-head">
-        <h1>Clutchlab</h1>
-        <p className="tagline">Upload a CS2 demo and watch it get parsed.</p>
-      </header>
-
+    <>
       <UploadDemo onUploaded={handleUploaded} />
-
       <div className="layout">
         <aside>
           <h2>Matches</h2>
@@ -33,6 +27,6 @@ export default function DashboardPage() {
           <MatchDashboard matchId={selectedId} />
         </main>
       </div>
-    </div>
+    </>
   )
 }
