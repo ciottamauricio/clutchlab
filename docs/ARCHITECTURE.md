@@ -19,33 +19,39 @@ to ask of every candidate service:
 ## Topology
 
 ```
-                    host:8080
-                        │
-                   ┌────▼─────┐
-                   │  nginx   │  (reverse proxy / gateway)
-                   └──┬────┬──┘
-              /       │    │      /api/*
-        ┌─────────────▼┐  ┌▼──────────────┐
-        │   frontend   │  │      api       │  Laravel (CRUD)
-        │  React/Vite  │  │                │
-        └──────────────┘  └───┬────────┬───┘
-                         rpush │        │ pdo
-                         ┌─────▼──┐  ┌──▼───────┐
-                         │ redis  │  │ postgres │
-                         └────▲───┘  └──▲───────┘
-                        blpop │         │
-                        ┌─────┴─────────┴──┐
-                        │      worker      │  Go (demo parser)
-                        └────────┬─────────┘
-                                 │ get/put demo files
-                            ┌────▼────┐
-                            │  minio  │
-                            └─────────┘
+                              host:8080
+                                  │
+                            ┌─────▼──────┐
+                            │   nginx    │  (reverse proxy / gateway)
+                            └─┬───┬────┬─┘
+                    /         │   │    │  /api/*      /realtime/* (ws)
+        ┌─────────────────┐   │   │    │        ┌──────────────────┐
+        │    frontend     │◄──┘   │    └───────►│    realtime      │  Go (websockets)
+        │   React/Vite    │       │             │  tactics board   │
+        └─────────────────┘       ▼             └───┬──────────┬───┘
+                          ┌────────────────┐        │ pdo      │ validate token
+                          │      api       │  Laravel (CRUD)    │
+                          │                │        │           │
+                          └──┬────────┬────┘        │           │
+                        rpush │        │ pdo         │           │
+                        ┌─────▼──┐  ┌──▼─────────────▼───────────▼─┐
+                        │ redis  │  │           postgres           │
+                        └────▲───┘  └──────────────▲───────────────┘
+                       blpop │                      │
+                       ┌─────┴──────────────────────┴─┐
+                       │           worker             │  Go (demo parser)
+                       └──────┬────────────────┬──────┘
+                     get/put  │                │ index
+                   ┌──────────▼──┐        ┌─────▼────────┐
+                   │    minio    │        │ meilisearch  │
+                   └─────────────┘        └──────────────┘
 ```
 
-The `worker` has **no inbound HTTP and is not behind nginx**. It's a background consumer.
-The queue is the only thing connecting the web world and the compute world — that's the
-physical shape of the async boundary.
+Two of these services have **no inbound HTTP through nginx by the queue path**: the `worker`
+is a pure background consumer (its only input is the Redis queue). The `realtime` service *is*
+behind nginx but on a separate `/realtime/*` websocket route — it earns its own boundary for a
+different reason than the worker does (see below). The queue is the only thing connecting the
+web world and the compute world — that's the physical shape of the async boundary.
 
 ## Why each boundary earns its place
 
@@ -59,6 +65,48 @@ different workloads = the reason the boundary exists.
 - **PHP could** parse a demo, but slowly, single-threaded, with no mature library.
 - So Go exists *only* because of the parsing workload. That's a real justification, not a
   contrived one.
+
+### Realtime service vs the Laravel api (a *second*, differently-justified split)
+
+The tactics board is collaborative: several people drag pieces on a shared board and each
+sees the others move in real time. That's a **long-lived, high-concurrency websocket**
+workload — thousands of idle-but-open connections, tiny frequent messages, presence — which
+is exactly what PHP-FPM's request-per-worker model is worst at. Go's goroutine-per-connection
+model is built for it (`gorilla/websocket`, one hub, a goroutine per socket).
+
+The important part for the study: this is a **different justification** from the worker.
+
+- The **worker** is split because its work is *CPU-bound and slow* → async queue boundary.
+- The **realtime** service is split because its work is *connection-bound and long-lived* →
+  a persistent-connection boundary, still synchronous but over a socket, not the queue.
+
+Two Go services, two unrelated reasons — a good reminder that "use Go" isn't the boundary;
+the *workload shape* is. Note also it does **not** reuse the queue: realtime talks straight to
+Postgres (load/save the board) and validates the caller by checking their Sanctum token
+against the shared `personal_access_tokens` table. That cross-service auth-by-shared-table is
+itself a deliberate shortcut (see its known-limitations note in `api/docs/domains/tactics.md`).
+
+### Search: CQRS across a service boundary (Step 4)
+
+Search introduces a **read model** that is a *projection*, not a source of truth. Postgres
+(`kill_events`, `round_events`, written by the worker) stays authoritative; Meilisearch holds
+a denormalized, query-optimized copy. This is CQRS made physical: writes and reads live in
+different stores, kept in sync by projection, and **eventually consistent**.
+
+- The **worker** projects: after it persists events to Postgres it indexes the same documents
+  into Meilisearch. Indexing failure never fails a parse — the read model can lag or be
+  rebuilt; the source of truth must not be held hostage to it.
+- The read model is **fully rebuildable** from Postgres (`php artisan search:reindex`). That is
+  the whole point of keeping the source of truth separate: the projection is disposable.
+- The engine sits behind an **interface on both sides** — `App\Contracts\SearchIndex`
+  (Laravel, for querying) and `internal/search.Indexer` (Go, for projecting). Swapping
+  Meilisearch for Elasticsearch is rebinding one implementation per side, no domain changes.
+
+Why a separate engine at all rather than Postgres `LIKE`/full-text: relevance-ranked
+free-text + faceted filters at speed is a genuinely different workload from relational CRUD —
+the same "earn the boundary" test the worker passed, applied to a datastore instead of a
+runtime. The cost you take on in return is the one CQRS always charges: **staleness between
+write and read**, and the operational duty to be able to rebuild the projection.
 
 ### Sync vs async
 
