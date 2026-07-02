@@ -1,0 +1,163 @@
+# Matches domain
+
+## Purpose
+
+The core domain. A user uploads a Counter-Strike 2 demo file (`.dem`); it is parsed
+asynchronously by the Go worker; the resulting match summary and per-player
+scoreboard are read back for a dashboard.
+
+## Status
+
+Implemented in Step 1 (the vertical slice). **No authentication or ownership yet** —
+any client can upload and read any match. Ownership arrives with the Teams & Auth
+domain (Step 2).
+
+## Ubiquitous language
+
+- **Demo** — a `.dem` recording of a CS2 match, uploaded by the user. Stored as an
+  object in MinIO/S3, never in the database.
+- **Match** — a row in `matches`: the tracked lifecycle of one uploaded demo. The
+  Eloquent model is `GameMatch` because `Match` is a reserved word in PHP.
+- **Parse** — the Go worker reading the demo and extracting stats.
+- **Player stat** — one row per player per match in `match_player_stats`.
+- **demo_key** — the S3 object key of the stored demo (`<uuid>.dem`); also the value
+  that joins the web tier to the worker via the queue.
+
+## Entities
+
+### `GameMatch` — table `matches` (`app/Models/GameMatch.php`)
+
+| Field | Type | Written by | Notes |
+|---|---|---|---|
+| id | bigint | api | |
+| original_filename | string | api | client-provided name; display only |
+| demo_key | string, unique | api | S3 object key `<uuid>.dem` |
+| status | string | api + worker | lifecycle code (see below) |
+| error_code | string, nullable | worker | set only when `status = failed` |
+| map_name | string, nullable | worker | e.g. `de_mirage` |
+| score_ct / score_t | uint, nullable | worker | final round score per side |
+| ct_name / t_name | string, nullable | worker | clan/team names (often empty in demos) |
+| total_rounds | uint, nullable | worker | `score_ct + score_t` |
+| parsed_at | timestamp, nullable | worker | set on success |
+| created_at / updated_at | timestamps | api + worker | |
+
+### `MatchPlayerStat` — table `match_player_stats` (`app/Models/MatchPlayerStat.php`)
+
+One row per (match, player). **Written exclusively by the worker.**
+
+| Field | Type | Notes |
+|---|---|---|
+| match_id | fk → matches, cascade delete | |
+| steam_id | string | 64-bit SteamID kept as text (JS precision). Unique with `match_id`. |
+| name | string | player display name |
+| team_side | string, nullable | `CT` / `T` at match end (empty if player left before end) |
+| kills / deaths / assists / headshots | uint | tallied from Kill events |
+
+No timestamps on this table.
+
+## Lifecycle
+
+```
+queued ──▶ parsing ──▶ parsed
+                   └──▶ failed   (error_code set)
+```
+
+- **queued** — set by the api the instant the demo is stored and the job enqueued.
+- **parsing** — set by the worker when it pulls the job.
+- **parsed** — terminal success: summary + player stats populated, `parsed_at` set,
+  `error_code` cleared.
+- **failed** — terminal failure: `error_code` explains why; summary/stats absent.
+
+Transition rules:
+
+- Only the **worker** moves a match out of `queued`.
+- Terminal states (`parsed`, `failed`) are only produced by the worker.
+- A `failed` (or crash-stuck `parsing`) match can be retried by re-enqueuing the same
+  `{match_id, demo_key}` job; a successful reparse transitions it to `parsed` and
+  **replaces** its stats (see invariant 4).
+
+## Business rules & invariants
+
+1. **One upload ⇒ exactly one `matches` row (status `queued`) and exactly one enqueued
+   parse job.** (`app/Actions/UploadDemoAction.php`)
+2. `demo_key` is unique and is the only identifier shared with the worker. The demo
+   object lives in the `demos` bucket as `<uuid>.dem`.
+3. The queue payload is the cross-language contract `{ "match_id": int, "demo_key": string }`.
+   Change it on **both** sides in the same commit (Laravel `app/Queue/RedisParseQueue.php`,
+   Go `worker/main.go` `Job`).
+4. **Parsing is idempotent.** Reprocessing a match deletes its existing
+   `match_player_stats` before inserting, so a re-delivered or retried job never
+   doubles a player's stats. (worker `save()`)
+5. The backend never emits user-facing prose. `status` and `error_code` are **codes**;
+   the frontend localizes them.
+6. `steam_id` is a **string** end-to-end (DB, API, JSON) to avoid 64-bit precision
+   loss in JavaScript.
+7. Summary fields (map, scores, rounds) are best-effort from the demo; `null` is valid
+   until `status = parsed`.
+8. A match that is not `parsed` exposes an **empty `players` array**. Consumers must
+   treat non-`parsed` matches as "no stats yet", not "zero stats".
+
+## Validation (boundary) — `app/Http/Requests/UploadDemoRequest.php`
+
+`demo` field:
+
+- required
+- must be a file
+- extension must be `dem` (`extensions:dem`)
+- max size `config('clutch.max_demo_kb')` = **512000 KB (500 MB)**
+
+Emitted codes (never prose): `demo.required`, `demo.invalid`, `demo.wrong_extension`,
+`demo.file_too_large`. A storage failure surfaces `demo.storage_failed`.
+
+Infra limits that must stay **≥** this size: nginx `client_max_body_size` (512M) and
+PHP `upload_max_filesize` / `post_max_size` (512M, set in `api/php.ini`).
+
+## API surface
+
+Base path `/api` (nginx preserves the prefix).
+
+| Method | Path | Purpose | Notes |
+|---|---|---|---|
+| GET | `/matches` | list matches, newest first | `{ data: [...] }` |
+| POST | `/matches` | upload a demo | multipart field `demo`; returns 201; throttled 30/min |
+| GET | `/matches/{match}` | match detail + players | players ordered by kills desc |
+
+Responses use `MatchResource` / `MatchPlayerStatResource` (wrapped in `data`).
+`players` is present only when the relation is loaded (the detail endpoint).
+
+## Error codes
+
+**Status** (`status`): `queued`, `parsing`, `parsed`, `failed`.
+
+**`error_code`** (set by the worker when `status = failed`):
+
+| Code | Meaning |
+|---|---|
+| `parse_failed_download` | The demo object couldn't be fetched from storage. |
+| `parse_failed_corrupt` | The demo couldn't be parsed — corrupt/unsupported (includes parser panics). |
+| `parse_failed_internal` | Parsing succeeded but persisting the results failed. |
+
+**Upload** (HTTP 422/500): the `demo.*` codes listed under Validation.
+
+## Authorization & ownership
+
+None yet — any client can upload and read any match. Step 2 (Teams & Auth) introduces
+users/teams; at that point document here:
+
+- which entity **owns** a match (user vs team),
+- that reads/writes are scoped to owned matches,
+- that ownership violations return **403** (not 404).
+
+## Known limitations (intentional — future steps)
+
+- **Crash mid-parse:** if the worker dies after setting `parsing` but before a terminal
+  state, the match stays `parsing` forever. There is no visibility timeout or
+  dead-letter queue yet; recovery is a manual re-enqueue. (Reliability is a later lesson.)
+- **Shared database** with the worker — deliberate; to be split later.
+- Happy-path parsing depends on demoinfocs v5 and is verified against corrupt input,
+  not yet against a real demo end-to-end.
+
+## Related
+
+- Cross-service reasoning: repo-root `docs/ARCHITECTURE.md`.
+- Worker side of this domain: `worker/main.go`, `worker/parser.go`.
