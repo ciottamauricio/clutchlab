@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Contracts\DemoStorage;
 use App\Contracts\ParseQueue;
 use App\Models\GameMatch;
+use App\Models\User;
 use Illuminate\Http\UploadedFile;
 
 class UploadDemoAction
@@ -14,11 +15,11 @@ class UploadDemoAction
         private ParseQueue $queue,
     ) {}
 
-    public function execute(UploadedFile $file): GameMatch
+    public function execute(UploadedFile $file, User $owner): GameMatch
     {
         $key = $this->storage->store($file);
 
-        $match = GameMatch::create([
+        $match = $owner->matches()->create([
             'original_filename' => $file->getClientOriginalName(),
             'demo_key' => $key,
             'status' => 'queued',

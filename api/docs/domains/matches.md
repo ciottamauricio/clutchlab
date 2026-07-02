@@ -8,9 +8,8 @@ scoreboard are read back for a dashboard.
 
 ## Status
 
-Implemented in Step 1 (the vertical slice). **No authentication or ownership yet** —
-any client can upload and read any match. Ownership arrives with the Teams & Auth
-domain (Step 2).
+Implemented in Step 1 (vertical slice); made **user-owned** in Step 2. Every match belongs
+to the user who uploaded it, and access is owner-only (see Authorization & ownership).
 
 ## Ubiquitous language
 
@@ -30,6 +29,7 @@ domain (Step 2).
 | Field | Type | Written by | Notes |
 |---|---|---|---|
 | id | bigint | api | |
+| user_id | fk users, nullable | api | the uploader/owner (null for legacy pre-auth rows) |
 | original_filename | string | api | client-provided name; display only |
 | demo_key | string, unique | api | S3 object key `<uuid>.dem` |
 | status | string | api + worker | lifecycle code (see below) |
@@ -96,6 +96,8 @@ Transition rules:
    until `status = parsed`.
 8. A match that is not `parsed` exposes an **empty `players` array**. Consumers must
    treat non-`parsed` matches as "no stats yet", not "zero stats".
+9. A match belongs to the user who uploaded it (`user_id`); only the owner may view or
+   delete it (see Authorization & ownership).
 
 ## Validation (boundary) — `app/Http/Requests/UploadDemoRequest.php`
 
@@ -114,13 +116,14 @@ PHP `upload_max_filesize` / `post_max_size` (512M, set in `api/php.ini`).
 
 ## API surface
 
-Base path `/api` (nginx preserves the prefix).
+Base path `/api` (nginx preserves the prefix). **All match endpoints require `auth:sanctum`**
+and are scoped to the authenticated owner.
 
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
-| GET | `/matches` | list matches, newest first | `{ data: [...] }` |
-| POST | `/matches` | upload a demo | multipart field `demo`; returns 201; throttled 30/min |
-| GET | `/matches/{match}` | match detail + players | players ordered by kills desc |
+| GET | `/matches` | list the caller's matches, newest first | `{ data: [...] }` |
+| POST | `/matches` | upload a demo | multipart field `demo`; sets owner; 201; throttled 30/min |
+| GET | `/matches/{match}` | match detail + players | owner only (403 otherwise); players by kills desc |
 
 Responses use `MatchResource` / `MatchPlayerStatResource` (wrapped in `data`).
 `players` is present only when the relation is loaded (the detail endpoint).
@@ -141,12 +144,13 @@ Responses use `MatchResource` / `MatchPlayerStatResource` (wrapped in `data`).
 
 ## Authorization & ownership
 
-None yet — any client can upload and read any match. Step 2 (Teams & Auth) introduces
-users/teams; at that point document here:
+Matches are **user-owned** (`user_id` = uploader), enforced by `GameMatchPolicy`:
 
-- which entity **owns** a match (user vs team),
-- that reads/writes are scoped to owned matches,
-- that ownership violations return **403** (not 404).
+- `view` / `delete` → allowed only when `match.user_id === user.id`.
+- The list endpoint returns only the caller's matches; the detail endpoint authorizes
+  `view` and returns **403** for someone else's match (not 404).
+- All match endpoints require a valid bearer token (`auth:sanctum`). See
+  [teams-auth.md](teams-auth.md).
 
 ## Known limitations (intentional — future steps)
 

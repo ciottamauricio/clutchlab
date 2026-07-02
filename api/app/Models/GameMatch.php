@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 // "Match" is a reserved word in PHP, so the model is GameMatch on the `matches` table.
@@ -17,6 +18,11 @@ class GameMatch extends Model
         return [
             'parsed_at' => 'datetime',
         ];
+    }
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function playerStats(): HasMany
