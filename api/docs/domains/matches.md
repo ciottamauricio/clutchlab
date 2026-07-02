@@ -50,7 +50,7 @@ One row per (match, player). **Written exclusively by the worker.**
 | match_id | fk → matches, cascade delete | |
 | steam_id | string | 64-bit SteamID kept as text (JS precision). Unique with `match_id`. |
 | name | string | player display name |
-| team_side | string, nullable | `CT` / `T` at match end (empty if player left before end) |
+| team_side | string, nullable | `CT` / `T` from the last live round (sides swap at the half, so it's captured per round). Empty only if the player never appeared in a live round. |
 | kills / deaths / assists / headshots | uint | tallied from Kill events |
 
 No timestamps on this table.

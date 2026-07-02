@@ -48,8 +48,10 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 	p := demoinfocs.NewParser(r)
 	defer p.Close()
 
+	gs := p.GameState()
+
 	byID := map[uint64]*PlayerStat{}
-	stat := func(pl *common.Player) *PlayerStat {
+	ensure := func(pl *common.Player) *PlayerStat {
 		if pl == nil || pl.SteamID64 == 0 {
 			return nil
 		}
@@ -58,7 +60,9 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 			s = &PlayerStat{SteamID: pl.SteamID64}
 			byID[pl.SteamID64] = s
 		}
-		s.Name = pl.Name
+		if pl.Name != "" {
+			s.Name = pl.Name
+		}
 		return s
 	}
 
@@ -69,17 +73,31 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		mapName = m.GetMapName()
 	})
 
+	// Sides swap at the half and everyone is unassigned once the demo ends, so
+	// team_side can't be read afterwards. Snapshot each player's side at the start
+	// of every live round; the last round wins, which matches the final CT/T clan
+	// names below. This also enrolls players who never got a kill or death.
+	p.RegisterEventHandler(func(events.RoundFreezetimeEnd) {
+		for _, pl := range gs.Participants().Playing() {
+			if s := ensure(pl); s != nil {
+				if side := teamSide(pl.Team); side != "" {
+					s.TeamSide = side
+				}
+			}
+		}
+	})
+
 	p.RegisterEventHandler(func(e events.Kill) {
-		if s := stat(e.Killer); s != nil {
+		if s := ensure(e.Killer); s != nil {
 			s.Kills++
 			if e.IsHeadshot {
 				s.Headshots++
 			}
 		}
-		if s := stat(e.Victim); s != nil {
+		if s := ensure(e.Victim); s != nil {
 			s.Deaths++
 		}
-		if s := stat(e.Assister); s != nil {
+		if s := ensure(e.Assister); s != nil {
 			s.Assists++
 		}
 	})
@@ -88,7 +106,6 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		return nil, err
 	}
 
-	gs := p.GameState()
 	ct := gs.TeamCounterTerrorists()
 	t := gs.TeamTerrorists()
 
@@ -101,11 +118,6 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		TotalRounds: ct.Score() + t.Score(),
 	}
 
-	for _, pl := range gs.Participants().Playing() {
-		if s, ok := byID[pl.SteamID64]; ok {
-			s.TeamSide = teamSide(pl.Team)
-		}
-	}
 	for _, s := range byID {
 		res.Players = append(res.Players, s)
 	}
