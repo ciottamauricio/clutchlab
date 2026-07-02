@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import TeamsPage from './pages/TeamsPage'
+import TacticsPage from './pages/TacticsPage'
 import './App.css'
 
 function Protected({ children }) {
@@ -30,6 +31,7 @@ export default function App() {
           >
             <Route path="/" element={<DashboardPage />} />
             <Route path="/teams" element={<TeamsPage />} />
+            <Route path="/tactics" element={<TacticsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

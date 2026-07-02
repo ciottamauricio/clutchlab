@@ -126,6 +126,91 @@
   color: var(--text);
 }
 
+.tactic-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tactic-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tactic-open {
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.tactic-list li.active .tactic-open {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.board-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.add-piece {
+  background: transparent;
+  border: 1px solid;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.presence {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.board-field {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 39px, var(--border) 39px, var(--border) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, var(--border) 39px, var(--border) 40px),
+    var(--code-bg);
+  touch-action: none;
+  overflow: hidden;
+}
+
+.piece {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: grab;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.piece:active {
+  cursor: grabbing;
+}
+
 .app-head h1 {
   margin: 0;
   font-size: 40px;

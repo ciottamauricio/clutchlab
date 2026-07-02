@@ -34,6 +34,8 @@ const MESSAGES = {
   'team.role_invalid': 'That role is not allowed',
   'team.already_member': 'That user is already on the team',
 
+  'tactic.name_required': 'Please name the tactic',
+
   'error.unknown': 'Something went wrong',
 }
 
