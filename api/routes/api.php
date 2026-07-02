@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MatchController;
+use App\Http\Controllers\TacticController;
 use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,4 +24,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/teams/{team}', [TeamController::class, 'show']);
     Route::post('/teams/{team}/members', [TeamController::class, 'addMember']);
     Route::delete('/teams/{team}/members/{user}', [TeamController::class, 'removeMember']);
+
+    Route::get('/tactics', [TacticController::class, 'index']);
+    Route::post('/tactics', [TacticController::class, 'store']);
+    Route::get('/tactics/{tactic}', [TacticController::class, 'show']);
+    Route::put('/tactics/{tactic}', [TacticController::class, 'update']);
+    Route::delete('/tactics/{tactic}', [TacticController::class, 'destroy']);
 });

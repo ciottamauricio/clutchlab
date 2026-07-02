@@ -1,0 +1,5 @@
+root = "."
+[build]
+  cmd = "go build -o ./tmp/realtime ./cmd/realtime"
+  bin = "./tmp/realtime"
+  include_ext = ["go"]

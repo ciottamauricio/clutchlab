@@ -18,11 +18,14 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 
-# --- Go worker (worker/) ---
+# --- Go services (worker/, realtime/) ---
+# air builds to <svc>/tmp/; stray <svc>/<svc> comes from `go build ./...`
 worker/tmp/
 worker/*.exe
-# stray binary from `go build ./...` (air builds to worker/tmp/)
 worker/worker
+realtime/tmp/
+realtime/*.exe
+realtime/realtime
 
 # --- Editor / OS ---
 .vscode/*
