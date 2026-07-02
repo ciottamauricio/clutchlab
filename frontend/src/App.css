@@ -163,10 +163,52 @@ button:disabled {
 }
 
 .scoreboard th:first-child,
-.scoreboard td:first-child,
-.scoreboard th:nth-child(2),
-.scoreboard td:nth-child(2) {
+.scoreboard td:first-child {
   text-align: left;
+}
+
+.teams {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.team-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+
+.team-name {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.team-score {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 18px;
+  color: var(--text-h);
+}
+
+.side {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid;
+}
+
+.side-CT {
+  color: #4a90d9;
+  border-color: #4a90d9;
+}
+
+.side-T {
+  color: #d9a520;
+  border-color: #d9a520;
 }
 
 .muted {
