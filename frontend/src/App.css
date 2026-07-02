@@ -153,6 +153,47 @@
   background: var(--accent-bg);
 }
 
+.search-modes {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.search-modes button.active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.search-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.search-form input,
+.search-form select {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+.search-form input[type='number'] {
+  width: 100px;
+}
+
+.chk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text);
+}
+
 .board-toolbar {
   display: flex;
   gap: 8px;

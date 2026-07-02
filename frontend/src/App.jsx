@@ -6,6 +6,7 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import TeamsPage from './pages/TeamsPage'
 import TacticsPage from './pages/TacticsPage'
+import SearchPage from './pages/SearchPage'
 import './App.css'
 
 function Protected({ children }) {
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/teams" element={<TeamsPage />} />
             <Route path="/tactics" element={<TacticsPage />} />
+            <Route path="/search" element={<SearchPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

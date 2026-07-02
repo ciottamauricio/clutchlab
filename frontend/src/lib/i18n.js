@@ -36,6 +36,8 @@ const MESSAGES = {
 
   'tactic.name_required': 'Please name the tactic',
 
+  'search.unavailable': 'Search is temporarily unavailable',
+
   'error.unknown': 'Something went wrong',
 }
 

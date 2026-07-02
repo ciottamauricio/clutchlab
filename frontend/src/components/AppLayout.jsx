@@ -13,6 +13,7 @@ export default function AppLayout() {
           <NavLink to="/" end>Matches</NavLink>
           <NavLink to="/teams">Teams</NavLink>
           <NavLink to="/tactics">Tactics</NavLink>
+          <NavLink to="/search">Search</NavLink>
         </nav>
         <div className="user">
           <span className="muted">{user?.name}</span>
