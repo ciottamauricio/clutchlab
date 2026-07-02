@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
-import { useUploadDemo } from '../hooks/useUploadDemo'
-import { t } from '../i18n/messages'
+import { useUploadDemo } from './api'
+import { t } from '../../lib/i18n'
 
-export default function UploadForm({ onUploaded }) {
+export default function UploadDemo({ onUploaded }) {
   const [file, setFile] = useState(null)
   const inputRef = useRef(null)
 

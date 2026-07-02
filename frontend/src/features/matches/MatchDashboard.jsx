@@ -1,5 +1,5 @@
-import { useMatch } from '../hooks/useMatch'
-import { t } from '../i18n/messages'
+import { useMatch } from './api'
+import { t } from '../../lib/i18n'
 import Scoreboard from './Scoreboard'
 import StatusBadge from './StatusBadge'
 

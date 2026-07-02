@@ -1,6 +1,7 @@
-// The one place codes become words. Backend services (Laravel, Go) only ever
-// return codes; when real i18n lands this map becomes en.json / pt-BR.json
-// resource files behind react-i18next (docs/ARCHITECTURE.md).
+// The one place codes become words. Backend services (Laravel, Go) only ever return
+// codes; this is where they turn into text. i18n is deferred (docs/ARCHITECTURE.md),
+// so this is a placeholder: when the time comes it becomes react-i18next backed by
+// locales/en.json + locales/pt-BR.json, and t() keeps the same call signature.
 const MESSAGES = {
   queued: 'Queued',
   parsing: 'Parsing…',
