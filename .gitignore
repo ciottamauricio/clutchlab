@@ -21,6 +21,8 @@ frontend/.vite/
 # --- Go worker (worker/) ---
 worker/tmp/
 worker/*.exe
+# stray binary from `go build ./...` (air builds to worker/tmp/)
+worker/worker
 
 # --- Editor / OS ---
 .vscode/*
