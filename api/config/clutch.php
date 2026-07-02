@@ -7,4 +7,10 @@ return [
 
     // Hard cap on uploaded demo size, in kilobytes (validation rule + nginx/php limits).
     'max_demo_kb' => env('MAX_DEMO_KB', 512000),
+
+    // Meilisearch (search read model), shared with the Go worker (the writer).
+    'meili' => [
+        'host' => env('MEILI_HOST', 'http://meilisearch:7700'),
+        'key' => env('MEILI_MASTER_KEY', ''),
+    ],
 ];

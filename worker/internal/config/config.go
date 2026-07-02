@@ -13,6 +13,7 @@ type Config struct {
 	Queue                                  string
 	MinioEndpoint, MinioKey, MinioSecret   string
 	Bucket                                 string
+	MeiliHost, MeiliKey                    string
 }
 
 func Load() Config {
@@ -28,6 +29,8 @@ func Load() Config {
 		MinioKey:      env("AWS_ACCESS_KEY_ID", "minioadmin"),
 		MinioSecret:   env("AWS_SECRET_ACCESS_KEY", "minioadmin"),
 		Bucket:        env("AWS_BUCKET", "demos"),
+		MeiliHost:     env("MEILI_HOST", "http://meilisearch:7700"),
+		MeiliKey:      env("MEILI_MASTER_KEY", ""),
 	}
 }
 

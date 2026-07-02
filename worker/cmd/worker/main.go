@@ -10,6 +10,7 @@ import (
 	"clutchlab/worker/internal/matches"
 	"clutchlab/worker/internal/parser"
 	"clutchlab/worker/internal/queue"
+	"clutchlab/worker/internal/search"
 	"clutchlab/worker/internal/storage"
 )
 
@@ -23,6 +24,7 @@ type Job struct {
 type worker struct {
 	store   *matches.Store
 	storage *storage.Client
+	indexer search.Indexer
 }
 
 func main() {
@@ -52,7 +54,11 @@ func main() {
 	defer consumer.Close()
 	log.Print("connected to redis")
 
-	w := &worker{store: matches.NewStore(conn), storage: store}
+	w := &worker{
+		store:   matches.NewStore(conn),
+		storage: store,
+		indexer: search.NewMeili(cfg.MeiliHost, cfg.MeiliKey),
+	}
 
 	log.Printf("ready, blocking on redis list %q", cfg.Queue)
 	for {
@@ -98,4 +104,27 @@ func (w *worker) handle(ctx context.Context, payload string) {
 		return
 	}
 	log.Printf("match %d: parsed %s %d-%d (%d players)", job.MatchID, res.MapName, res.ScoreCT, res.ScoreT, len(res.Players))
+
+	// Project events into the search read model. Failure here is logged, not fatal —
+	// the match is already parsed and the index can be rebuilt from Postgres.
+	w.index(ctx, job.MatchID, res)
+}
+
+func (w *worker) index(ctx context.Context, matchID int64, res *parser.ParseResult) {
+	ownerID := w.store.OwnerID(matchID)
+	kills, rounds, err := w.store.SaveEvents(matchID, ownerID, res)
+	if err != nil {
+		log.Printf("match %d: save events failed: %v", matchID, err)
+		return
+	}
+	if err := w.indexer.DeleteMatch(ctx, matchID); err != nil {
+		log.Printf("match %d: index delete failed: %v", matchID, err)
+	}
+	if err := w.indexer.IndexKills(ctx, kills); err != nil {
+		log.Printf("match %d: index kills failed: %v", matchID, err)
+	}
+	if err := w.indexer.IndexRounds(ctx, rounds); err != nil {
+		log.Printf("match %d: index rounds failed: %v", matchID, err)
+	}
+	log.Printf("match %d: indexed %d kills, %d rounds", matchID, len(kills), len(rounds))
 }

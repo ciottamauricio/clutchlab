@@ -23,7 +23,7 @@ services:
     volumes:
       - ./api:/var/www/html
     env_file: .env
-    depends_on: [postgres, redis, minio]
+    depends_on: [postgres, redis, minio, meilisearch]
     networks: [clutchnet]
 
   worker:
@@ -31,7 +31,7 @@ services:
     volumes:
       - ./worker:/app
     env_file: .env
-    depends_on: [redis, minio, postgres]
+    depends_on: [redis, minio, postgres, meilisearch]
     networks: [clutchnet]
 
   # Real-time tactics service (Go, websockets). Reached only through nginx at /realtime.
@@ -57,6 +57,17 @@ services:
 
   redis:
     image: redis:7-alpine
+    networks: [clutchnet]
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.12
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meilidata:/meili_data
+    ports:
+      - "7700:7700"                # optional: Meili dashboard/API from host
     networks: [clutchnet]
 
   # One-shot: waits for MinIO, then creates the demos bucket so the first upload
@@ -87,6 +98,7 @@ services:
 volumes:
   pgdata:
   miniodata:
+  meilidata:
 
 networks:
   clutchnet:

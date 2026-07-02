@@ -1,6 +1,6 @@
-// Package parser turns a CS2 demo stream into a per-player scoreboard via
-// demoinfocs. This is the single "analysis pass" the roadmap grows later
-// (heatmaps, clutch detection) by adding more event handlers here.
+// Package parser turns a CS2 demo stream into a per-player scoreboard plus the
+// kill and round events that feed the search read model. This is the single
+// "analysis pass" the roadmap grows by adding more event handlers here.
 package parser
 
 import (
@@ -24,6 +24,29 @@ type PlayerStat struct {
 	Headshots int
 }
 
+type KillEvent struct {
+	Round         int
+	KillerSteamID uint64
+	KillerName    string
+	VictimSteamID uint64
+	VictimName    string
+	AssisterName  string
+	Weapon        string
+	Headshot      bool
+	Opening       bool
+	Side          string
+}
+
+type RoundEvent struct {
+	Round   int
+	Winner  string
+	Reason  string
+	CTAlive int
+	TAlive  int
+	CTBuy   string
+	TBuy    string
+}
+
 type ParseResult struct {
 	MapName     string
 	ScoreCT     int
@@ -32,6 +55,8 @@ type ParseResult struct {
 	TName       string
 	TotalRounds int
 	Players     []*PlayerStat
+	Kills       []KillEvent
+	Rounds      []RoundEvent
 }
 
 func ParseDemo(r io.Reader) (result *ParseResult, err error) {
@@ -49,6 +74,7 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 	defer p.Close()
 
 	gs := p.GameState()
+	res := &ParseResult{}
 
 	byID := map[uint64]*PlayerStat{}
 	ensure := func(pl *common.Player) *PlayerStat {
@@ -73,11 +99,24 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		mapName = m.GetMapName()
 	})
 
-	// Sides swap at the half and everyone is unassigned once the demo ends, so
-	// team_side can't be read afterwards. Snapshot each player's side at the start
-	// of every live round; the last round wins, which matches the final CT/T clan
-	// names below. This also enrolls players who never got a kill or death.
+	// Round bookkeeping. Warmup rounds are skipped so counts and events are real.
+	currentRound := 0
+	openingSeen := false
+	var ctBuy, tBuy string
+
 	p.RegisterEventHandler(func(events.RoundFreezetimeEnd) {
+		if gs.IsWarmupPeriod() {
+			return
+		}
+		currentRound++
+		openingSeen = false
+		ct := gs.TeamCounterTerrorists()
+		t := gs.TeamTerrorists()
+		ctBuy = classifyBuy(ct.FreezeTimeEndEquipmentValue())
+		tBuy = classifyBuy(t.FreezeTimeEndEquipmentValue())
+
+		// Sides swap at the half and everyone is unassigned once the demo ends, so
+		// snapshot team_side each round; the last live round wins.
 		for _, pl := range gs.Participants().Playing() {
 			if s := ensure(pl); s != nil {
 				if side := teamSide(pl.Team); side != "" {
@@ -88,6 +127,9 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 	})
 
 	p.RegisterEventHandler(func(e events.Kill) {
+		if gs.IsWarmupPeriod() {
+			return
+		}
 		if s := ensure(e.Killer); s != nil {
 			s.Kills++
 			if e.IsHeadshot {
@@ -100,6 +142,51 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		if s := ensure(e.Assister); s != nil {
 			s.Assists++
 		}
+
+		if currentRound == 0 {
+			return
+		}
+		opening := !openingSeen
+		openingSeen = true
+		res.Kills = append(res.Kills, KillEvent{
+			Round:         currentRound,
+			KillerSteamID: steamID(e.Killer),
+			KillerName:    name(e.Killer),
+			VictimSteamID: steamID(e.Victim),
+			VictimName:    name(e.Victim),
+			AssisterName:  name(e.Assister),
+			Weapon:        weaponName(e.Weapon),
+			Headshot:      e.IsHeadshot,
+			Opening:       opening,
+			Side:          teamSide(killerTeam(e.Killer)),
+		})
+	})
+
+	p.RegisterEventHandler(func(e events.RoundEnd) {
+		if gs.IsWarmupPeriod() || currentRound == 0 {
+			return
+		}
+		ctAlive, tAlive := 0, 0
+		for _, pl := range gs.Participants().Playing() {
+			if !pl.IsAlive() {
+				continue
+			}
+			switch pl.Team {
+			case common.TeamCounterTerrorists:
+				ctAlive++
+			case common.TeamTerrorists:
+				tAlive++
+			}
+		}
+		res.Rounds = append(res.Rounds, RoundEvent{
+			Round:   currentRound,
+			Winner:  teamSide(e.Winner),
+			Reason:  reasonString(e.Reason),
+			CTAlive: ctAlive,
+			TAlive:  tAlive,
+			CTBuy:   ctBuy,
+			TBuy:    tBuy,
+		})
 	})
 
 	if err := p.ParseToEnd(); err != nil {
@@ -108,20 +195,38 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 
 	ct := gs.TeamCounterTerrorists()
 	t := gs.TeamTerrorists()
-
-	res := &ParseResult{
-		MapName:     cleanMapName(mapName),
-		ScoreCT:     ct.Score(),
-		ScoreT:      t.Score(),
-		CTName:      ct.ClanName(),
-		TName:       t.ClanName(),
-		TotalRounds: ct.Score() + t.Score(),
-	}
+	res.MapName = cleanMapName(mapName)
+	res.ScoreCT = ct.Score()
+	res.ScoreT = t.Score()
+	res.CTName = ct.ClanName()
+	res.TName = t.ClanName()
+	res.TotalRounds = ct.Score() + t.Score()
 	for _, s := range byID {
 		res.Players = append(res.Players, s)
 	}
 
 	return res, nil
+}
+
+func steamID(pl *common.Player) uint64 {
+	if pl == nil {
+		return 0
+	}
+	return pl.SteamID64
+}
+
+func name(pl *common.Player) string {
+	if pl == nil {
+		return ""
+	}
+	return pl.Name
+}
+
+func killerTeam(pl *common.Player) common.Team {
+	if pl == nil {
+		return common.TeamUnassigned
+	}
+	return pl.Team
 }
 
 // CS2 ServerInfo can report the map as a workshop path (e.g. "workshop/123/de_nuke");
@@ -142,4 +247,44 @@ func teamSide(t common.Team) string {
 	default:
 		return ""
 	}
+}
+
+func reasonString(r events.RoundEndReason) string {
+	switch r {
+	case events.RoundEndReasonTargetBombed:
+		return "bomb_exploded"
+	case events.RoundEndReasonBombDefused:
+		return "bomb_defused"
+	case events.RoundEndReasonCTWin, events.RoundEndReasonTerroristsWin:
+		return "elimination"
+	case events.RoundEndReasonTargetSaved:
+		return "time"
+	default:
+		return "other"
+	}
+}
+
+// classifyBuy is a rough heuristic on a team's freeze-time equipment value.
+func classifyBuy(value int) string {
+	switch {
+	case value < 5000:
+		return "eco"
+	case value < 18000:
+		return "force"
+	default:
+		return "full"
+	}
+}
+
+func weaponName(eq *common.Equipment) string {
+	if eq == nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, r := range strings.ToLower(eq.String()) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

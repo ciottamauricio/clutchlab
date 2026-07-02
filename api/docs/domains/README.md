@@ -12,7 +12,7 @@ same change when rules change.
 | Matches — demo upload + parsing | Implemented (Step 1) | [matches.md](matches.md) |
 | Teams & Auth — roles, ownership | Planned (Step 2) | [teams-auth.md](teams-auth.md) |
 | Tactics board | Implemented (Step 3) | [tactics.md](tactics.md) |
-| Search | Planned (Step 4) | [search.md](search.md) |
+| Search | Implemented (Step 4) | [search.md](search.md) |
 | Notifications | Planned (Step 5) | [notifications.md](notifications.md) |
 
 ## What "business rules" means here
