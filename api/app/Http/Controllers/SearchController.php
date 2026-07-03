@@ -11,12 +11,13 @@ class SearchController extends Controller
     // Allowed filter fields per index and how to coerce the query-string value so it
     // matches the type stored in Meilisearch.
     private const KILL_FILTERS = [
-        'map' => 'string', 'weapon' => 'string', 'side' => 'string',
+        'match_id' => 'int', 'map' => 'string', 'weapon' => 'string', 'side' => 'string',
+        'killer_name' => 'string', 'victim_name' => 'string',
         'headshot' => 'bool', 'opening' => 'bool', 'round' => 'int',
     ];
 
     private const ROUND_FILTERS = [
-        'map' => 'string', 'winner' => 'string', 'reason' => 'string',
+        'match_id' => 'int', 'map' => 'string', 'winner' => 'string', 'reason' => 'string',
         'ct_buy' => 'string', 't_buy' => 'string',
         'ct_alive' => 'int', 't_alive' => 'int', 'round' => 'int',
     ];

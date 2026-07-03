@@ -10,7 +10,7 @@ class MeilisearchIndex implements SearchIndex
     // Filterable/searchable/sortable attributes per index (used by configure()).
     private const SETTINGS = [
         'kills' => [
-            'filterable' => ['owner_id', 'match_id', 'map', 'weapon', 'headshot', 'opening', 'side', 'round'],
+            'filterable' => ['owner_id', 'match_id', 'map', 'weapon', 'headshot', 'opening', 'side', 'round', 'killer_name', 'victim_name'],
             'searchable' => ['killer_name', 'victim_name', 'weapon', 'map'],
             'sortable' => ['round'],
         ],

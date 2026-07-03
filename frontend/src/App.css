@@ -1,39 +1,86 @@
-.app {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 0 20px 64px;
+.app-shell {
+  min-height: 100vh;
 }
 
+/* Full-bleed sticky bar: spans the viewport, background + blur so page content
+   scrolls under it; the inner row is what stays width-constrained. */
 .app-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  width: 100%;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  -webkit-backdrop-filter: saturate(1.4) blur(10px);
+}
+
+.app-bar-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 14px 24px;
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 16px 0;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--border);
+  gap: 32px;
 }
 
-.app-bar .brand {
+.app-main {
+  padding: 32px 0 80px;
+}
+
+.app-main-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-weight: 700;
-  font-size: 20px;
+  font-size: 21px;
+  letter-spacing: -0.02em;
   color: var(--text-h);
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #4a90d9));
 }
 
 .nav {
   display: flex;
-  gap: 14px;
+  gap: 6px;
 }
 
 .nav a {
   color: var(--text);
   text-decoration: none;
-  padding: 4px 2px;
-  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.nav a:hover {
+  color: var(--text-h);
+  background: color-mix(in srgb, var(--text-h) 6%, transparent);
 }
 
 .nav a.active {
-  color: var(--text-h);
-  border-bottom-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
 }
 
 .app-bar .user {
@@ -41,6 +88,22 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .app-bar-inner {
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    padding: 12px 16px;
+  }
+  .nav {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+  }
+  .app-main-inner {
+    padding: 0 16px;
+  }
 }
 
 .link-btn {
@@ -151,6 +214,18 @@
 .tactic-list li.active .tactic-open {
   border-color: var(--accent);
   background: var(--accent-bg);
+}
+
+.match-search {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.match-search h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: var(--text-h);
 }
 
 .search-modes {

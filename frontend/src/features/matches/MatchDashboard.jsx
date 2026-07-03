@@ -2,6 +2,7 @@ import { useMatch } from './api'
 import { t } from '../../lib/i18n'
 import Scoreboard from './Scoreboard'
 import StatusBadge from './StatusBadge'
+import MatchSearch from '../search/MatchSearch'
 
 export default function MatchDashboard({ matchId }) {
   const { match, error } = useMatch(matchId)
@@ -48,6 +49,7 @@ export default function MatchDashboard({ matchId }) {
             ))}
             <Scoreboard title="Unassigned" side="" score={null} players={unassigned} />
           </div>
+          <MatchSearch matchId={matchId} players={players} />
         </>
       )}
     </section>

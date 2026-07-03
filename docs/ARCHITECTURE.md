@@ -33,7 +33,7 @@ to ask of every candidate service:
                           │      api       │  Laravel (CRUD)    │
                           │                │        │           │
                           └──┬────────┬────┘        │           │
-                        rpush │        │ pdo         │           │
+                       rpush │        │ pdo         │           │
                         ┌─────▼──┐  ┌──▼─────────────▼───────────▼─┐
                         │ redis  │  │           postgres           │
                         └────▲───┘  └──────────────▲───────────────┘

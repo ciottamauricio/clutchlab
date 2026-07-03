@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSearch } from '../features/search/api'
 import KillsTable from '../features/search/KillsTable'
 import RoundsTable from '../features/search/RoundsTable'
+import WeaponSelect from '../features/search/WeaponSelect'
 import { t } from '../lib/i18n'
 
 const SIDES = ['', 'CT', 'T']
@@ -34,7 +35,7 @@ export default function SearchPage() {
 
         {kind === 'kills' ? (
           <>
-            <input placeholder="weapon (e.g. ak47)" value={kf.weapon} onChange={(e) => setKf({ ...kf, weapon: e.target.value })} />
+            <WeaponSelect value={kf.weapon} onChange={(v) => setKf({ ...kf, weapon: v })} />
             <select value={kf.side} onChange={(e) => setKf({ ...kf, side: e.target.value })}>
               {SIDES.map((s) => <option key={s} value={s}>{s || 'any side'}</option>)}
             </select>

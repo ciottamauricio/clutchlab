@@ -76,8 +76,10 @@ scoreboard's delete-then-insert.
 Two indexes, `kills` and `rounds`, whose documents mirror the rows above (the row `id` is the
 Meili document id). Configured by `php artisan search:setup`:
 
-- **kills** — filterable: `owner_id, match_id, map, weapon, headshot, opening, side, round`;
-  searchable: `killer_name, victim_name, weapon, map`; sortable: `round`.
+- **kills** — filterable: `owner_id, match_id, map, weapon, headshot, opening, side, round,
+  killer_name, victim_name`; searchable: `killer_name, victim_name, weapon, map`; sortable:
+  `round`. (`killer_name`/`victim_name` are both filterable *and* searchable: filter for an
+  exact player, free-text for fuzzy.)
 - **rounds** — filterable: `owner_id, match_id, map, winner, reason, ct_alive, t_alive, ct_buy, t_buy, round`;
   searchable: `map, reason`; sortable: `round`.
 
@@ -109,6 +111,10 @@ Query params: `q` (free text) plus filter params matching the filterable attribu
 (e.g. `weapon=awp&opening=1&map=de_mirage`, or `winner=CT&ct_alive=5&t_alive=3`). The api
 **always** adds `owner_id = <auth user>` — never trust a client-supplied owner. Response is
 `{ data: [...hits], total }`.
+
+The same endpoints back the **per-match search** on the match dashboard: the UI pins
+`match_id=<selected match>` and offers `killer_name` (drawn from that match's roster) + weapon
+so a user can ask "this player's AWP kills in this match" without free-text guessing.
 
 ## Interfaces (the swap point)
 
