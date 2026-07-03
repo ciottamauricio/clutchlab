@@ -12,7 +12,7 @@ class SearchController extends Controller
     // matches the type stored in Meilisearch.
     private const KILL_FILTERS = [
         'match_id' => 'int', 'map' => 'string', 'weapon' => 'string', 'side' => 'string',
-        'killer_name' => 'string', 'victim_name' => 'string',
+        'killer_team' => 'string', 'killer_name' => 'string', 'victim_name' => 'string',
         'headshot' => 'bool', 'opening' => 'bool', 'round' => 'int',
     ];
 

@@ -7,10 +7,11 @@ import { t } from '../../lib/i18n'
 const SIDES = ['', 'CT', 'T']
 
 // Kill search scoped to a single match. Unlike the global Search page, match_id is
-// pinned here and the player list is drawn from this match's roster, so you can ask
-// "this player's AWP kills in this match" without free-text guessing.
-export default function MatchSearch({ matchId, players }) {
-  const [f, setF] = useState({ killer_name: '', weapon: '', side: '', headshot: false, opening: false })
+// pinned here and the player/team pickers are drawn from this match, so you can ask
+// "this team's AWP kills in this match" without free-text guessing. `killer_team` filters
+// by the killer's whole-match team (stable across the side swap); `side` is the per-kill side.
+export default function MatchSearch({ matchId, players, teams }) {
+  const [f, setF] = useState({ killer_name: '', weapon: '', killer_team: '', side: '', headshot: false, opening: false })
   const { hits, total, loading, error, ran, run } = useSearch()
 
   const names = [...new Set(players.map((p) => p.name).filter(Boolean))].sort()
@@ -29,6 +30,10 @@ export default function MatchSearch({ matchId, players }) {
           {names.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
         <WeaponSelect value={f.weapon} onChange={(v) => setF({ ...f, weapon: v })} />
+        <select value={f.killer_team} onChange={(e) => setF({ ...f, killer_team: e.target.value })}>
+          <option value="">any team</option>
+          {teams.map((tm) => <option key={tm.side} value={tm.side}>{tm.name}</option>)}
+        </select>
         <select value={f.side} onChange={(e) => setF({ ...f, side: e.target.value })}>
           {SIDES.map((s) => <option key={s} value={s}>{s || 'any side'}</option>)}
         </select>

@@ -24,6 +24,7 @@ type KillDoc struct {
 	Headshot   bool   `json:"headshot"`
 	Opening    bool   `json:"opening"`
 	Side       string `json:"side"`
+	KillerTeam string `json:"killer_team"`
 }
 
 type RoundDoc struct {

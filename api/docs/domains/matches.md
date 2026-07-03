@@ -124,9 +124,21 @@ and are scoped to the authenticated owner.
 | GET | `/matches` | list the caller's matches, newest first | `{ data: [...] }` |
 | POST | `/matches` | upload a demo | multipart field `demo`; sets owner; 201; throttled 30/min |
 | GET | `/matches/{match}` | match detail + players | owner only (403 otherwise); players by kills desc |
+| GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | owner only; see [heatmap.md](heatmap.md) |
+| POST | `/matches/{match}/reparse` | re-enqueue the stored demo | owner only; resets to `queued`; throttled 30/min; `ReparseMatchAction` |
+| DELETE | `/matches/{match}` | delete a match | owner only (403 otherwise); 204; `DeleteMatchAction` |
 
 Responses use `MatchResource` / `MatchPlayerStatResource` (wrapped in `data`).
 `players` is present only when the relation is loaded (the detail endpoint).
+
+**Reparse** (`ReparseMatchAction`) re-runs the parse on the demo already in storage — no
+re-upload. It resets the match to `queued`, re-enqueues `{match_id, demo_key}`, and the worker
+rewrites stats/events idempotently (delete-then-insert). This is how older matches backfill
+newer analysis (e.g. kill positions added after they were first parsed).
+
+**Delete** (`DeleteMatchAction`) removes the read-model docs (Meili) and the stored demo,
+then deletes the row; `kill_events` / `round_events` / `match_player_stats` cascade via FK. It
+is the only way to remove a match — there is no soft-delete.
 
 ## Error codes
 

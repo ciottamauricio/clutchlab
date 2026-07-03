@@ -3,6 +3,9 @@ import { api } from '../../lib/api'
 
 const listMatches = () => api.get('/matches')
 const getMatch = (id) => api.get(`/matches/${id}`)
+const getKillPositions = (id) => api.get(`/matches/${id}/kill-positions`)
+const deleteMatch = (id) => api.delete(`/matches/${id}`)
+const reparseMatch = (id) => api.post(`/matches/${id}/reparse`)
 const uploadDemo = (file) => {
   const form = new FormData()
   form.append('demo', file)
@@ -47,6 +50,10 @@ export function useMatches(pollMs = 3000) {
 export function useMatch(id, pollMs = 2000) {
   const [match, setMatch] = useState(null)
   const [error, setError] = useState(null)
+  // Bumping this restarts the effect — used after a reparse flips a terminal match back
+  // to `queued`, so polling resumes until it reaches `parsed` again.
+  const [reloadKey, setReloadKey] = useState(0)
+  const reload = useCallback(() => setReloadKey((k) => k + 1), [])
 
   useEffect(() => {
     if (!id) {
@@ -76,9 +83,75 @@ export function useMatch(id, pollMs = 2000) {
       active = false
       clearTimeout(timer)
     }
-  }, [id, pollMs])
+  }, [id, pollMs, reloadKey])
 
-  return { match, error }
+  return { match, error, reload }
+}
+
+export function useReparseMatch(onReparsed) {
+  const [reparsing, setReparsing] = useState(false)
+  const [error, setError] = useState(null)
+
+  const reparse = useCallback(async (id) => {
+    setReparsing(true)
+    setError(null)
+    try {
+      await reparseMatch(id)
+      onReparsed?.(id)
+    } catch (e) {
+      setError(e.code ?? 'error.unknown')
+    } finally {
+      setReparsing(false)
+    }
+  }, [onReparsed])
+
+  return { reparse, reparsing, error }
+}
+
+// Loads every kill position for a match once (see api/docs/domains/heatmap.md); the
+// heatmap filters this set client-side, so no refetch on filter changes.
+export function useKillPositions(id) {
+  const [data, setData] = useState({ map: null, points: [] })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!id) {
+      setData({ map: null, points: [] })
+      return
+    }
+    let active = true
+    setLoading(true)
+    getKillPositions(id)
+      .then((d) => active && setData({ map: d.map, points: d.points ?? [] }))
+      .catch((e) => active && setError(e.code ?? 'error.unknown'))
+      .finally(() => active && setLoading(false))
+    return () => {
+      active = false
+    }
+  }, [id])
+
+  return { ...data, loading, error }
+}
+
+export function useDeleteMatch(onDeleted) {
+  const [deletingId, setDeletingId] = useState(null)
+  const [error, setError] = useState(null)
+
+  const remove = useCallback(async (id) => {
+    setDeletingId(id)
+    setError(null)
+    try {
+      await deleteMatch(id)
+      onDeleted?.(id)
+    } catch (e) {
+      setError(e.code ?? 'error.unknown')
+    } finally {
+      setDeletingId(null)
+    }
+  }, [onDeleted])
+
+  return { remove, deletingId, error }
 }
 
 export function useUploadDemo(onUploaded) {

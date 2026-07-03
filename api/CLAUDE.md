@@ -21,6 +21,7 @@ changes.** The code follows the doc, not the other way around.
 | Teams & Auth — roles, ownership | Planned (Step 2) | `docs/domains/teams-auth.md` |
 | Tactics board | Implemented (Step 3) | `docs/domains/tactics.md` |
 | Search | Implemented (Step 4) | `docs/domains/search.md` |
+| Kill heatmap — kill positions on radar | Implemented | `docs/domains/heatmap.md` |
 | Notifications | Planned (Step 5) | `docs/domains/notifications.md` |
 
 ## API conventions (non-negotiable)

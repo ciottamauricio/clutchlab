@@ -10,7 +10,7 @@ class MeilisearchIndex implements SearchIndex
     // Filterable/searchable/sortable attributes per index (used by configure()).
     private const SETTINGS = [
         'kills' => [
-            'filterable' => ['owner_id', 'match_id', 'map', 'weapon', 'headshot', 'opening', 'side', 'round', 'killer_name', 'victim_name'],
+            'filterable' => ['owner_id', 'match_id', 'map', 'weapon', 'headshot', 'opening', 'side', 'killer_team', 'round', 'killer_name', 'victim_name'],
             'searchable' => ['killer_name', 'victim_name', 'weapon', 'map'],
             'sortable' => ['round'],
         ],
@@ -52,7 +52,7 @@ class MeilisearchIndex implements SearchIndex
 
     public function deleteByMatch(string $index, int $matchId): void
     {
-        $this->client->index($index)->deleteDocumentsByFilter('match_id = '.$matchId);
+        $this->client->index($index)->deleteDocuments(['filter' => 'match_id = '.$matchId]);
     }
 
     public function configure(): void

@@ -23,4 +23,10 @@ class S3DemoStorage implements DemoStorage
 
         return $key;
     }
+
+    public function delete(string $key): void
+    {
+        // delete() on a missing object is a no-op, so this is naturally idempotent.
+        $this->disk->delete($key);
+    }
 }

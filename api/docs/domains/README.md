@@ -13,6 +13,7 @@ same change when rules change.
 | Teams & Auth — roles, ownership | Planned (Step 2) | [teams-auth.md](teams-auth.md) |
 | Tactics board | Implemented (Step 3) | [tactics.md](tactics.md) |
 | Search | Implemented (Step 4) | [search.md](search.md) |
+| Kill heatmap — kill positions on the radar | Implemented | [heatmap.md](heatmap.md) |
 | Notifications | Planned (Step 5) | [notifications.md](notifications.md) |
 
 ## What "business rules" means here

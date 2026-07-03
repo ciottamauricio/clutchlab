@@ -32,6 +32,7 @@ class SearchReindex extends Command
                 'headshot' => (bool) $r->headshot,
                 'opening' => (bool) $r->opening,
                 'side' => $r->side,
+                'killer_team' => $r->killer_team,
             ])->all();
             $index->indexDocuments('kills', $docs);
             $kills += count($docs);

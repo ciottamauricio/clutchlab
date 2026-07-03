@@ -35,6 +35,9 @@ type KillEvent struct {
 	Headshot      bool
 	Opening       bool
 	Side          string
+	KillerTeam    string
+	VictimX       float64
+	VictimY       float64
 }
 
 type RoundEvent struct {
@@ -148,6 +151,7 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		}
 		opening := !openingSeen
 		openingSeen = true
+		vx, vy := victimPos(e.Victim)
 		res.Kills = append(res.Kills, KillEvent{
 			Round:         currentRound,
 			KillerSteamID: steamID(e.Killer),
@@ -159,6 +163,8 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 			Headshot:      e.IsHeadshot,
 			Opening:       opening,
 			Side:          teamSide(killerTeam(e.Killer)),
+			VictimX:       vx,
+			VictimY:       vy,
 		})
 	})
 
@@ -205,6 +211,15 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		res.Players = append(res.Players, s)
 	}
 
+	// Attribute each kill to the killer's team. A team keeps its roster across the
+	// half-time side swap, so a player's final team_side is a stable team id for the
+	// whole match — unlike the per-kill Side, which flips at the half.
+	for i := range res.Kills {
+		if s, ok := byID[res.Kills[i].KillerSteamID]; ok {
+			res.Kills[i].KillerTeam = s.TeamSide
+		}
+	}
+
 	return res, nil
 }
 
@@ -227,6 +242,16 @@ func killerTeam(pl *common.Player) common.Team {
 		return common.TeamUnassigned
 	}
 	return pl.Team
+}
+
+// victimPos is the victim's world X/Y at death. Raw coordinates only — mapping them onto a
+// radar image is a render concern the frontend owns (api/docs/domains/heatmap.md).
+func victimPos(pl *common.Player) (float64, float64) {
+	if pl == nil {
+		return 0, 0
+	}
+	p := pl.Position()
+	return p.X, p.Y
 }
 
 // CS2 ServerInfo can report the map as a workshop path (e.g. "workshop/123/de_nuke");

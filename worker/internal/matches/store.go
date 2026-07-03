@@ -95,8 +95,8 @@ func (s *Store) SaveEvents(matchID, ownerID int64, res *parser.ParseResult) ([]s
 	owner := ownerArg(ownerID)
 
 	killStmt, err := tx.Prepare(`INSERT INTO kill_events
-		(match_id, owner_id, map, round, killer_steam_id, killer_name, victim_steam_id, victim_name, assister_name, weapon, headshot, opening, side)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`)
+		(match_id, owner_id, map, round, killer_steam_id, killer_name, victim_steam_id, victim_name, assister_name, weapon, headshot, opening, side, killer_team, victim_x, victim_y)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -107,13 +107,14 @@ func (s *Store) SaveEvents(matchID, ownerID int64, res *parser.ParseResult) ([]s
 		var id int64
 		if err := killStmt.QueryRow(matchID, owner, res.MapName, k.Round,
 			steamStr(k.KillerSteamID), k.KillerName, steamStr(k.VictimSteamID), k.VictimName,
-			k.AssisterName, k.Weapon, k.Headshot, k.Opening, k.Side).Scan(&id); err != nil {
+			k.AssisterName, k.Weapon, k.Headshot, k.Opening, k.Side, k.KillerTeam,
+			nullPos(k.VictimX), nullPos(k.VictimY)).Scan(&id); err != nil {
 			return nil, nil, err
 		}
 		kills = append(kills, search.KillDoc{
 			ID: id, MatchID: matchID, OwnerID: ownerID, Map: res.MapName, Round: k.Round,
 			KillerName: k.KillerName, VictimName: k.VictimName, Weapon: k.Weapon,
-			Headshot: k.Headshot, Opening: k.Opening, Side: k.Side,
+			Headshot: k.Headshot, Opening: k.Opening, Side: k.Side, KillerTeam: k.KillerTeam,
 		})
 	}
 
@@ -143,6 +144,15 @@ func (s *Store) SaveEvents(matchID, ownerID int64, res *parser.ParseResult) ([]s
 		return nil, nil, err
 	}
 	return kills, rounds, nil
+}
+
+// nullPos stores NULL for a missing position (both coords 0) so the heatmap can skip it,
+// rather than pinning the point to the map origin.
+func nullPos(v float64) any {
+	if v == 0 {
+		return nil
+	}
+	return v
 }
 
 func steamStr(id uint64) string {

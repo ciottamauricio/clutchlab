@@ -16,4 +16,9 @@ class GameMatchPolicy
     {
         return $match->user_id === $user->id;
     }
+
+    public function reparse(User $user, GameMatch $match): bool
+    {
+        return $match->user_id === $user->id;
+    }
 }

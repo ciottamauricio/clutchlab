@@ -19,6 +19,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/matches', [MatchController::class, 'index']);
     Route::post('/matches', [MatchController::class, 'store'])->middleware('throttle:30,1');
     Route::get('/matches/{match}', [MatchController::class, 'show']);
+    Route::get('/matches/{match}/kill-positions', [MatchController::class, 'killPositions']);
+    Route::post('/matches/{match}/reparse', [MatchController::class, 'reparse'])->middleware('throttle:30,1');
+    Route::delete('/matches/{match}', [MatchController::class, 'destroy']);
 
     Route::get('/teams', [TeamController::class, 'index']);
     Route::post('/teams', [TeamController::class, 'store']);

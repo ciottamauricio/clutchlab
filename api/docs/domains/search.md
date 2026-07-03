@@ -76,10 +76,13 @@ scoreboard's delete-then-insert.
 Two indexes, `kills` and `rounds`, whose documents mirror the rows above (the row `id` is the
 Meili document id). Configured by `php artisan search:setup`:
 
-- **kills** — filterable: `owner_id, match_id, map, weapon, headshot, opening, side, round,
-  killer_name, victim_name`; searchable: `killer_name, victim_name, weapon, map`; sortable:
-  `round`. (`killer_name`/`victim_name` are both filterable *and* searchable: filter for an
-  exact player, free-text for fuzzy.)
+- **kills** — filterable: `owner_id, match_id, map, weapon, headshot, opening, side,
+  killer_team, round, killer_name, victim_name`; searchable: `killer_name, victim_name,
+  weapon, map`; sortable: `round`. (`killer_name`/`victim_name` are both filterable *and*
+  searchable: filter for an exact player, free-text for fuzzy.) `side` is the side **at the
+  moment of the kill**; `killer_team` is the killer's **whole-match team** (their stable final
+  side), which is what the per-match UI filters by — a team keeps its roster across the
+  half-time swap, so `side` alone can't isolate one team's kills.
 - **rounds** — filterable: `owner_id, match_id, map, winner, reason, ct_alive, t_alive, ct_buy, t_buy, round`;
   searchable: `map, reason`; sortable: `round`.
 
