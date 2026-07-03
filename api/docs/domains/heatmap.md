@@ -22,9 +22,21 @@ world-coordinate columns and one read endpoint. No new store — positions live 
 |---|---|---|---|
 | victim_x | double, nullable | worker | victim world X at death (`Player.Position()`) |
 | victim_y | double, nullable | worker | victim world Y at death |
+| hitgroups | jsonb, nullable | worker | body-zone damage of the killing engagement (see below) |
 
 Nullable because kills parsed before this feature (or on a demo where a position is
 unavailable) have no coordinates; the heatmap simply skips those points.
+
+### Hitgroups (body hitgroup map)
+`hitgroups` is a JSON object of body zone → total health damage the **killer dealt the
+victim in that round**, aggregated by the worker from `events.PlayerHurt`. Zones collapse
+demoinfocs hit groups into five: `head` (head+neck), `chest`, `stomach`, `arms` (left+right),
+`legs` (left+right); Generic/Gear hits are dropped. Example: `{"head":140,"chest":27}`.
+Damage can exceed 100 (over-damage across multiple hits). Null for kills with no tracked hits
+(knife, bomb, fall). The frontend renders this over a body silhouette
+(`frontend/public/hitgroups/body.png`, a CS2-agnostic public-domain image used as a themeable
+mask), one damage badge per hit zone — shown in a dialog from the heatmap and as an expandable
+row under a search result.
 
 ## Business rules & invariants
 1. Coordinates are the **victim's** position (where someone died), not the killer's.
@@ -49,10 +61,22 @@ frontend fetches once and filters client-side by player/weapon/side/headshot). R
   "map": "de_inferno",
   "points": [
     { "round": 3, "killer_name": "...", "victim_name": "...",
-      "weapon": "ak47", "side": "T", "team": "T", "headshot": true, "x": 145.2, "y": -320.8 }
-  ]
+      "weapon": "ak47", "side": "T", "team": "T", "headshot": true,
+      "hitgroups": { "head": 140, "chest": 27 }, "tick": 8866, "x": 145.2, "y": -320.8 }
+  ],
+  "tick_rate": 64,
+  "demo": "original-name.dem"
 } }
 ```
+
+### Watch in game
+Each kill carries its demo `tick`; the response also includes the match `tick_rate` and the
+demo filename. The UI turns these into a copy-paste console command that jumps CS2's demo
+playback to ~5 s before the kill:
+`playdemo "<demo>"; demo_gototick <tick − 5·tick_rate>`. The demo itself is fetched via the
+owner-scoped download endpoint below (a browser can't push commands into a running game, so
+this is copy-paste, not one-click). `tick`/`tick_rate` are null on matches parsed before this
+feature — reparse to backfill.
 
 `side` is the killer's side at the moment of the kill; `team` is their whole-match team
 (stable across the half-time swap — see [search.md](search.md)), which the heatmap's team

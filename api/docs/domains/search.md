@@ -89,6 +89,12 @@ Meili document id). Configured by `php artisan search:setup`:
 The document shape is a **contract between the worker (writer) and the api (reader)** — change
 both sides in the same commit.
 
+Kill docs also carry a few **display-only** fields that aren't filterable/searchable, so a
+search result is self-sufficient for the reader UI without another lookup: `hitgroups` (body
+damage → the hitgroup map), and `tick` + `tick_rate` + `demo` (→ the "watch in game"
+`demo_gototick` command). `tick_rate`/`demo` are match-level, denormalized onto each kill so a
+cross-match search still has them per hit (see [heatmap.md](heatmap.md)).
+
 ## Sync flow
 
 ```

@@ -249,8 +249,49 @@
   color: var(--text-h);
 }
 
+.radar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  max-width: 560px;
+  margin-bottom: 8px;
+}
+
+.radar-head p {
+  margin: 0;
+}
+
+.radar-legend {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Reuse the map dots as legend swatches, minus their absolute positioning. */
+.lg .dot {
+  position: static;
+  margin: 0;
+}
+
+.radar-wrap {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
 .radar {
   position: relative;
+  flex: 1 1 340px;
   width: 100%;
   max-width: 560px;
   aspect-ratio: 1 / 1;
@@ -261,6 +302,255 @@
   overflow: hidden;
 }
 
+.kill-log {
+  flex: 1 1 220px;
+  min-width: 200px;
+  max-width: 320px;
+  max-height: 560px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.kill-log li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+}
+
+.kill-log li:last-child {
+  border-bottom: none;
+}
+
+.kill-log li.active {
+  background: var(--accent-bg);
+}
+
+.kl-round {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.kl-victim {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-h);
+}
+
+.kl-weapon {
+  flex: 0 0 auto;
+  color: var(--text);
+}
+
+.kill-log li {
+  cursor: pointer;
+}
+
+/* Body hitgroup map */
+.bodymap-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.bodymap {
+  position: relative;
+  width: 130px;
+  aspect-ratio: 500 / 1135;
+}
+
+.bodymap-silhouette {
+  position: absolute;
+  inset: 0;
+  background: var(--text);
+  opacity: 0.5;
+  -webkit-mask: url(/hitgroups/body.png) center / contain no-repeat;
+  mask: url(/hitgroups/body.png) center / contain no-repeat;
+}
+
+.bz {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 26px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.bodymap-total {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* Clickable dots + search rows that open the body map */
+.dot {
+  cursor: pointer;
+}
+
+.kill-row {
+  cursor: pointer;
+}
+
+.kill-row.open td,
+.kill-row:hover td {
+  background: color-mix(in srgb, var(--text-h) 5%, transparent);
+}
+
+.kill-expand td {
+  padding: 16px 12px;
+  background: var(--code-bg);
+}
+
+/* Silhouette and watch block side by side, centered as a group; the watch column is
+   constrained so the command box stays small instead of stretching the table width. */
+.kill-expand-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.kill-expand-watch {
+  flex: 0 1 360px;
+  min-width: 240px;
+}
+
+/* Inside the expanded cell the watch block has its own column, so drop the divider. */
+.kill-expand-watch .watch {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.kill-expand-watch .watch-steps code {
+  word-break: break-word;
+}
+
+/* Modal dialog */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.modal {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  padding: 24px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.modal-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  color: var(--text-h);
+}
+
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.watch {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.watch-killer {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.watch-killer strong {
+  color: var(--text-h);
+}
+
+.watch-cmd {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.watch-cmd + .watch-cmd {
+  margin-top: 8px;
+}
+
+.watch-cmd code {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 8px 10px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-h);
+}
+
+.watch-cmd .copy-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  color: var(--text);
+}
+
+.watch-cmd .copy-btn:hover {
+  color: var(--text-h);
+}
+
+.watch-steps {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.watch-steps code {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-h);
+}
+
 .dot {
   position: absolute;
   width: 9px;
@@ -269,6 +559,14 @@
   border-radius: 50%;
   border: 1px solid rgba(0, 0, 0, 0.55);
   box-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+/* Hovered dot (or its linked kill-log row) pops above the rest. */
+.dot-active {
+  transform: scale(1.9);
+  z-index: 5;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 4px rgba(0, 0, 0, 0.7);
 }
 
 .dot-CT {

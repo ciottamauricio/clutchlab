@@ -5,6 +5,7 @@ package matches
 
 import (
 	"database/sql"
+	"encoding/json"
 	"strconv"
 
 	"clutchlab/worker/internal/parser"
@@ -66,10 +67,10 @@ func (s *Store) Save(id int64, res *parser.ParseResult) error {
 
 	if _, err := tx.Exec(`UPDATE matches SET
 		status='parsed', error_code=NULL,
-		map_name=$2, score_ct=$3, score_t=$4, ct_name=$5, t_name=$6, total_rounds=$7,
+		map_name=$2, score_ct=$3, score_t=$4, ct_name=$5, t_name=$6, total_rounds=$7, tick_rate=$8,
 		parsed_at=now(), updated_at=now()
 		WHERE id=$1`,
-		id, res.MapName, res.ScoreCT, res.ScoreT, res.CTName, res.TName, res.TotalRounds); err != nil {
+		id, res.MapName, res.ScoreCT, res.ScoreT, res.CTName, res.TName, res.TotalRounds, res.TickRate); err != nil {
 		return err
 	}
 
@@ -94,9 +95,14 @@ func (s *Store) SaveEvents(matchID, ownerID int64, res *parser.ParseResult) ([]s
 
 	owner := ownerArg(ownerID)
 
+	// The demo filename is denormalized into each kill doc so a search hit (which may
+	// span matches) can build its own "watch in game" command without another lookup.
+	var demoName string
+	_ = tx.QueryRow("SELECT original_filename FROM matches WHERE id=$1", matchID).Scan(&demoName)
+
 	killStmt, err := tx.Prepare(`INSERT INTO kill_events
-		(match_id, owner_id, map, round, killer_steam_id, killer_name, victim_steam_id, victim_name, assister_name, weapon, headshot, opening, side, killer_team, victim_x, victim_y)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`)
+		(match_id, owner_id, map, round, killer_steam_id, killer_name, victim_steam_id, victim_name, assister_name, weapon, headshot, opening, side, killer_team, tick, victim_x, victim_y, hitgroups)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -107,14 +113,15 @@ func (s *Store) SaveEvents(matchID, ownerID int64, res *parser.ParseResult) ([]s
 		var id int64
 		if err := killStmt.QueryRow(matchID, owner, res.MapName, k.Round,
 			steamStr(k.KillerSteamID), k.KillerName, steamStr(k.VictimSteamID), k.VictimName,
-			k.AssisterName, k.Weapon, k.Headshot, k.Opening, k.Side, k.KillerTeam,
-			nullPos(k.VictimX), nullPos(k.VictimY)).Scan(&id); err != nil {
+			k.AssisterName, k.Weapon, k.Headshot, k.Opening, k.Side, k.KillerTeam, k.Tick,
+			nullPos(k.VictimX), nullPos(k.VictimY), hitgroupsJSON(k.Hitgroups)).Scan(&id); err != nil {
 			return nil, nil, err
 		}
 		kills = append(kills, search.KillDoc{
 			ID: id, MatchID: matchID, OwnerID: ownerID, Map: res.MapName, Round: k.Round,
-			KillerName: k.KillerName, VictimName: k.VictimName, Weapon: k.Weapon,
+			KillerName: k.KillerName, KillerSteamID: steamStr(k.KillerSteamID), VictimName: k.VictimName, Weapon: k.Weapon,
 			Headshot: k.Headshot, Opening: k.Opening, Side: k.Side, KillerTeam: k.KillerTeam,
+			Hitgroups: k.Hitgroups, Tick: k.Tick, TickRate: res.TickRate, Demo: demoName,
 		})
 	}
 
@@ -153,6 +160,19 @@ func nullPos(v float64) any {
 		return nil
 	}
 	return v
+}
+
+// hitgroupsJSON serializes the body-zone damage map for the jsonb column, or NULL when
+// there were no tracked hits (e.g. a knife kill or bomb death).
+func hitgroupsJSON(hg map[string]int) any {
+	if len(hg) == 0 {
+		return nil
+	}
+	b, err := json.Marshal(hg)
+	if err != nil {
+		return nil
+	}
+	return string(b)
 }
 
 func steamStr(id uint64) string {

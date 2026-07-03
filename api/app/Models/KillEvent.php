@@ -13,10 +13,12 @@ class KillEvent extends Model
 
     protected $casts = [
         'round' => 'integer',
+        'tick' => 'integer',
         'headshot' => 'boolean',
         'opening' => 'boolean',
         'victim_x' => 'float',
         'victim_y' => 'float',
+        'hitgroups' => 'array',
     ];
 
     public function match(): BelongsTo

@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Actions\DeleteMatchAction;
 use App\Actions\ReparseMatchAction;
 use App\Actions\UploadDemoAction;
+use App\Contracts\DemoStorage;
 use App\Http\Requests\UploadDemoRequest;
 use App\Http\Resources\MatchResource;
 use App\Models\GameMatch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MatchController extends Controller
 {
@@ -46,20 +48,35 @@ class MatchController extends Controller
             ->whereNotNull('victim_x')
             ->whereNotNull('victim_y')
             ->orderBy('round')
-            ->get(['round', 'killer_name', 'victim_name', 'weapon', 'side', 'killer_team', 'headshot', 'victim_x', 'victim_y'])
+            ->get(['round', 'killer_name', 'killer_steam_id', 'victim_name', 'weapon', 'side', 'killer_team', 'headshot', 'tick', 'victim_x', 'victim_y', 'hitgroups'])
             ->map(fn ($k) => [
                 'round' => $k->round,
                 'killer_name' => $k->killer_name,
+                'killer_steam_id' => $k->killer_steam_id,
                 'victim_name' => $k->victim_name,
                 'weapon' => $k->weapon,
                 'side' => $k->side,
                 'team' => $k->killer_team,
                 'headshot' => $k->headshot,
+                'tick' => $k->tick,
+                'hitgroups' => $k->hitgroups,
                 'x' => $k->victim_x,
                 'y' => $k->victim_y,
             ]);
 
-        return response()->json(['data' => ['map' => $match->map_name, 'points' => $points]]);
+        return response()->json(['data' => [
+            'map' => $match->map_name,
+            'tick_rate' => $match->tick_rate,
+            'demo' => $match->original_filename,
+            'points' => $points,
+        ]]);
+    }
+
+    public function demo(Request $request, GameMatch $match, DemoStorage $storage): StreamedResponse
+    {
+        $this->authorize('view', $match);
+
+        return $storage->download($match->demo_key, $match->original_filename);
     }
 
     public function destroy(Request $request, GameMatch $match, DeleteMatchAction $action): JsonResponse

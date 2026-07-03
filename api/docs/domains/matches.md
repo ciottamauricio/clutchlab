@@ -125,6 +125,7 @@ and are scoped to the authenticated owner.
 | POST | `/matches` | upload a demo | multipart field `demo`; sets owner; 201; throttled 30/min |
 | GET | `/matches/{match}` | match detail + players | owner only (403 otherwise); players by kills desc |
 | GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | owner only; see [heatmap.md](heatmap.md) |
+| GET | `/matches/{match}/demo` | download the stored `.dem` | owner only; streamed from storage via `DemoStorage::download` |
 | POST | `/matches/{match}/reparse` | re-enqueue the stored demo | owner only; resets to `queued`; throttled 30/min; `ReparseMatchAction` |
 | DELETE | `/matches/{match}` | delete a match | owner only (403 otherwise); 204; `DeleteMatchAction` |
 

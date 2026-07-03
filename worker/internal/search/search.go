@@ -17,14 +17,19 @@ type KillDoc struct {
 	MatchID    int64  `json:"match_id"`
 	OwnerID    int64  `json:"owner_id"`
 	Map        string `json:"map"`
-	Round      int    `json:"round"`
-	KillerName string `json:"killer_name"`
-	VictimName string `json:"victim_name"`
-	Weapon     string `json:"weapon"`
-	Headshot   bool   `json:"headshot"`
-	Opening    bool   `json:"opening"`
-	Side       string `json:"side"`
-	KillerTeam string `json:"killer_team"`
+	Round         int    `json:"round"`
+	KillerName    string `json:"killer_name"`
+	KillerSteamID string `json:"killer_steam_id"`
+	VictimName    string `json:"victim_name"`
+	Weapon     string         `json:"weapon"`
+	Headshot   bool           `json:"headshot"`
+	Opening    bool           `json:"opening"`
+	Side       string         `json:"side"`
+	KillerTeam string         `json:"killer_team"`
+	Hitgroups  map[string]int `json:"hitgroups,omitempty"`
+	Tick       int            `json:"tick"`
+	TickRate   float64        `json:"tick_rate"`
+	Demo       string         `json:"demo"`
 }
 
 type RoundDoc struct {

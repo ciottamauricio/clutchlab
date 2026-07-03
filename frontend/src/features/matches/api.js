@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api } from '../../lib/api'
+import { api, ApiError, tokenStore } from '../../lib/api'
 
 const listMatches = () => api.get('/matches')
 const getMatch = (id) => api.get(`/matches/${id}`)
@@ -111,19 +111,19 @@ export function useReparseMatch(onReparsed) {
 // Loads every kill position for a match once (see api/docs/domains/heatmap.md); the
 // heatmap filters this set client-side, so no refetch on filter changes.
 export function useKillPositions(id) {
-  const [data, setData] = useState({ map: null, points: [] })
+  const [data, setData] = useState({ map: null, tickRate: null, demo: null, points: [] })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     if (!id) {
-      setData({ map: null, points: [] })
+      setData({ map: null, tickRate: null, demo: null, points: [] })
       return
     }
     let active = true
     setLoading(true)
     getKillPositions(id)
-      .then((d) => active && setData({ map: d.map, points: d.points ?? [] }))
+      .then((d) => active && setData({ map: d.map, tickRate: d.tick_rate, demo: d.demo, points: d.points ?? [] }))
       .catch((e) => active && setError(e.code ?? 'error.unknown'))
       .finally(() => active && setLoading(false))
     return () => {
@@ -132,6 +132,24 @@ export function useKillPositions(id) {
   }, [id])
 
   return { ...data, loading, error }
+}
+
+// Streams the stored .dem through the api (auth header required, so not a plain link)
+// and triggers a browser download named after the original file.
+export async function downloadDemo(id, filename) {
+  const res = await fetch(`/api/matches/${id}/demo`, {
+    headers: { Accept: 'application/octet-stream', Authorization: `Bearer ${tokenStore.get()}` },
+  })
+  if (!res.ok) throw new ApiError('error.unknown', res.status)
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || 'demo.dem'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 export function useDeleteMatch(onDeleted) {

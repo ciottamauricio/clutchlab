@@ -7,6 +7,7 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class S3DemoStorage implements DemoStorage
 {
@@ -28,5 +29,10 @@ class S3DemoStorage implements DemoStorage
     {
         // delete() on a missing object is a no-op, so this is naturally idempotent.
         $this->disk->delete($key);
+    }
+
+    public function download(string $key, string $name): StreamedResponse
+    {
+        return $this->disk->download($key, $name);
     }
 }

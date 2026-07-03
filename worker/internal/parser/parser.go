@@ -36,8 +36,12 @@ type KillEvent struct {
 	Opening       bool
 	Side          string
 	KillerTeam    string
+	Tick          int
 	VictimX       float64
 	VictimY       float64
+	// Health damage the killer dealt to the victim this round, by body zone
+	// (head/chest/stomach/arms/legs) — the "where shots landed" hitgroup map.
+	Hitgroups map[string]int
 }
 
 type RoundEvent struct {
@@ -57,6 +61,7 @@ type ParseResult struct {
 	CTName      string
 	TName       string
 	TotalRounds int
+	TickRate    float64
 	Players     []*PlayerStat
 	Kills       []KillEvent
 	Rounds      []RoundEvent
@@ -106,6 +111,28 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 	currentRound := 0
 	openingSeen := false
 	var ctBuy, tBuy string
+
+	// Health damage per (attacker, victim, round) by body zone, so each kill can carry
+	// the hitgroup breakdown of the engagement that produced it.
+	hurts := map[hurtKey]map[string]int{}
+	p.RegisterEventHandler(func(e events.PlayerHurt) {
+		if gs.IsWarmupPeriod() || currentRound == 0 {
+			return
+		}
+		a, v := steamID(e.Attacker), steamID(e.Player)
+		if a == 0 || v == 0 || a == v {
+			return
+		}
+		zone := hitZone(e.HitGroup)
+		if zone == "" {
+			return
+		}
+		k := hurtKey{attacker: a, victim: v, round: currentRound}
+		if hurts[k] == nil {
+			hurts[k] = map[string]int{}
+		}
+		hurts[k][zone] += e.HealthDamage
+	})
 
 	p.RegisterEventHandler(func(events.RoundFreezetimeEnd) {
 		if gs.IsWarmupPeriod() {
@@ -163,6 +190,7 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 			Headshot:      e.IsHeadshot,
 			Opening:       opening,
 			Side:          teamSide(killerTeam(e.Killer)),
+			Tick:          gs.IngameTick(),
 			VictimX:       vx,
 			VictimY:       vy,
 		})
@@ -207,6 +235,7 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 	res.CTName = ct.ClanName()
 	res.TName = t.ClanName()
 	res.TotalRounds = ct.Score() + t.Score()
+	res.TickRate = p.TickRate()
 	for _, s := range byID {
 		res.Players = append(res.Players, s)
 	}
@@ -218,9 +247,36 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		if s, ok := byID[res.Kills[i].KillerSteamID]; ok {
 			res.Kills[i].KillerTeam = s.TeamSide
 		}
+		k := hurtKey{attacker: res.Kills[i].KillerSteamID, victim: res.Kills[i].VictimSteamID, round: res.Kills[i].Round}
+		if hg := hurts[k]; len(hg) > 0 {
+			res.Kills[i].Hitgroups = hg
+		}
 	}
 
 	return res, nil
+}
+
+type hurtKey struct {
+	attacker, victim uint64
+	round            int
+}
+
+// hitZone collapses demoinfocs hit groups into the five body zones the UI shows.
+func hitZone(g events.HitGroup) string {
+	switch g {
+	case events.HitGroupHead, events.HitGroupNeck:
+		return "head"
+	case events.HitGroupChest:
+		return "chest"
+	case events.HitGroupStomach:
+		return "stomach"
+	case events.HitGroupLeftArm, events.HitGroupRightArm:
+		return "arms"
+	case events.HitGroupLeftLeg, events.HitGroupRightLeg:
+		return "legs"
+	default:
+		return ""
+	}
 }
 
 func steamID(pl *common.Player) uint64 {

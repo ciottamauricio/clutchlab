@@ -20,6 +20,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/matches', [MatchController::class, 'store'])->middleware('throttle:30,1');
     Route::get('/matches/{match}', [MatchController::class, 'show']);
     Route::get('/matches/{match}/kill-positions', [MatchController::class, 'killPositions']);
+    Route::get('/matches/{match}/demo', [MatchController::class, 'demo']);
     Route::post('/matches/{match}/reparse', [MatchController::class, 'reparse'])->middleware('throttle:30,1');
     Route::delete('/matches/{match}', [MatchController::class, 'destroy']);
 
