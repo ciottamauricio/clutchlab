@@ -24,9 +24,11 @@ export default function TeamsPage() {
             <ul className="match-list">
               {teams.map((team) => (
                 <li key={team.id} className={team.id === selectedId ? 'active' : ''}>
-                  <button type="button" onClick={() => setSelectedId(team.id)}>
-                    <span className="file">{team.name}</span>
-                    <span className="role">{team.my_role}</span>
+                  <button type="button" className="match-open" onClick={() => setSelectedId(team.id)}>
+                    <span className="mc-line">
+                      <span className="mc-map">{team.name}</span>
+                      <span className="role">{team.my_role}</span>
+                    </span>
                   </button>
                 </li>
               ))}

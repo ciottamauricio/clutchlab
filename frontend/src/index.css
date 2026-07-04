@@ -1,32 +1,43 @@
+/* Clutchlab — "match-room console" theme.
+   Dark-only by design: the radar overviews, body-silhouette masks, and heatmap dots all
+   live on dark surfaces, and this is an analyst's desktop tool. The only chroma in the
+   chrome is the game's two sides (CT blue / T gold); primary actions are flashbang-white,
+   red is reserved for danger. Numerals and labels speak mono — the demo-console voice. */
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
+  --bg: #0e1116;
+  --surface: #141a21;
+  --surface-2: #1b232d;
+  --border: #2a3441;
+  --border-strong: #3a4656;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --text: #94a1b2;
+  --text-h: #ecf1f7;
+  --text-dim: #5c6875;
 
-  font: 16px/145% var(--sans);
-  color-scheme: light dark;
+  --ct: #58a6e8;
+  --ct-bg: rgba(88, 166, 232, 0.13);
+  --t: #e3a93c;
+  --t-bg: rgba(227, 169, 60, 0.13);
+
+  --danger: #e0635b;
+  --danger-bg: rgba(224, 99, 91, 0.12);
+  --win: #56b87b;
+
+  /* Legacy aliases still referenced by feature styles. */
+  --accent: var(--ct);
+  --accent-bg: var(--ct-bg);
+  --code-bg: var(--surface-2);
+
+  --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+
+  font: 15px/1.55 var(--sans);
+  color-scheme: dark;
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-  }
 }
 
 * {
@@ -35,10 +46,126 @@
 
 body {
   margin: 0;
+  background: var(--bg);
 }
 
 h1,
-h2 {
+h2,
+h3,
+h4 {
   color: var(--text-h);
   font-weight: 600;
+}
+
+a {
+  color: var(--ct);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Forms — one quiet system everywhere. */
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--text-h);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 11px;
+  transition: border-color 0.12s ease;
+}
+
+input::placeholder {
+  color: var(--text-dim);
+}
+
+input:hover,
+select:hover {
+  border-color: var(--border-strong);
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--ct);
+}
+
+select {
+  cursor: pointer;
+}
+
+input[type='file'] {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--text);
+}
+
+input[type='file']::file-selector-button {
+  font: 500 13px var(--sans);
+  color: var(--text-h);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 14px;
+  margin-right: 12px;
+  cursor: pointer;
+}
+
+input[type='file']::file-selector-button:hover {
+  border-color: var(--border-strong);
+}
+
+input[type='checkbox'] {
+  accent-color: var(--ct);
+  width: 15px;
+  height: 15px;
+  padding: 0;
+}
+
+/* Buttons: bare <button> = primary action (flashbang-white). Everything quieter carries
+   its own class (.link-btn, .copy-btn, .match-open, …). */
+button {
+  font: 500 14px var(--sans);
+  color: #10151b;
+  background: #e6ecf3;
+  border: 1px solid #e6ecf3;
+  border-radius: 6px;
+  padding: 8px 18px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+button:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: #ffffff;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ct);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(88, 166, 232, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
