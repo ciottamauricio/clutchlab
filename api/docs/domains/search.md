@@ -77,8 +77,8 @@ Two indexes, `kills` and `rounds`, whose documents mirror the rows above (the ro
 Meili document id). Configured by `php artisan search:setup`:
 
 - **kills** — filterable: `owner_id, match_id, map, weapon, headshot, opening, side,
-  killer_team, round, killer_name, victim_name`; searchable: `killer_name, victim_name,
-  weapon, map`; sortable: `round`. (`killer_name`/`victim_name` are both filterable *and*
+  killer_team, clutch, round, killer_name, victim_name`; searchable: `killer_name,
+  victim_name, weapon, map`; sortable: `round`. (`killer_name`/`victim_name` are both filterable *and*
   searchable: filter for an exact player, free-text for fuzzy.) `side` is the side **at the
   moment of the kill**; `killer_team` is the killer's **whole-match team** (their stable final
   side), which is what the per-match UI filters by — a team keeps its roster across the
@@ -115,6 +115,15 @@ api  ── queries Meilisearch (owner-filtered) ──▶ results
 |---|---|---|
 | GET | `/api/search/kills` | search the caller's kills |
 | GET | `/api/search/rounds` | search the caller's rounds |
+| GET | `/api/search/clutch-sizes` | clutch sizes (1vN) present in the caller's kills |
+
+`clutch` is the size of the 1vN a kill was part of (the killer was the last player alive on
+their team **and won the round**); 0 = not a clutch kill. A clutch is decided in a post-parse
+pass (a kill's own `side` vs that round's winner), not incrementally at RoundEnd — demos fire
+round restarts / repeated freezetime events that desync per-round bookkeeping. Filter
+`clutch=3` for 1v3 clutch kills. `clutch-sizes` uses a Meilisearch facet distribution so the
+UI only offers sizes that actually occurred. Per-match clutches (grouped by clutcher) are
+served by `/api/matches/{match}/clutches` (see matches.md).
 
 Query params: `q` (free text) plus filter params matching the filterable attributes
 (e.g. `weapon=awp&opening=1&map=de_mirage`, or `winner=CT&ct_alive=5&t_alive=3`). The api

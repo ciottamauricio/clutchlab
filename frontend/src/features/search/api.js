@@ -1,5 +1,14 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../lib/api'
+
+// Clutch sizes (1vN) present in the caller's kills, so the filter only offers real ones.
+export function useClutchSizes() {
+  const [sizes, setSizes] = useState([])
+  useEffect(() => {
+    api.get('/search/clutch-sizes').then((d) => setSizes(d ?? [])).catch(() => {})
+  }, [])
+  return sizes
+}
 
 // Build a query string, dropping empty/false params (so an unchecked box doesn't
 // force a filter). Booleans become 1.

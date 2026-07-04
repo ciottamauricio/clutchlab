@@ -38,6 +38,7 @@ class SearchReindex extends Command
                     'opening' => (bool) $r->opening,
                     'side' => $r->side,
                     'killer_team' => $r->killer_team,
+                    'clutch' => (int) $r->clutch,
                     'hitgroups' => $r->hitgroups ? json_decode($r->hitgroups, true) : null,
                     'tick' => $r->tick !== null ? (int) $r->tick : null,
                     'tick_rate' => $r->tick_rate !== null ? (float) $r->tick_rate : null,

@@ -26,6 +26,7 @@ type KillDoc struct {
 	Opening    bool           `json:"opening"`
 	Side       string         `json:"side"`
 	KillerTeam string         `json:"killer_team"`
+	Clutch     int            `json:"clutch"`
 	Hitgroups  map[string]int `json:"hitgroups,omitempty"`
 	Tick       int            `json:"tick"`
 	TickRate   float64        `json:"tick_rate"`

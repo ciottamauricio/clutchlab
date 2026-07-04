@@ -22,6 +22,13 @@ interface SearchIndex
 
     public function deleteByMatch(string $index, int $matchId): void;
 
+    /**
+     * Owner-scoped facet distribution for one filterable field: [value => count].
+     *
+     * @return array<string, int>
+     */
+    public function facets(string $index, string $field, int $ownerId): array;
+
     /** Create the indexes and set their filterable/searchable/sortable attributes. */
     public function configure(): void;
 }

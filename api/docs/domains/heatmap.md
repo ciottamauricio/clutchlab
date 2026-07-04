@@ -61,7 +61,7 @@ frontend fetches once and filters client-side by player/weapon/side/headshot). R
   "map": "de_inferno",
   "points": [
     { "round": 3, "killer_name": "...", "victim_name": "...",
-      "weapon": "ak47", "side": "T", "team": "T", "headshot": true,
+      "weapon": "ak47", "side": "T", "team": "T", "clutch": 3, "headshot": true,
       "hitgroups": { "head": 140, "chest": 27 }, "tick": 8866, "x": 145.2, "y": -320.8 }
   ],
   "tick_rate": 64,

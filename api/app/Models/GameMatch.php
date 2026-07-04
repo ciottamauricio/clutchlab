@@ -18,6 +18,7 @@ class GameMatch extends Model
         return [
             'parsed_at' => 'datetime',
             'tick_rate' => 'float',
+            'duration_seconds' => 'float',
         ];
     }
 

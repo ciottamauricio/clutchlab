@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSearch } from '../features/search/api'
+import { useSearch, useClutchSizes } from '../features/search/api'
 import KillsTable from '../features/search/KillsTable'
 import RoundsTable from '../features/search/RoundsTable'
 import WeaponSelect from '../features/search/WeaponSelect'
@@ -13,9 +13,10 @@ export default function SearchPage() {
   const [kind, setKind] = useState('kills')
   const [lastKind, setLastKind] = useState('kills')
   const [q, setQ] = useState('')
-  const [kf, setKf] = useState({ weapon: '', side: '', map: '', headshot: false, opening: false })
+  const [kf, setKf] = useState({ weapon: '', side: '', map: '', clutch: '', headshot: false, opening: false })
   const [rf, setRf] = useState({ winner: '', reason: '', map: '', ct_alive: '', t_alive: '', ct_buy: '', t_buy: '' })
   const { hits, total, loading, error, ran, run } = useSearch()
+  const clutchSizes = useClutchSizes()
 
   const submit = (e) => {
     e.preventDefault()
@@ -40,6 +41,12 @@ export default function SearchPage() {
               {SIDES.map((s) => <option key={s} value={s}>{s || 'any side'}</option>)}
             </select>
             <input placeholder="map" value={kf.map} onChange={(e) => setKf({ ...kf, map: e.target.value })} />
+            {clutchSizes.length > 0 && (
+              <select value={kf.clutch} onChange={(e) => setKf({ ...kf, clutch: e.target.value })}>
+                <option value="">any clutch</option>
+                {clutchSizes.map((n) => <option key={n} value={n}>1v{n}</option>)}
+              </select>
+            )}
             <label className="chk"><input type="checkbox" checked={kf.headshot} onChange={(e) => setKf({ ...kf, headshot: e.target.checked })} /> HS</label>
             <label className="chk"><input type="checkbox" checked={kf.opening} onChange={(e) => setKf({ ...kf, opening: e.target.checked })} /> opening</label>
           </>

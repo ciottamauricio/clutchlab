@@ -37,8 +37,11 @@ type KillEvent struct {
 	Side          string
 	KillerTeam    string
 	Tick          int
-	VictimX       float64
-	VictimY       float64
+	// Clutch is the size of the 1vN this kill was part of (the killer was the last player
+	// alive on their team). 0 means it wasn't a clutch kill.
+	Clutch  int
+	VictimX float64
+	VictimY float64
 	// Health damage the killer dealt to the victim this round, by body zone
 	// (head/chest/stomach/arms/legs) — the "where shots landed" hitgroup map.
 	Hitgroups map[string]int
@@ -62,9 +65,12 @@ type ParseResult struct {
 	TName       string
 	TotalRounds int
 	TickRate    float64
-	Players     []*PlayerStat
-	Kills       []KillEvent
-	Rounds      []RoundEvent
+	// DurationSeconds spans actual play (first round start to last round end) —
+	// warmup and any post-game time are excluded.
+	DurationSeconds float64
+	Players         []*PlayerStat
+	Kills           []KillEvent
+	Rounds          []RoundEvent
 }
 
 func ParseDemo(r io.Reader) (result *ParseResult, err error) {
@@ -111,6 +117,18 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 	currentRound := 0
 	openingSeen := false
 	var ctBuy, tBuy string
+	// Ticks spanning actual play, for DurationSeconds — first round's freezetime-end to the
+	// last round's end, so warmup and any post-game time don't inflate the duration.
+	var matchStartTick, matchEndTick int
+
+	// Clutch tracking: who is alive per side this round, and — once a side is first cut to
+	// a single survivor facing live enemies — that clutcher and the 1vN size, so their
+	// subsequent kills can be tagged as clutch kills.
+	aliveCT := map[uint64]bool{}
+	aliveT := map[uint64]bool{}
+	var clutcher uint64
+	var clutchN int
+	clutchRecorded := false
 
 	// Health damage per (attacker, victim, round) by body zone, so each kill can carry
 	// the hitgroup breakdown of the engagement that produced it.
@@ -144,6 +162,16 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		t := gs.TeamTerrorists()
 		ctBuy = classifyBuy(ct.FreezeTimeEndEquipmentValue())
 		tBuy = classifyBuy(t.FreezeTimeEndEquipmentValue())
+		if currentRound == 1 {
+			matchStartTick = gs.IngameTick()
+		}
+
+		// Reset clutch tracking and seed the alive rosters for the new round.
+		aliveCT = map[uint64]bool{}
+		aliveT = map[uint64]bool{}
+		clutcher = 0
+		clutchN = 0
+		clutchRecorded = false
 
 		// Sides swap at the half and everyone is unassigned once the demo ends, so
 		// snapshot team_side each round; the last live round wins.
@@ -152,6 +180,12 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 				if side := teamSide(pl.Team); side != "" {
 					s.TeamSide = side
 				}
+			}
+			switch pl.Team {
+			case common.TeamCounterTerrorists:
+				aliveCT[pl.SteamID64] = true
+			case common.TeamTerrorists:
+				aliveT[pl.SteamID64] = true
 			}
 		}
 	})
@@ -179,6 +213,15 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		opening := !openingSeen
 		openingSeen = true
 		vx, vy := victimPos(e.Victim)
+
+		// Tag before updating the roster: a kill is a clutch kill if the clutch is already
+		// under way and the clutcher fragged an enemy (not a suicide / world death). This is
+		// provisional — kills from a *lost* clutch are dropped in a post-pass below.
+		clutch := 0
+		if clutchRecorded && steamID(e.Killer) == clutcher && steamID(e.Victim) != clutcher {
+			clutch = clutchN
+		}
+
 		res.Kills = append(res.Kills, KillEvent{
 			Round:         currentRound,
 			KillerSteamID: steamID(e.Killer),
@@ -191,15 +234,32 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 			Opening:       opening,
 			Side:          teamSide(killerTeam(e.Killer)),
 			Tick:          gs.IngameTick(),
+			Clutch:        clutch,
 			VictimX:       vx,
 			VictimY:       vy,
 		})
+
+		// Remove the victim, then start a clutch the first time a side is cut to one
+		// survivor while the other side still has players.
+		if vid := steamID(e.Victim); vid != 0 {
+			delete(aliveCT, vid)
+			delete(aliveT, vid)
+		}
+		if !clutchRecorded {
+			ctN, tN := len(aliveCT), len(aliveT)
+			if ctN == 1 && tN >= 1 {
+				clutcher, clutchN, clutchRecorded = onlyKey(aliveCT), tN, true
+			} else if tN == 1 && ctN >= 1 {
+				clutcher, clutchN, clutchRecorded = onlyKey(aliveT), ctN, true
+			}
+		}
 	})
 
 	p.RegisterEventHandler(func(e events.RoundEnd) {
 		if gs.IsWarmupPeriod() || currentRound == 0 {
 			return
 		}
+		matchEndTick = gs.IngameTick()
 		ctAlive, tAlive := 0, 0
 		for _, pl := range gs.Participants().Playing() {
 			if !pl.IsAlive() {
@@ -236,8 +296,20 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 	res.TName = t.ClanName()
 	res.TotalRounds = ct.Score() + t.Score()
 	res.TickRate = p.TickRate()
+	if matchEndTick > matchStartTick && res.TickRate > 0 {
+		res.DurationSeconds = float64(matchEndTick-matchStartTick) / res.TickRate
+	}
 	for _, s := range byID {
 		res.Players = append(res.Players, s)
+	}
+
+	// A clutch only counts if it was won. Decide that here, after parsing, rather than at
+	// RoundEnd: demos fire round restarts / repeated freezetime events that desync any
+	// per-round index bookkeeping. A clutch kill's own Side is the clutcher's side, so if
+	// it doesn't match that round's winner the 1vN was lost — drop the tag.
+	winnerByRound := make(map[int]string, len(res.Rounds))
+	for _, r := range res.Rounds {
+		winnerByRound[r.Round] = r.Winner
 	}
 
 	// Attribute each kill to the killer's team. A team keeps its roster across the
@@ -250,6 +322,9 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		k := hurtKey{attacker: res.Kills[i].KillerSteamID, victim: res.Kills[i].VictimSteamID, round: res.Kills[i].Round}
 		if hg := hurts[k]; len(hg) > 0 {
 			res.Kills[i].Hitgroups = hg
+		}
+		if res.Kills[i].Clutch > 0 && res.Kills[i].Side != winnerByRound[res.Kills[i].Round] {
+			res.Kills[i].Clutch = 0
 		}
 	}
 
@@ -298,6 +373,14 @@ func killerTeam(pl *common.Player) common.Team {
 		return common.TeamUnassigned
 	}
 	return pl.Team
+}
+
+// onlyKey returns the single key of a one-element set (the lone survivor).
+func onlyKey(m map[uint64]bool) uint64 {
+	for k := range m {
+		return k
+	}
+	return 0
 }
 
 // victimPos is the victim's world X/Y at death. Raw coordinates only — mapping them onto a

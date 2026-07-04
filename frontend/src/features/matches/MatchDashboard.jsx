@@ -3,8 +3,9 @@ import { t } from '../../lib/i18n'
 import Scoreboard from './Scoreboard'
 import StatusBadge from './StatusBadge'
 import Heatmap from './Heatmap'
+import Clutches from './Clutches'
 import MatchSearch from '../search/MatchSearch'
-import { formatMatchDate, matchTeams } from './format'
+import { formatMatchDate, formatDuration, matchTeams } from './format'
 
 export default function MatchDashboard({ matchId }) {
   const { match, error, reload } = useMatch(matchId)
@@ -18,6 +19,7 @@ export default function MatchDashboard({ matchId }) {
   const parsed = match.status === 'parsed'
   const players = match.players ?? []
   const date = formatMatchDate(match.created_at)
+  const duration = formatDuration(match.duration_seconds)
 
   // Group the flat player list into the two rosters. Players arrive sorted by
   // kills, so each side stays sorted after filtering. Winner shown first.
@@ -36,6 +38,7 @@ export default function MatchDashboard({ matchId }) {
           <div className="dh-meta">
             {date && <span>{date}</span>}
             {parsed && <span>{match.total_rounds} rounds</span>}
+            {duration && <span>{duration}</span>}
           </div>
         </div>
         <div className="dh-actions">
@@ -69,6 +72,7 @@ export default function MatchDashboard({ matchId }) {
           <p className="demo-file">{match.original_filename}</p>
           <Heatmap matchId={matchId} players={players} teams={[teamA, teamB]} />
           <MatchSearch matchId={matchId} players={players} teams={[teamA, teamB]} />
+          <Clutches matchId={matchId} />
         </>
       )}
     </section>

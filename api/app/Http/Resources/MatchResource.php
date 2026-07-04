@@ -20,6 +20,7 @@ class MatchResource extends JsonResource
             'ct_name' => $this->ct_name,
             't_name' => $this->t_name,
             'total_rounds' => $this->total_rounds,
+            'duration_seconds' => $this->duration_seconds,
             'parsed_at' => $this->parsed_at,
             'created_at' => $this->created_at,
             'players' => MatchPlayerStatResource::collection($this->whenLoaded('playerStats')),

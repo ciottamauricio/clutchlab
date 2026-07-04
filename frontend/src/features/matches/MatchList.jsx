@@ -1,8 +1,9 @@
 import StatusBadge from './StatusBadge'
-import { formatMatchDate, matchTeams } from './format'
+import { formatMatchDate, formatDuration, matchTeams } from './format'
 
 function MatchCard({ match }) {
   const date = formatMatchDate(match.created_at)
+  const duration = formatDuration(match.duration_seconds)
 
   if (match.status !== 'parsed') {
     return (
@@ -21,7 +22,10 @@ function MatchCard({ match }) {
     <>
       <span className="mc-line">
         <span className="mc-map">{match.map_name || 'unknown map'}</span>
-        <span className="mc-date">{date}</span>
+        <span className="mc-date">
+          {date}
+          {duration && <span className="mc-duration"> · {duration}</span>}
+        </span>
       </span>
       <span className="mc-score">
         <span className="mc-team">{a.name}</span>

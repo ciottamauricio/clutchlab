@@ -13,7 +13,7 @@ class SearchController extends Controller
     private const KILL_FILTERS = [
         'match_id' => 'int', 'map' => 'string', 'weapon' => 'string', 'side' => 'string',
         'killer_team' => 'string', 'killer_name' => 'string', 'victim_name' => 'string',
-        'headshot' => 'bool', 'opening' => 'bool', 'round' => 'int',
+        'clutch' => 'int', 'headshot' => 'bool', 'opening' => 'bool', 'round' => 'int',
     ];
 
     private const ROUND_FILTERS = [
@@ -30,6 +30,22 @@ class SearchController extends Controller
     public function rounds(Request $request, SearchIndex $index): JsonResponse
     {
         return $this->run($request, $index, 'rounds', self::ROUND_FILTERS);
+    }
+
+    // Clutch sizes (1vN) present in the caller's kills, so the filter only offers sizes
+    // that actually occurred. Returns e.g. [1, 2, 3].
+    public function clutchSizes(Request $request, SearchIndex $index): JsonResponse
+    {
+        try {
+            $dist = $index->facets('kills', 'clutch', $request->user()->id);
+        } catch (\Throwable) {
+            return response()->json(['message' => 'search.unavailable'], 503);
+        }
+
+        $sizes = array_values(array_filter(array_map('intval', array_keys($dist)), fn ($n) => $n > 0));
+        sort($sizes);
+
+        return response()->json(['data' => $sizes]);
     }
 
     private function run(Request $request, SearchIndex $index, string $name, array $allowed): JsonResponse

@@ -48,7 +48,7 @@ class MatchController extends Controller
             ->whereNotNull('victim_x')
             ->whereNotNull('victim_y')
             ->orderBy('round')
-            ->get(['round', 'killer_name', 'killer_steam_id', 'victim_name', 'weapon', 'side', 'killer_team', 'headshot', 'tick', 'victim_x', 'victim_y', 'hitgroups'])
+            ->get(['round', 'killer_name', 'killer_steam_id', 'victim_name', 'weapon', 'side', 'killer_team', 'clutch', 'headshot', 'tick', 'victim_x', 'victim_y', 'hitgroups'])
             ->map(fn ($k) => [
                 'round' => $k->round,
                 'killer_name' => $k->killer_name,
@@ -57,6 +57,7 @@ class MatchController extends Controller
                 'weapon' => $k->weapon,
                 'side' => $k->side,
                 'team' => $k->killer_team,
+                'clutch' => $k->clutch,
                 'headshot' => $k->headshot,
                 'tick' => $k->tick,
                 'hitgroups' => $k->hitgroups,
@@ -77,6 +78,41 @@ class MatchController extends Controller
         $this->authorize('view', $match);
 
         return $storage->download($match->demo_key, $match->original_filename);
+    }
+
+    // Clutches in the match: one per round where a player was last alive on their team,
+    // grouped as { round, size, killer, kills[] } with the clutcher's kills in kill order.
+    public function clutches(Request $request, GameMatch $match): JsonResponse
+    {
+        $this->authorize('view', $match);
+
+        $clutches = $match->killEvents()
+            ->where('clutch', '>', 0)
+            ->orderBy('round')
+            ->orderBy('tick')
+            ->get(['round', 'clutch', 'killer_name', 'killer_steam_id', 'victim_name', 'weapon', 'side', 'headshot', 'tick', 'hitgroups'])
+            ->groupBy('round')
+            ->map(fn ($kills, $round) => [
+                'round' => (int) $round,
+                'size' => $kills->first()->clutch,
+                'killer_name' => $kills->first()->killer_name,
+                'killer_steam_id' => $kills->first()->killer_steam_id,
+                'kills' => $kills->map(fn ($k) => [
+                    'victim_name' => $k->victim_name,
+                    'weapon' => $k->weapon,
+                    'side' => $k->side,
+                    'headshot' => $k->headshot,
+                    'tick' => $k->tick,
+                    'hitgroups' => $k->hitgroups,
+                ])->values(),
+            ])
+            ->values();
+
+        return response()->json(['data' => [
+            'tick_rate' => $match->tick_rate,
+            'demo' => $match->original_filename,
+            'clutches' => $clutches,
+        ]]);
     }
 
     public function destroy(Request $request, GameMatch $match, DeleteMatchAction $action): JsonResponse

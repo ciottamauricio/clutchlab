@@ -21,6 +21,7 @@ export default function KillsTable({ hits }) {
           <th>HS</th>
           <th>Opening</th>
           <th>Side</th>
+          <th>Clutch</th>
         </tr>
       </thead>
       <tbody>
@@ -34,10 +35,11 @@ export default function KillsTable({ hits }) {
               <td>{k.headshot ? '✓' : ''}</td>
               <td>{k.opening ? '✓' : ''}</td>
               <td>{k.side}</td>
+              <td>{k.clutch > 0 ? <span className="clutch-badge">1v{k.clutch}</span> : ''}</td>
             </tr>
             {openId === k.id && (
               <tr className="kill-expand">
-                <td colSpan={7}>
+                <td colSpan={8}>
                   <div className="kill-expand-body">
                     <BodyHitgroups hitgroups={k.hitgroups} />
                     <div className="kill-expand-watch">

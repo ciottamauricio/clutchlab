@@ -20,6 +20,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/matches', [MatchController::class, 'store'])->middleware('throttle:30,1');
     Route::get('/matches/{match}', [MatchController::class, 'show']);
     Route::get('/matches/{match}/kill-positions', [MatchController::class, 'killPositions']);
+    Route::get('/matches/{match}/clutches', [MatchController::class, 'clutches']);
     Route::get('/matches/{match}/demo', [MatchController::class, 'demo']);
     Route::post('/matches/{match}/reparse', [MatchController::class, 'reparse'])->middleware('throttle:30,1');
     Route::delete('/matches/{match}', [MatchController::class, 'destroy']);
@@ -38,4 +39,5 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/search/kills', [SearchController::class, 'kills']);
     Route::get('/search/rounds', [SearchController::class, 'rounds']);
+    Route::get('/search/clutch-sizes', [SearchController::class, 'clutchSizes']);
 });

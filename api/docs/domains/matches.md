@@ -38,6 +38,8 @@ to the user who uploaded it, and access is owner-only (see Authorization & owner
 | score_ct / score_t | uint, nullable | worker | final round score per side |
 | ct_name / t_name | string, nullable | worker | clan/team names (often empty in demos) |
 | total_rounds | uint, nullable | worker | `score_ct + score_t` |
+| tick_rate | float, nullable | worker | server tick rate, used to convert ticks to seconds |
+| duration_seconds | float, nullable | worker | play time only: first round's freezetime-end to the last round's end (excludes warmup/post-game) |
 | parsed_at | timestamp, nullable | worker | set on success |
 | created_at / updated_at | timestamps | api + worker | |
 
@@ -125,6 +127,7 @@ and are scoped to the authenticated owner.
 | POST | `/matches` | upload a demo | multipart field `demo`; sets owner; 201; throttled 30/min |
 | GET | `/matches/{match}` | match detail + players | owner only (403 otherwise); players by kills desc |
 | GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | owner only; see [heatmap.md](heatmap.md) |
+| GET | `/matches/{match}/clutches` | clutches grouped by clutcher/round | owner only; each `{ round, size, killer_name, kills[] }` |
 | GET | `/matches/{match}/demo` | download the stored `.dem` | owner only; streamed from storage via `DemoStorage::download` |
 | POST | `/matches/{match}/reparse` | re-enqueue the stored demo | owner only; resets to `queued`; throttled 30/min; `ReparseMatchAction` |
 | DELETE | `/matches/{match}` | delete a match | owner only (403 otherwise); 204; `DeleteMatchAction` |

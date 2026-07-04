@@ -4,6 +4,7 @@ import { api, ApiError, tokenStore } from '../../lib/api'
 const listMatches = () => api.get('/matches')
 const getMatch = (id) => api.get(`/matches/${id}`)
 const getKillPositions = (id) => api.get(`/matches/${id}/kill-positions`)
+const getClutches = (id) => api.get(`/matches/${id}/clutches`)
 const deleteMatch = (id) => api.delete(`/matches/${id}`)
 const reparseMatch = (id) => api.post(`/matches/${id}/reparse`)
 const uploadDemo = (file) => {
@@ -124,6 +125,31 @@ export function useKillPositions(id) {
     setLoading(true)
     getKillPositions(id)
       .then((d) => active && setData({ map: d.map, tickRate: d.tick_rate, demo: d.demo, points: d.points ?? [] }))
+      .catch((e) => active && setError(e.code ?? 'error.unknown'))
+      .finally(() => active && setLoading(false))
+    return () => {
+      active = false
+    }
+  }, [id])
+
+  return { ...data, loading, error }
+}
+
+// Clutches for a match (see MatchController@clutches): grouped by the round/clutcher.
+export function useClutches(id) {
+  const [data, setData] = useState({ clutches: [], tickRate: null, demo: null })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!id) {
+      setData({ clutches: [], tickRate: null, demo: null })
+      return
+    }
+    let active = true
+    setLoading(true)
+    getClutches(id)
+      .then((d) => active && setData({ clutches: d.clutches ?? [], tickRate: d.tick_rate, demo: d.demo }))
       .catch((e) => active && setError(e.code ?? 'error.unknown'))
       .finally(() => active && setLoading(false))
     return () => {

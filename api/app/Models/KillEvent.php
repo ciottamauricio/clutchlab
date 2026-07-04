@@ -14,6 +14,7 @@ class KillEvent extends Model
     protected $casts = [
         'round' => 'integer',
         'tick' => 'integer',
+        'clutch' => 'integer',
         'headshot' => 'boolean',
         'opening' => 'boolean',
         'victim_x' => 'float',
