@@ -10,6 +10,7 @@ const CALIBRATION = {
   de_nuke: { posX: -3453, posY: 2887, scale: 7.0 },
   de_ancient: { posX: -2953, posY: 2164, scale: 5.0 },
   de_anubis: { posX: -2796, posY: 3328, scale: 5.22 },
+  de_cache: { posX: -2000, posY: 3250, scale: 5.5 },
   de_dust2: { posX: -2476, posY: 3239, scale: 4.4 },
   de_overpass: { posX: -4831, posY: 1781, scale: 5.2 },
   de_train: { posX: -2308, posY: 2078, scale: 4.082077 },
