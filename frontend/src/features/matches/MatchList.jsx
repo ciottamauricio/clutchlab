@@ -1,8 +1,8 @@
 import StatusBadge from './StatusBadge'
-import { formatMatchDate, formatDuration, matchTeams } from './format'
+import { formatMatchDate, formatDuration, matchTeams, matchDate } from './format'
 
 function MatchCard({ match }) {
-  const date = formatMatchDate(match.created_at)
+  const date = formatMatchDate(matchDate(match))
   const duration = formatDuration(match.duration_seconds)
 
   if (match.status !== 'parsed') {

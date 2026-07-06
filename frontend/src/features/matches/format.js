@@ -1,7 +1,12 @@
 // Display helpers shared by the match card and the dashboard title.
 
-// Date + time (e.g. "Jul 3, 2026, 2:32 PM"), locale-aware. This is the upload timestamp —
-// the demo's actual in-game date/time isn't parsed.
+// The date to show for a match: when it was actually played (parsed from the demo filename,
+// `played_at`) when available, otherwise the upload time as a fallback.
+export function matchDate(match) {
+  return match?.played_at || match?.created_at || null
+}
+
+// Date + time (e.g. "Jul 3, 2026, 2:32 PM"), locale-aware.
 export function formatMatchDate(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleString(undefined, {

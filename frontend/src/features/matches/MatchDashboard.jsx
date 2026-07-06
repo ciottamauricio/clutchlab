@@ -5,7 +5,7 @@ import StatusBadge from './StatusBadge'
 import Heatmap from './Heatmap'
 import Clutches from './Clutches'
 import MatchSearch from '../search/MatchSearch'
-import { formatMatchDate, formatDuration, matchTeams } from './format'
+import { formatMatchDate, formatDuration, matchTeams, matchDate } from './format'
 
 export default function MatchDashboard({ matchId }) {
   const { match, error, reload } = useMatch(matchId)
@@ -18,7 +18,7 @@ export default function MatchDashboard({ matchId }) {
   const inProgress = match.status !== 'parsed' && match.status !== 'failed'
   const parsed = match.status === 'parsed'
   const players = match.players ?? []
-  const date = formatMatchDate(match.created_at)
+  const date = formatMatchDate(matchDate(match))
   const duration = formatDuration(match.duration_seconds)
 
   // Group the flat player list into the two rosters. Players arrive sorted by

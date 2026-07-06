@@ -23,7 +23,20 @@ class MatchResource extends JsonResource
             'duration_seconds' => $this->duration_seconds,
             'parsed_at' => $this->parsed_at,
             'created_at' => $this->created_at,
+            // When the match was actually played, parsed from the demo filename
+            // (`YYYY-MM-DD__HHMM__…`); null when the name doesn't carry it. Naive local time
+            // (no timezone) so the frontend shows the wall-clock the demo was named with.
+            'played_at' => $this->playedAt(),
             'players' => MatchPlayerStatResource::collection($this->whenLoaded('playerStats')),
         ];
+    }
+
+    private function playedAt(): ?string
+    {
+        if ($this->original_filename && preg_match('/(\d{4})-(\d{2})-(\d{2})__(\d{2})(\d{2})/', $this->original_filename, $m)) {
+            return sprintf('%s-%s-%sT%s:%s:00', $m[1], $m[2], $m[3], $m[4], $m[5]);
+        }
+
+        return null;
     }
 }
