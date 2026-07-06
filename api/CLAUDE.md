@@ -22,6 +22,7 @@ changes.** The code follows the doc, not the other way around.
 | Tactics board | Implemented (Step 3) | `docs/domains/tactics.md` |
 | Search | Implemented (Step 4) | `docs/domains/search.md` |
 | Kill heatmap — kill positions on radar | Implemented | `docs/domains/heatmap.md` |
+| Awards — cross-match superlatives | Implemented | `docs/domains/awards.md` |
 | Notifications | Planned (Step 5) | `docs/domains/notifications.md` |
 
 ## API conventions (non-negotiable)

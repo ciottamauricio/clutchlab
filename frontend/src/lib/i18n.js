@@ -15,7 +15,7 @@ const MESSAGES = {
   'demo.required': 'Please choose a .dem file',
   'demo.invalid': 'That upload is not a valid file',
   'demo.wrong_extension': 'Only .dem files are accepted',
-  'demo.file_too_large': 'That demo is too large (max 500 MB)',
+  'demo.file_too_large': 'That demo is too large (max 1 GB)',
   'demo.storage_failed': 'Uploading to storage failed',
 
   'auth.name_required': 'Please enter your name',
@@ -33,6 +33,7 @@ const MESSAGES = {
   'team.role_required': 'Please pick a role',
   'team.role_invalid': 'That role is not allowed',
   'team.already_member': 'That user is already on the team',
+  'team.steam_id_required': 'Pick a player to add',
 
   'tactic.name_required': 'Please name the tactic',
 

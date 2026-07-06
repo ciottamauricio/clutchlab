@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Actions\AddTeamMemberAction;
+use App\Actions\ComputeTeamStatsAction;
 use App\Actions\CreateTeamAction;
 use App\Http\Requests\AddTeamMemberRequest;
+use App\Http\Requests\AddTeamPlayerRequest;
 use App\Http\Requests\StoreTeamRequest;
 use App\Http\Resources\TeamResource;
 use App\Models\Team;
@@ -30,7 +32,36 @@ class TeamController extends Controller
     {
         $this->authorize('view', $team);
 
-        return new TeamResource($team->load('members'));
+        return new TeamResource($team->load(['members', 'players']));
+    }
+
+    public function addPlayer(AddTeamPlayerRequest $request, Team $team): TeamResource
+    {
+        $this->authorize('manageMembers', $team);
+
+        // Idempotent: re-adding the same steam_id updates its nickname instead of erroring.
+        $team->players()->updateOrCreate(
+            ['steam_id' => $request->validated('steam_id')],
+            ['nickname' => $request->validated('nickname')],
+        );
+
+        return new TeamResource($team->load(['members', 'players']));
+    }
+
+    public function removePlayer(Team $team, string $steamId): TeamResource
+    {
+        $this->authorize('manageMembers', $team);
+
+        $team->players()->where('steam_id', $steamId)->delete();
+
+        return new TeamResource($team->load(['members', 'players']));
+    }
+
+    public function stats(Request $request, Team $team, ComputeTeamStatsAction $action): JsonResponse
+    {
+        $this->authorize('view', $team);
+
+        return response()->json(['data' => $action->execute($team, $request->user())]);
     }
 
     public function addMember(AddTeamMemberRequest $request, Team $team, AddTeamMemberAction $action): TeamResource

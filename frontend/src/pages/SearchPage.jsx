@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useSearch, useClutchSizes } from '../features/search/api'
+import { useTeams } from '../features/teams/api'
 import KillsTable from '../features/search/KillsTable'
 import RoundsTable from '../features/search/RoundsTable'
 import WeaponSelect from '../features/search/WeaponSelect'
@@ -13,10 +14,11 @@ export default function SearchPage() {
   const [kind, setKind] = useState('kills')
   const [lastKind, setLastKind] = useState('kills')
   const [q, setQ] = useState('')
-  const [kf, setKf] = useState({ weapon: '', side: '', map: '', clutch: '', headshot: false, opening: false })
+  const [kf, setKf] = useState({ team_id: '', weapon: '', side: '', map: '', clutch: '', headshot: false, opening: false })
   const [rf, setRf] = useState({ winner: '', reason: '', map: '', ct_alive: '', t_alive: '', ct_buy: '', t_buy: '' })
   const { hits, total, loading, error, ran, run } = useSearch()
   const clutchSizes = useClutchSizes()
+  const { teams } = useTeams()
 
   const submit = (e) => {
     e.preventDefault()
@@ -36,6 +38,12 @@ export default function SearchPage() {
 
         {kind === 'kills' ? (
           <>
+            {teams.length > 0 && (
+              <select value={kf.team_id} onChange={(e) => setKf({ ...kf, team_id: e.target.value })}>
+                <option value="">any team</option>
+                {teams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
+              </select>
+            )}
             <WeaponSelect value={kf.weapon} onChange={(v) => setKf({ ...kf, weapon: v })} />
             <select value={kf.side} onChange={(e) => setKf({ ...kf, side: e.target.value })}>
               {SIDES.map((s) => <option key={s} value={s}>{s || 'any side'}</option>)}

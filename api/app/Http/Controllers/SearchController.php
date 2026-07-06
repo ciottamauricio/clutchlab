@@ -24,7 +24,20 @@ class SearchController extends Controller
 
     public function kills(Request $request, SearchIndex $index): JsonResponse
     {
-        return $this->run($request, $index, 'kills', self::KILL_FILTERS);
+        $extra = [];
+
+        // A roster team scopes results to its players' kills. Resolved server-side to the
+        // roster's steam_ids (only the caller's own teams) and applied as an IN filter.
+        if ($request->filled('team_id')) {
+            $team = $request->user()->teams()->whereKey((int) $request->query('team_id'))->first();
+            if ($team) {
+                $ids = $team->players()->pluck('steam_id')->all();
+                // Empty roster → a sentinel that matches nothing, so the filter never widens results.
+                $extra['killer_steam_id'] = $ids ?: ['__none__'];
+            }
+        }
+
+        return $this->run($request, $index, 'kills', self::KILL_FILTERS, $extra);
     }
 
     public function rounds(Request $request, SearchIndex $index): JsonResponse
@@ -48,9 +61,9 @@ class SearchController extends Controller
         return response()->json(['data' => $sizes]);
     }
 
-    private function run(Request $request, SearchIndex $index, string $name, array $allowed): JsonResponse
+    private function run(Request $request, SearchIndex $index, string $name, array $allowed, array $extra = []): JsonResponse
     {
-        $filters = [];
+        $filters = $extra;
         foreach ($allowed as $field => $type) {
             if ($request->filled($field)) {
                 $filters[$field] = $this->coerce($request->query($field), $type);

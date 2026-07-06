@@ -231,10 +231,12 @@
   color: var(--text-dim);
 }
 
-/* Section callouts inside the match detail. */
+/* Section callouts inside the match detail and team detail. */
 .heatmap h3,
 .match-search h3,
-.clutches h3 {
+.clutches h3,
+.roster h3,
+.team-stats h3 {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -247,12 +249,155 @@
 
 .heatmap h3::before,
 .match-search h3::before,
-.clutches h3::before {
+.clutches h3::before,
+.roster h3::before,
+.team-stats h3::before {
   content: '';
   width: 6px;
   height: 6px;
   transform: rotate(45deg);
   background: var(--text-dim);
+}
+
+/* ---------- Team roster + stat board ---------- */
+
+.roster,
+.team-stats {
+  margin-top: 28px;
+}
+
+.roster .mono-dim {
+  font: 400 12px var(--mono);
+  color: var(--text-dim);
+}
+
+.team-stats .board-wrap {
+  overflow-x: auto;
+}
+
+/* ---------- Awards (leaderboards) ---------- */
+
+.awards-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.awards-filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.awards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.award-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.award-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.award-emoji {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.award-card-head h3 {
+  margin: 0;
+  font: 500 12px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-h);
+}
+
+.award-hint {
+  margin: 3px 0 0;
+  font-size: 12px;
+}
+
+.award-leaders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.award-leaders li {
+  border-top: 1px solid var(--border);
+}
+
+.award-leaders li:first-child {
+  border-top: none;
+}
+
+.award-leader {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 4px;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.award-leader:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.award-rank {
+  font: 500 11px var(--mono);
+  color: var(--text-dim);
+  text-align: right;
+}
+
+.award-name {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.award-leaders li.lead .award-name {
+  color: var(--text-h);
+}
+
+.award-value {
+  font: 600 13px var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-h);
+  white-space: nowrap;
+}
+
+.award-leaders li.lead .award-value {
+  color: var(--t);
+}
+
+.award-sub {
+  font-weight: 400;
+  color: var(--text-dim);
 }
 
 /* ---------- Upload ---------- */
@@ -764,6 +909,17 @@
   white-space: nowrap;
 }
 
+/* A clutch count that opens the watch dialog — keeps the badge look, not the button one. */
+button.clutch-open {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+button.clutch-open:hover {
+  background: var(--t);
+  color: var(--bg);
+}
+
 /* ---------- Heatmap ---------- */
 
 .radar-head {
@@ -1153,6 +1309,13 @@
   border: 1px solid var(--border-strong);
   border-radius: 12px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+/* Wider variant for list dialogs (a player's clutches across matches). Scrolls when tall. */
+.modal.modal-wide {
+  max-width: 640px;
+  max-height: 85vh;
+  overflow-y: auto;
 }
 
 .modal-title {

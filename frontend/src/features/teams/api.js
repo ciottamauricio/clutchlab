@@ -51,3 +51,78 @@ export function useTeam(id) {
 export const createTeam = (name) => api.post('/teams', { name })
 export const addMember = (teamId, email, role) => api.post(`/teams/${teamId}/members`, { email, role })
 export const removeMember = (teamId, userId) => api.delete(`/teams/${teamId}/members/${userId}`)
+
+export const addPlayer = (teamId, steamId, nickname) =>
+  api.post(`/teams/${teamId}/players`, { steam_id: steamId, nickname: nickname || null })
+export const removePlayer = (teamId, steamId) => api.delete(`/teams/${teamId}/players/${steamId}`)
+
+// The catalog of every player seen across the caller's matches — the roster pick list.
+export function usePlayerCatalog() {
+  const [players, setPlayers] = useState([])
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let active = true
+    api.get('/players')
+      .then((d) => active && setPlayers(d.players ?? []))
+      .catch((e) => active && setError(e.code ?? 'error.unknown'))
+    return () => {
+      active = false
+    }
+  }, [])
+
+  return { players, error }
+}
+
+// A player's won clutches across the caller's matches (grouped by match+round), loaded on
+// demand when the stat board opens the clutch dialog for that player.
+export function usePlayerClutches(steamId) {
+  const [clutches, setClutches] = useState([])
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!steamId) {
+      setClutches([])
+      return
+    }
+    let active = true
+    setLoading(true)
+    setError(null)
+    api.get(`/players/${steamId}/clutches`)
+      .then((d) => active && setClutches(d.clutches ?? []))
+      .catch((e) => active && setError(e.code ?? 'error.unknown'))
+      .finally(() => active && setLoading(false))
+    return () => {
+      active = false
+    }
+  }, [steamId])
+
+  return { clutches, error, loading }
+}
+
+// Roster stat board for a team, aggregated across the caller's matches. Refetched when the
+// roster changes (bump `reloadKey`).
+export function useTeamStats(teamId, reloadKey = 0) {
+  const [players, setPlayers] = useState([])
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!teamId) {
+      setPlayers([])
+      return
+    }
+    let active = true
+    setLoading(true)
+    api.get(`/teams/${teamId}/stats`)
+      .then((d) => active && setPlayers(d.players ?? []))
+      .catch((e) => active && setError(e.code ?? 'error.unknown'))
+      .finally(() => active && setLoading(false))
+    return () => {
+      active = false
+    }
+  }, [teamId, reloadKey])
+
+  return { players, error, loading }
+}
