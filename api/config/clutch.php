@@ -6,7 +6,7 @@ return [
     'parse_queue' => env('PARSE_QUEUE', 'demo_parse_jobs'),
 
     // Hard cap on uploaded demo size, in kilobytes (validation rule + nginx/php limits).
-    'max_demo_kb' => env('MAX_DEMO_KB', 512000),
+    'max_demo_kb' => env('MAX_DEMO_KB', 1048576),
 
     // Meilisearch (search read model), shared with the Go worker (the writer).
     'meili' => [

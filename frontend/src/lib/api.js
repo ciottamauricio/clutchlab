@@ -40,6 +40,9 @@ async function request(path, { auth = true, headers = {}, ...options } = {}) {
       tokenStore.clear()
       window.dispatchEvent(new Event('auth:unauthorized'))
     }
+    // A body over the limit is rejected by nginx (client_max_body_size) with a raw HTML
+    // 413 — no JSON code to map — so name it here instead of a generic error.
+    if (res.status === 413) throw new ApiError('demo.file_too_large', 413)
     throw new ApiError(firstCode(body), res.status)
   }
 
