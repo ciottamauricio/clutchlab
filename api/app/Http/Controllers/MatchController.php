@@ -115,6 +115,50 @@ class MatchController extends Controller
         ]]);
     }
 
+    // Side-by-side comparison of the match's two teams (CT vs T): scoreboard totals plus the
+    // opening-duel and clutch stats that only kill_events carries. Teams are the stable
+    // whole-match sides (killer_team / team_side), so the numbers are steady across the half.
+    public function teamStats(Request $request, GameMatch $match): JsonResponse
+    {
+        $this->authorize('view', $match);
+
+        $board = $match->playerStats()
+            ->selectRaw('team_side, sum(kills) kills, sum(deaths) deaths, sum(assists) assists, sum(headshots) headshots')
+            ->groupBy('team_side')->get()->keyBy('team_side');
+
+        $opening = $match->killEvents()->where('opening', true)
+            ->selectRaw('killer_team, count(*) c')->groupBy('killer_team')->pluck('c', 'killer_team');
+
+        $clutches = $match->killEvents()->where('clutch', '>', 0)
+            ->selectRaw('killer_team, count(DISTINCT round) c')->groupBy('killer_team')->pluck('c', 'killer_team');
+
+        // Each opening kill is one team's opener and the other team's opening death, so a
+        // team's opening deaths are the opposing team's opening kills.
+        $team = function (string $side, string $other, ?string $name, ?int $score) use ($board, $opening, $clutches) {
+            $b = $board[$side] ?? null;
+            $kills = (int) ($b->kills ?? 0);
+            $headshots = (int) ($b->headshots ?? 0);
+
+            return [
+                'side' => $side,
+                'name' => $name ?: ($side === 'CT' ? 'Counter-Terrorists' : 'Terrorists'),
+                'score' => (int) $score,
+                'kills' => $kills,
+                'deaths' => (int) ($b->deaths ?? 0),
+                'assists' => (int) ($b->assists ?? 0),
+                'hs_pct' => $kills > 0 ? (int) round($headshots / $kills * 100) : 0,
+                'opening_kills' => (int) ($opening[$side] ?? 0),
+                'opening_deaths' => (int) ($opening[$other] ?? 0),
+                'clutches' => (int) ($clutches[$side] ?? 0),
+            ];
+        };
+
+        return response()->json(['data' => [
+            'ct' => $team('CT', 'T', $match->ct_name, $match->score_ct),
+            't' => $team('T', 'CT', $match->t_name, $match->score_t),
+        ]]);
+    }
+
     public function destroy(Request $request, GameMatch $match, DeleteMatchAction $action): JsonResponse
     {
         $this->authorize('delete', $match);

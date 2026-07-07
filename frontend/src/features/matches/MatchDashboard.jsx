@@ -4,6 +4,7 @@ import Scoreboard from './Scoreboard'
 import StatusBadge from './StatusBadge'
 import Heatmap from './Heatmap'
 import Clutches from './Clutches'
+import TeamComparison from './TeamComparison'
 import MatchSearch from '../search/MatchSearch'
 import { formatMatchDate, formatDuration, matchTeams, matchDate } from './format'
 
@@ -29,6 +30,10 @@ export default function MatchDashboard({ matchId }) {
   ].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
   const unassigned = players.filter((p) => p.team_side !== 'CT' && p.team_side !== 'T')
   const [teamA, teamB] = matchTeams(match)
+  const knifeWinner =
+    match.knife_round_winner === 'CT' ? (match.ct_name || 'Counter-Terrorists')
+      : match.knife_round_winner === 'T' ? (match.t_name || 'Terrorists')
+        : null
 
   return (
     <section className="dashboard">
@@ -69,7 +74,11 @@ export default function MatchDashboard({ matchId }) {
             ))}
             <Scoreboard title="Unassigned" side="" score={null} players={unassigned} />
           </div>
+          {knifeWinner && (
+            <p className="knife-note"><span aria-hidden="true">🔪</span> {knifeWinner} won the knife round</p>
+          )}
           <p className="demo-file">{match.original_filename}</p>
+          <TeamComparison matchId={matchId} />
           <Heatmap matchId={matchId} players={players} teams={[teamA, teamB]} />
           <MatchSearch matchId={matchId} players={players} teams={[teamA, teamB]} />
           <Clutches matchId={matchId} />

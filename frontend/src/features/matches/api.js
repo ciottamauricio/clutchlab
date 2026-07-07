@@ -5,6 +5,7 @@ const listMatches = () => api.get('/matches')
 const getMatch = (id) => api.get(`/matches/${id}`)
 const getKillPositions = (id) => api.get(`/matches/${id}/kill-positions`)
 const getClutches = (id) => api.get(`/matches/${id}/clutches`)
+const getTeamStats = (id) => api.get(`/matches/${id}/team-stats`)
 const deleteMatch = (id) => api.delete(`/matches/${id}`)
 const reparseMatch = (id) => api.post(`/matches/${id}/reparse`)
 const uploadDemo = (file) => {
@@ -158,6 +159,28 @@ export function useClutches(id) {
   }, [id])
 
   return { ...data, loading, error }
+}
+
+// Side-by-side CT vs T comparison for the match (see MatchController@teamStats).
+export function useTeamComparison(id) {
+  const [data, setData] = useState({ ct: null, t: null })
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!id) {
+      setData({ ct: null, t: null })
+      return
+    }
+    let active = true
+    getTeamStats(id)
+      .then((d) => active && setData({ ct: d.ct, t: d.t }))
+      .catch((e) => active && setError(e.code ?? 'error.unknown'))
+    return () => {
+      active = false
+    }
+  }, [id])
+
+  return { ...data, error }
 }
 
 // Streams the stored .dem through the api (auth header required, so not a plain link)

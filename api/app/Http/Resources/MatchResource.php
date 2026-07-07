@@ -21,6 +21,7 @@ class MatchResource extends JsonResource
             't_name' => $this->t_name,
             'total_rounds' => $this->total_rounds,
             'duration_seconds' => $this->duration_seconds,
+            'knife_round_winner' => $this->knife_round_winner,
             'parsed_at' => $this->parsed_at,
             'created_at' => $this->created_at,
             // When the match was actually played, parsed from the demo filename

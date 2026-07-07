@@ -3,9 +3,8 @@ export default function Scoreboard({ title, side, score, players }) {
   if (!players?.length) return null
 
   return (
-    <div className="team">
+    <div className={`team${side ? ` team-${side.toLowerCase()}` : ''}`}>
       <header className="team-head">
-        <span className={`side side-${side}`}>{side || '—'}</span>
         <span className="team-name">{title}</span>
         {score != null && <span className="team-score">{score}</span>}
       </header>
