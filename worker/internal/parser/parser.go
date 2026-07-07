@@ -28,10 +28,11 @@ type KillEvent struct {
 	Round         int
 	KillerSteamID uint64
 	KillerName    string
-	VictimSteamID uint64
-	VictimName    string
-	AssisterName  string
-	Weapon        string
+	VictimSteamID   uint64
+	VictimName      string
+	AssisterSteamID uint64
+	AssisterName    string
+	Weapon          string
 	Headshot      bool
 	Opening       bool
 	Side          string
@@ -68,9 +69,12 @@ type ParseResult struct {
 	// DurationSeconds spans actual play (first round start to last round end) —
 	// warmup and any post-game time are excluded.
 	DurationSeconds float64
-	Players         []*PlayerStat
-	Kills           []KillEvent
-	Rounds          []RoundEvent
+	// KnifeRoundWinner is the stable side ("CT"/"T") of the team that won the pre-match knife
+	// round, or "" if there was none. The knife round's kills are stripped from the stats.
+	KnifeRoundWinner string
+	Players          []*PlayerStat
+	Kills            []KillEvent
+	Rounds           []RoundEvent
 }
 
 func ParseDemo(r io.Reader) (result *ParseResult, err error) {
@@ -226,10 +230,11 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 			Round:         currentRound,
 			KillerSteamID: steamID(e.Killer),
 			KillerName:    name(e.Killer),
-			VictimSteamID: steamID(e.Victim),
-			VictimName:    name(e.Victim),
-			AssisterName:  name(e.Assister),
-			Weapon:        weaponName(e.Weapon),
+			VictimSteamID:   steamID(e.Victim),
+			VictimName:      name(e.Victim),
+			AssisterSteamID: steamID(e.Assister),
+			AssisterName:    name(e.Assister),
+			Weapon:          weaponName(e.Weapon),
 			Headshot:      e.IsHeadshot,
 			Opening:       opening,
 			Side:          teamSide(killerTeam(e.Killer)),
@@ -328,7 +333,83 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		}
 	}
 
+	stripKnifeRound(res, byID)
+
 	return res, nil
+}
+
+// stripKnifeRound removes the pre-match knife round (which only decides side choice) from the
+// stats. A knife round kill is a knife kill that lands before the first gun kill of the match —
+// a tick-based test, since game restarts around the knife round make round numbers unreliable
+// (the knife round and real round 1 can share a number). It strips those kills from the
+// scoreboard and the event list, records the winning team, and recomputes opening kills.
+func stripKnifeRound(res *ParseResult, byID map[uint64]*PlayerStat) {
+	firstGunTick := -1
+	for _, k := range res.Kills {
+		if k.Weapon != "knife" && (firstGunTick < 0 || k.Tick < firstGunTick) {
+			firstGunTick = k.Tick
+		}
+	}
+	if firstGunTick < 0 {
+		return // no gun kills at all — nothing to anchor the knife round against
+	}
+
+	kept := res.Kills[:0]
+	winByTeam := map[string]int{}
+	lastTick, lastWinner := -1, ""
+	removed := 0
+	for _, k := range res.Kills {
+		if !(k.Weapon == "knife" && k.Tick < firstGunTick) {
+			kept = append(kept, k)
+			continue
+		}
+		removed++
+		if s := byID[k.KillerSteamID]; s != nil {
+			s.Kills--
+			if k.Headshot {
+				s.Headshots--
+			}
+		}
+		if s := byID[k.VictimSteamID]; s != nil {
+			s.Deaths--
+		}
+		if s := byID[k.AssisterSteamID]; s != nil {
+			s.Assists--
+		}
+		if k.KillerTeam != "" {
+			winByTeam[k.KillerTeam]++
+			if k.Tick > lastTick {
+				lastTick, lastWinner = k.Tick, k.KillerTeam
+			}
+		}
+	}
+	if removed == 0 {
+		return
+	}
+	res.Kills = kept
+
+	// Winner: the side with the most knife-round kills (whoever eliminated more), breaking a
+	// tie by whoever landed the final blow.
+	switch {
+	case winByTeam["CT"] > winByTeam["T"]:
+		res.KnifeRoundWinner = "CT"
+	case winByTeam["T"] > winByTeam["CT"]:
+		res.KnifeRoundWinner = "T"
+	default:
+		res.KnifeRoundWinner = lastWinner
+	}
+
+	// The removed kills may have held a round's opening flag, so recompute it as the earliest
+	// surviving kill of each round.
+	firstTick := map[int]int{}
+	for _, k := range res.Kills {
+		if t, ok := firstTick[k.Round]; !ok || k.Tick < t {
+			firstTick[k.Round] = k.Tick
+		}
+	}
+	for i := range res.Kills {
+		res.Kills[i].Opening = res.Kills[i].Tick == firstTick[res.Kills[i].Round]
+	}
 }
 
 type hurtKey struct {

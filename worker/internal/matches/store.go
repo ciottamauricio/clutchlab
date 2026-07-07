@@ -68,10 +68,10 @@ func (s *Store) Save(id int64, res *parser.ParseResult) error {
 	if _, err := tx.Exec(`UPDATE matches SET
 		status='parsed', error_code=NULL,
 		map_name=$2, score_ct=$3, score_t=$4, ct_name=$5, t_name=$6, total_rounds=$7, tick_rate=$8,
-		duration_seconds=$9, parsed_at=now(), updated_at=now()
+		duration_seconds=$9, knife_round_winner=$10, parsed_at=now(), updated_at=now()
 		WHERE id=$1`,
 		id, res.MapName, res.ScoreCT, res.ScoreT, res.CTName, res.TName, res.TotalRounds, res.TickRate,
-		res.DurationSeconds); err != nil {
+		res.DurationSeconds, nullIfEmpty(res.KnifeRoundWinner)); err != nil {
 		return err
 	}
 
@@ -188,4 +188,11 @@ func ownerArg(ownerID int64) any {
 		return nil
 	}
 	return ownerID
+}
+
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }

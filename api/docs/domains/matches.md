@@ -40,6 +40,7 @@ to the user who uploaded it, and access is owner-only (see Authorization & owner
 | total_rounds | uint, nullable | worker | `score_ct + score_t` |
 | tick_rate | float, nullable | worker | server tick rate, used to convert ticks to seconds |
 | duration_seconds | float, nullable | worker | play time only: first round's freezetime-end to the last round's end (excludes warmup/post-game) |
+| knife_round_winner | string(2), nullable | worker | stable side (`CT`/`T`) that won the pre-match knife round; `null` if none |
 | parsed_at | timestamp, nullable | worker | set on success |
 | created_at / updated_at | timestamps | api + worker | |
 
@@ -100,6 +101,12 @@ Transition rules:
    treat non-`parsed` matches as "no stats yet", not "zero stats".
 9. A match belongs to the user who uploaded it (`user_id`); only the owner may view or
    delete it (see Authorization & ownership).
+10. **The pre-match knife round is excluded from the stats.** It only decides side choice, so
+    the worker strips its kills from the scoreboard and `kill_events` and records the winning
+    side in `knife_round_winner`. Knife-round kills are detected as knife kills landing before
+    the match's first gun kill (a tick test — round numbers are unreliable because the restart
+    around the knife round can merge it with real round 1). Legitimate mid-game knife kills are
+    kept. Opening-kill flags are recomputed on the surviving kills.
 
 ## Validation (boundary) — `app/Http/Requests/UploadDemoRequest.php`
 
