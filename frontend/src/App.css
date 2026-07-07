@@ -1331,6 +1331,19 @@ button.clutch-open:hover {
   color: var(--text-h);
 }
 
+/* The full default install path is long — render it as a wrapping chip so it never
+   overflows the command box. */
+.watch-steps code.watch-path {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 2px 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  word-break: break-all;
+}
+
 /* ---------- Modal ---------- */
 
 .modal-overlay {

@@ -95,7 +95,9 @@ export default function WatchInGame({ matchId, tick, tickRate, demo, killer }) {
         <li>
           <button type="button" className="link-btn" disabled={downloading} onClick={download}>
             {downloading ? 'Downloading…' : 'Download demo'}
-          </button>{' '}into your CS2 folder (<code>…\game\csgo</code>) — or in CS2 use <strong>Watch → Load a demo file</strong>
+          </button>{' '}into your CS2 folder{' '}
+          <code className="watch-path">C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\game\csgo</code>{' '}
+          — or in CS2 use <strong>Watch → Load a demo file</strong>
         </li>
         <li>Run the first command (or load it from the menu) and wait for the demo to start</li>
         <li>Run the second command — it lands paused ~{LEAD_SECONDS}s before the kill</li>
