@@ -33,8 +33,10 @@ class MatchResource extends JsonResource
 
     private function playedAt(): ?string
     {
+        // The demo filename's `HHMM` is UTC. Emit it with a `Z` so the frontend renders it in
+        // the viewer's local timezone (e.g. 2237 UTC shows as 19:37 in Brazil, UTC-3).
         if ($this->original_filename && preg_match('/(\d{4})-(\d{2})-(\d{2})__(\d{2})(\d{2})/', $this->original_filename, $m)) {
-            return sprintf('%s-%s-%sT%s:%s:00', $m[1], $m[2], $m[3], $m[4], $m[5]);
+            return sprintf('%s-%s-%sT%s:%s:00Z', $m[1], $m[2], $m[3], $m[4], $m[5]);
         }
 
         return null;
