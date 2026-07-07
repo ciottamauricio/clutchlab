@@ -970,11 +970,56 @@ button.clutch-open:hover {
   width: 100%;
   max-width: 560px;
   aspect-ratio: 1 / 1;
-  background-size: cover;
-  background-position: center;
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
+  user-select: none;
+}
+
+/* The zoom/pan layer: image + dots share this transform so they stay aligned. */
+.radar-stage {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.radar-zoom {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 6;
+}
+
+.radar-zoom button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font: 600 16px var(--mono);
+  line-height: 1;
+  color: var(--text-h);
+  background: rgba(20, 26, 33, 0.85);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+}
+
+.radar-zoom button:hover:not(:disabled) {
+  background: rgba(27, 35, 45, 0.95);
+  border-color: var(--text-dim);
+}
+
+.radar-zoom button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .dot {
@@ -1009,8 +1054,9 @@ button.clutch-open:hover {
   box-shadow: 0 0 0 1px #fff, 0 0 3px rgba(0, 0, 0, 0.8);
 }
 
+/* The active (hovered) scale-up is folded into each dot's inline transform, since dots also
+   carry an inverse-zoom scale; here we only lift and outline it. */
 .dot-active {
-  transform: scale(1.9);
   z-index: 5;
   box-shadow: 0 0 0 2px var(--text-h), 0 0 6px rgba(0, 0, 0, 0.8);
 }

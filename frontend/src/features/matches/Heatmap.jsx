@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useKillPositions } from './api'
 import { hasRadar, radarUrl, toRadar } from './radar'
 import WeaponSelect from '../search/WeaponSelect'
@@ -24,6 +24,80 @@ export default function Heatmap({ matchId, players, teams }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [selected])
+
+  // Radar zoom/pan. The image and dots share one transformed stage, so they stay aligned at
+  // any zoom. `view` is { scale, x, y } (translate in px); pan is clamped so the map can't be
+  // dragged off the viewport, and zoom keeps the point under the cursor fixed.
+  const MIN_SCALE = 1
+  const MAX_SCALE = 6
+  const viewportRef = useRef(null)
+  const movedRef = useRef(false)
+  const [view, setView] = useState({ scale: 1, x: 0, y: 0 })
+  const [panning, setPanning] = useState(false)
+
+  // Reset when the match/map changes.
+  useEffect(() => setView({ scale: 1, x: 0, y: 0 }), [map])
+
+  const clampView = (v, rect) => {
+    const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale))
+    const minX = rect.width * (1 - scale)
+    const minY = rect.height * (1 - scale)
+    return { scale, x: Math.min(0, Math.max(minX, v.x)), y: Math.min(0, Math.max(minY, v.y)) }
+  }
+
+  const zoomAt = (clientX, clientY, factor) => {
+    const vp = viewportRef.current
+    if (!vp) return
+    const rect = vp.getBoundingClientRect()
+    const px = clientX - rect.left
+    const py = clientY - rect.top
+    setView((v) => {
+      const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale * factor))
+      const k = scale / v.scale
+      return clampView({ scale, x: px - (px - v.x) * k, y: py - (py - v.y) * k }, rect)
+    })
+  }
+
+  const zoomFromButton = (factor) => {
+    const rect = viewportRef.current?.getBoundingClientRect()
+    if (rect) zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor)
+  }
+
+  // Wheel zoom needs a non-passive listener to preventDefault (React's onWheel is passive).
+  useEffect(() => {
+    const vp = viewportRef.current
+    if (!vp) return
+    const onWheel = (e) => {
+      e.preventDefault()
+      zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.15 : 1 / 1.15)
+    }
+    vp.addEventListener('wheel', onWheel, { passive: false })
+    return () => vp.removeEventListener('wheel', onWheel)
+  }, [map, loading])
+
+  // Drag to pan (window listeners, not pointer capture, so a dot's click still lands when
+  // zoomed). movedRef is reset on every press so a real click after a pan isn't swallowed.
+  const onMouseDown = (e) => {
+    movedRef.current = false
+    if (view.scale <= MIN_SCALE) return // nothing to pan; leave dot clicks alone
+    e.preventDefault()
+    setPanning(true)
+    const start = { sx: e.clientX, sy: e.clientY, ox: view.x, oy: view.y }
+    const rect = viewportRef.current.getBoundingClientRect()
+    const move = (ev) => {
+      const dx = ev.clientX - start.sx
+      const dy = ev.clientY - start.sy
+      if (Math.abs(dx) + Math.abs(dy) > 4) movedRef.current = true
+      setView((v) => clampView({ scale: v.scale, x: start.ox + dx, y: start.oy + dy }, rect))
+    }
+    const up = () => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+      setPanning(false)
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
 
   const names = [...new Set(players.map((p) => p.name).filter(Boolean))].sort()
 
@@ -77,22 +151,46 @@ export default function Heatmap({ matchId, players, teams }) {
             </div>
           </div>
           <div className="radar-wrap">
-            <div className="radar" style={{ backgroundImage: `url(${radarUrl(map)})` }}>
-              {shown.map((p, i) => {
-                const pos = toRadar(map, p.x, p.y)
-                if (!pos) return null
-                return (
-                  <span
-                    key={i}
-                    className={`dot dot-${p.side || 'none'}${p.headshot ? ' dot-hs' : ''}${hovered === i ? ' dot-active' : ''}`}
-                    style={{ left: `${pos.left * 100}%`, top: `${pos.top * 100}%` }}
-                    title={`${p.killer_name} → ${p.victim_name} (${p.weapon}, round ${p.round}) — click for hitgroups`}
-                    onMouseEnter={() => setHovered(i)}
-                    onMouseLeave={() => setHovered(null)}
-                    onClick={() => setSelected(p)}
-                  />
-                )
-              })}
+            <div
+              className="radar"
+              ref={viewportRef}
+              onMouseDown={onMouseDown}
+              style={{ cursor: view.scale > 1 ? (panning ? 'grabbing' : 'grab') : 'default' }}
+            >
+              <div
+                className="radar-stage"
+                style={{
+                  backgroundImage: `url(${radarUrl(map)})`,
+                  transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+                }}
+              >
+                {shown.map((p, i) => {
+                  const pos = toRadar(map, p.x, p.y)
+                  if (!pos) return null
+                  return (
+                    <span
+                      key={i}
+                      className={`dot dot-${p.side || 'none'}${p.headshot ? ' dot-hs' : ''}${hovered === i ? ' dot-active' : ''}`}
+                      style={{
+                        left: `${pos.left * 100}%`,
+                        top: `${pos.top * 100}%`,
+                        // Counter the stage zoom so dots keep a constant screen size — zooming
+                        // then spreads dense clusters instead of magnifying the overlap.
+                        transform: `scale(${(hovered === i ? 1.9 : 1) / view.scale})`,
+                      }}
+                      title={`${p.killer_name} → ${p.victim_name} (${p.weapon}, round ${p.round}) — click for hitgroups`}
+                      onMouseEnter={() => setHovered(i)}
+                      onMouseLeave={() => setHovered(null)}
+                      onClick={() => !movedRef.current && setSelected(p)}
+                    />
+                  )
+                })}
+              </div>
+              <div className="radar-zoom" onMouseDown={(e) => e.stopPropagation()}>
+                <button type="button" onClick={() => zoomFromButton(1.4)} disabled={view.scale >= MAX_SCALE} aria-label="Zoom in">+</button>
+                <button type="button" onClick={() => zoomFromButton(1 / 1.4)} disabled={view.scale <= MIN_SCALE} aria-label="Zoom out">−</button>
+                <button type="button" onClick={() => setView({ scale: 1, x: 0, y: 0 })} disabled={view.scale === 1} aria-label="Reset zoom">⌂</button>
+              </div>
             </div>
 
             {f.killer_name && (
