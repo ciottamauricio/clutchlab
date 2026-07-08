@@ -19,11 +19,18 @@ Step 1: matches become user-owned and access is enforced.
 
 ## Ubiquitous language
 
-- **User** — an authenticated account. Owns matches; belongs to teams.
+- **User** — an authenticated account. Owns matches; belongs to teams; carries a global role.
 - **Team** — a named group of users. Membership carries a role.
-- **Role** — a user's role *within a team*: `owner` | `igl` | `player` | `coach`. Roles are
+- **Global role** — a user's platform-wide role: `member` (default) | `admin`. The `admin` is
+  the **master admin** who manages every user and passes every authorization check. Distinct
+  from the per-team role below. Stored on `users.role`; not mass-assignable (an admin sets it).
+- **Team role** — a user's role *within a team*: `owner` | `igl` | `player` | `coach`. Roles are
   per-team (a user can be owner of one team and a player in another). Today only `owner`
   grants team-management permission.
+- **Linked SteamID** — an account's own SteamID64 (`users.steam_id`), admin-assigned and
+  optional. Bridges the login account to its demo stats (keyed by SteamID64) so a user can see
+  their own numbers. Not every account has one (a coach/analyst never played). Distinct from
+  `team_players`, which says a SteamID *plays for a team*, not that it *is an account*.
 - **Token** — a Sanctum personal access token; the bearer credential for the API.
 
 ## Entities
@@ -32,6 +39,9 @@ Step 1: matches become user-owned and access is enforced.
 
 - `id`, `name`, `email` (unique), `password` (hashed), **`locale`** (default `en`), timestamps.
 - `locale`: the user's language choice, persisted across devices (frontend i18n seam).
+- **`role`** (default `member`): global role, cast to `App\Enums\UserRole` (`member` | `admin`).
+  **Out of `Fillable`** — register/login can never set it; an admin assigns it deliberately.
+- **`steam_id`** (nullable, unique, string): the account's own SteamID64. Also out of `Fillable`.
 - Relations: `matches` (hasMany), `teams` (belongsToMany via `team_user`, `withPivot('role')`).
 
 ### `teams`
@@ -92,9 +102,14 @@ the caller's own matches — and stats are aggregated from `kill_events` for the
 | Add / remove members, change roles, rename/delete team | members with role `owner` |
 | Add / remove roster players, view team stats¹ | members with role `owner` (view stats: any member) |
 | Upload / view / delete a match | the match's owner only |
+| Everything above, on any resource | global `admin` (master admin) |
 
 `igl` / `player` / `coach` are descriptive roles for now; they gain permissions when later
 features attach behavior to them.
+
+The global **`admin`** is orthogonal to team roles: it isn't a team owner, it overrides every
+policy. Implemented as a single `Gate::before` short-circuit (returns `true` for admins, `null`
+otherwise so non-admins fall through to the ordinary policy) — see Authorization below.
 
 ## Rules & invariants
 
@@ -151,6 +166,7 @@ shows how the rostered ids performed in demos you uploaded.
 
 ## Authorization (policies)
 
+- `Gate::before` (in `AppServiceProvider::boot`): a global `admin` passes every check.
 - `GameMatchPolicy`: `view` / `delete` → `match.user_id === user.id`.
 - `TeamPolicy`: `view` → user is a member; `manageMembers` / `update` / `delete` → the user's
   role in that team is `owner`.
@@ -168,6 +184,9 @@ shows how the rostered ids performed in demos you uploaded.
 - No invitation/acceptance flow — an owner adds existing users directly by email.
 - Matches are user-owned only; team-sharing of matches is a later step.
 - Removing the last `owner` of a team isn't prevented.
+- **Global role & `steam_id` are set by hand** (tinker) for now — the admin UI to list users,
+  set the global role, and assign a SteamID is a later step. No self-service Steam linking.
+- No guard against demoting the last `admin`.
 
 ## Related
 
