@@ -49,18 +49,11 @@
   gap: 10px;
 }
 
-/* The duality mark: one square, split down the middle — CT half, T half. */
+/* The duality mark: CT/T split tile with a crosshair (public/favicon.svg). */
 .brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 26px;
   height: 26px;
-  border-radius: 6px;
-  font: 700 10px var(--mono);
-  letter-spacing: 0;
-  color: #0e1116;
-  background: linear-gradient(135deg, var(--ct) 0 50%, var(--t) 50% 100%);
 }
 
 .brand-word {
@@ -168,6 +161,18 @@
   );
   opacity: 0.25;
   pointer-events: none;
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.auth-mark {
+  display: block;
+  width: 46px;
+  height: 46px;
 }
 
 .auth-page h1 {

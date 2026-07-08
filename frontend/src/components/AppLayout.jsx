@@ -10,7 +10,7 @@ export default function AppLayout() {
       <header className="app-bar">
         <div className="app-bar-inner">
           <div className="brand">
-            <span className="brand-mark" aria-hidden="true">CL</span>
+            <img className="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" />
             <span className="brand-word">Clutchlab</span>
           </div>
           <nav className="nav">
