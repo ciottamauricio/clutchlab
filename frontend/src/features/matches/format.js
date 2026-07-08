@@ -6,12 +6,15 @@ export function matchDate(match) {
   return match?.played_at || match?.created_at || null
 }
 
-// Date + time (e.g. "Jul 3, 2026, 2:32 PM"), locale-aware.
+// Date + time as dd/mm/yyyy, HH:MM (e.g. "03/07/2026, 14:32). The date is fixed dd/mm/yyyy;
+// the clock stays locale-aware, both rendered in the viewer's local timezone.
 export function formatMatchDate(iso) {
   if (!iso) return ''
-  return new Date(iso).toLocaleString(undefined, {
-    year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-  })
+  const d = new Date(iso)
+  const pad = (n) => String(n).padStart(2, '0')
+  const date = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`
+  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  return `${date}, ${time}`
 }
 
 // Compact duration (e.g. "1h 12m", "48m", "36s"). Minutes are dropped when there are hours
