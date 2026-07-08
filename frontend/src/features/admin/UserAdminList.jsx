@@ -1,16 +1,15 @@
 import { useState } from 'react'
 import { t } from '../../lib/i18n'
 
-function UserRow({ user, onUpdate }) {
-  const [steam, setSteam] = useState(user.steam_id ?? '')
+function UserRow({ user, players, takenSteamIds, onUpdate }) {
   const [error, setError] = useState(null)
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const run = async (patch, resetSaved = true) => {
+  const run = async (patch) => {
     setBusy(true)
     setError(null)
-    if (resetSaved) setSaved(false)
+    setSaved(false)
     try {
       await onUpdate(user.id, patch)
       setSaved(true)
@@ -21,12 +20,9 @@ function UserRow({ user, onUpdate }) {
     }
   }
 
-  const changeRole = (e) => run({ role: e.target.value })
-  const saveSteam = (e) => {
-    e.preventDefault()
-    if ((steam || '') === (user.steam_id ?? '')) return
-    run({ steam_id: steam })
-  }
+  // The linked player may not be in the catalog (e.g. no longer in any visible demo); keep it
+  // selectable so it still shows and can be changed.
+  const linkedKnown = players.some((p) => p.steam_id === user.steam_id)
 
   return (
     <tr>
@@ -35,26 +31,34 @@ function UserRow({ user, onUpdate }) {
         <div className="ua-email">{user.email}</div>
       </td>
       <td>
-        <select value={user.role} onChange={changeRole} disabled={busy} aria-label={`Role for ${user.name}`}>
+        <select value={user.role} onChange={(e) => run({ role: e.target.value })} disabled={busy} aria-label={`Role for ${user.name}`}>
           <option value="member">Member</option>
           <option value="admin">Admin</option>
         </select>
       </td>
       <td>
-        <form className="ua-steam" onSubmit={saveSteam}>
-          <input
-            value={steam}
-            onChange={(e) => setSteam(e.target.value)}
-            placeholder="SteamID64"
-            inputMode="numeric"
-            aria-label={`SteamID for ${user.name}`}
-          />
-          <button type="submit" className="link-btn" disabled={busy || (steam || '') === (user.steam_id ?? '')}>
-            Save
-          </button>
-        </form>
+        <select
+          value={user.steam_id ?? ''}
+          onChange={(e) => run({ steam_id: e.target.value })}
+          disabled={busy}
+          aria-label={`Player for ${user.name}`}
+        >
+          <option value="">— Not linked —</option>
+          {user.steam_id && !linkedKnown && (
+            <option value={user.steam_id}>{user.steam_id}</option>
+          )}
+          {players.map((p) => (
+            <option
+              key={p.steam_id}
+              value={p.steam_id}
+              disabled={p.steam_id !== user.steam_id && takenSteamIds.has(p.steam_id)}
+            >
+              {p.name}{takenSteamIds.has(p.steam_id) && p.steam_id !== user.steam_id ? ' (linked)' : ''}
+            </option>
+          ))}
+        </select>
       </td>
-      <td className="ua-teams">
+      <td>
         {user.teams?.length
           ? user.teams.map((team) => (
               <span key={team.id} className="ua-team-tag" title={team.role}>{team.name}</span>
@@ -68,7 +72,9 @@ function UserRow({ user, onUpdate }) {
   )
 }
 
-export default function UserAdminList({ users, onUpdate }) {
+export default function UserAdminList({ users, players, onUpdate }) {
+  const takenSteamIds = new Set(users.map((u) => u.steam_id).filter(Boolean))
+
   return (
     <div className="ua-wrap">
       <table className="ua-table">
@@ -76,14 +82,14 @@ export default function UserAdminList({ users, onUpdate }) {
           <tr>
             <th>User</th>
             <th>Role</th>
-            <th>Linked SteamID</th>
+            <th>Player</th>
             <th>Teams</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {users.map((user) => (
-            <UserRow key={user.id} user={user} onUpdate={onUpdate} />
+            <UserRow key={user.id} user={user} players={players} takenSteamIds={takenSteamIds} onUpdate={onUpdate} />
           ))}
         </tbody>
       </table>

@@ -58,5 +58,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('can:admin')->group(function () {
         Route::get('/admin/users', [AdminUserController::class, 'index']);
         Route::patch('/admin/users/{user}', [AdminUserController::class, 'update']);
+        Route::get('/admin/players', [AdminUserController::class, 'players']);
     });
 });

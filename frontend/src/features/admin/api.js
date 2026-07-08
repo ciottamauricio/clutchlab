@@ -32,3 +32,21 @@ export function useUsers() {
 
   return { users, error, loading, update }
 }
+
+// Every player (SteamID64 + name) seen across all matches — the pick list for linking an
+// account to its demo identity. Admin-only server-side.
+export function useKnownPlayers() {
+  const [players, setPlayers] = useState([])
+
+  useEffect(() => {
+    let active = true
+    api.get('/admin/players')
+      .then((d) => active && setPlayers(d.players ?? []))
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [])
+
+  return players
+}

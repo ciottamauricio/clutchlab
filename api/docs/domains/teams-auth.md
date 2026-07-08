@@ -31,8 +31,10 @@ Step 1: matches become user-owned and access is enforced.
   grants team-management permission.
 - **Linked SteamID** — an account's own SteamID64 (`users.steam_id`), admin-assigned and
   optional. Bridges the login account to its demo stats (keyed by SteamID64) so a user can see
-  their own numbers. Not every account has one (a coach/analyst never played). Distinct from
-  `team_players`, which says a SteamID *plays for a team*, not that it *is an account*.
+  their own numbers. The admin picks the player from the catalog of SteamIDs already seen in
+  demos (`/admin/players`) rather than typing a raw id. Not every account has one (a
+  coach/analyst never played). Distinct from `team_players`, which says a SteamID *plays for a
+  team*, not that it *is an account*.
 - **Token** — a Sanctum personal access token; the bearer credential for the API.
 
 ## Entities
@@ -183,6 +185,7 @@ rostered ids performed in the team's games, and every member sees the same numbe
 |---|---|---|
 | GET | `/api/admin/users` | list every user (role, linked SteamID, teams) |
 | PATCH | `/api/admin/users/{user}` | set a user's global `role` and/or `steam_id` |
+| GET | `/api/admin/players` | catalog of players (SteamID64 + name) seen across all matches — the pick list for linking |
 
 ## Authorization (policies)
 
