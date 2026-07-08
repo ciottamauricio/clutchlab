@@ -12,8 +12,10 @@ Step 1: matches become user-owned and access is enforced.
 
 ## Decisions (Step 2)
 
-- **Match ownership: user-owned.** `matches.user_id` = the uploader. Only the owner may
-  view/manage their matches; others get **403**.
+- **Match ownership: uploader + optional team.** `matches.user_id` = the uploader;
+  `matches.team_id` = the team it's shared with (optional). Any team member may **view** a
+  team match; the uploader and upload-capable roles (owner/igl) may **manage** it. A match
+  with no team is private to its uploader. Non-visible → **403**.
 - **Auth: Sanctum API tokens (Bearer).** Register/login return a plain-text token; the SPA
   sends `Authorization: Bearer <token>`. Guard: `auth:sanctum`.
 
@@ -90,8 +92,10 @@ the caller's own matches — and stats are aggregated from `kill_events` for the
 
 ### `matches` (addition)
 
-- `user_id` (fk `users`, nullable, indexed) — the uploader/owner. Legacy pre-auth rows are
-  null and therefore invisible to everyone.
+- `user_id` (fk `users`, nullable, indexed) — the uploader. Legacy pre-auth rows are null.
+- `team_id` (fk `teams`, nullable, indexed, `nullOnDelete`) — the team the match is shared
+  with; null = private to the uploader. Deleting a team un-shares its matches (sets null),
+  it doesn't delete them.
 
 ## Roles & permissions
 
@@ -101,7 +105,9 @@ the caller's own matches — and stats are aggregated from `kill_events` for the
 | View a team + members | any member |
 | Add / remove members, change roles, rename/delete team | members with role `owner` |
 | Add / remove roster players, view team stats¹ | members with role `owner` (view stats: any member) |
-| Upload / view / delete a match | the match's owner only |
+| Upload a match to a team | members with role `owner` or `igl` |
+| View a team's match | any member of that team |
+| Delete / reparse a match | the uploader, or the team's `owner` / `igl` |
 | Everything above, on any resource | global `admin` (master admin) |
 
 `igl` / `player` / `coach` are descriptive roles for now; they gain permissions when later
@@ -120,9 +126,10 @@ otherwise so non-admins fall through to the ordinary policy) — see Authorizati
 4. **Creating a team** attaches the creator as a member with role `owner` in the same operation.
 5. A user has at most one role per team (unique pivot). Adding an existing member returns
    **`team.already_member`**.
-6. **Ownership:** a user may only view/delete their own matches; violations return **403** (not 404).
-7. Match upload sets `user_id` = the authenticated user; the match list returns only the
-   caller's matches.
+6. **Ownership:** a user may view any match of a team they belong to and manage matches they
+   uploaded (or that belong to a team where they're owner/igl); violations return **403** (not 404).
+7. Match upload sets `user_id` = the authenticated user and optionally `team_id`; the match
+   list returns the caller's own matches plus every match of the teams they belong to.
 8. Auth endpoints are rate-limited.
 
 ## Validation (boundary)
@@ -152,7 +159,7 @@ shows how the rostered ids performed in demos you uploaded.
 |---|---|---|
 | POST | `/api/logout` | revoke the current token |
 | GET | `/api/me` | current user |
-| GET/POST/GET | `/api/matches…` | owner-scoped (see [matches.md](matches.md)) |
+| GET/POST/GET | `/api/matches…` | uploader + team-shared (see [matches.md](matches.md)) |
 | GET | `/api/players` | catalog of players seen across my matches |
 | GET | `/api/players/{steamId}/clutches` | a player's won clutches across my matches |
 | GET | `/api/teams` | teams I belong to |
@@ -167,22 +174,26 @@ shows how the rostered ids performed in demos you uploaded.
 ## Authorization (policies)
 
 - `Gate::before` (in `AppServiceProvider::boot`): a global `admin` passes every check.
-- `GameMatchPolicy`: `view` / `delete` → `match.user_id === user.id`.
+- `GameMatchPolicy`: `view` → uploader or any member of `match.team_id`; `delete` / `reparse`
+  → uploader or an `owner`/`igl` of `match.team_id`.
 - `TeamPolicy`: `view` → user is a member; `manageMembers` / `update` / `delete` → the user's
-  role in that team is `owner`.
+  role in that team is `owner`; `uploadMatch` → role `owner` or `igl`.
 
 ## Error codes
 
 - `auth.invalid_credentials` — bad email/password (login).
+- `match.invalid_team` — upload `team_id` isn't a team the caller may upload to (owner/igl).
 - `team.already_member` — the user is already in the team.
 - `team.steam_id_required` — no player selected when adding to the roster.
 - 401 unauthenticated · 403 authorization · 422 validation (field codes).
 
 ## Known limitations / later
 
-- Roles beyond `owner` don't grant permissions yet.
+- Roles beyond `owner`/`igl` don't grant permissions yet (`igl` gained match-upload rights).
 - No invitation/acceptance flow — an owner adds existing users directly by email.
-- Matches are user-owned only; team-sharing of matches is a later step.
+- **Cross-match analytics** (awards, search, player catalog, team stats) are still scoped to
+  the caller's own uploads, not their teams' matches — re-scoping is the next step.
+- A match belongs to at most one team; there's no re-assigning a match's team after upload yet.
 - Removing the last `owner` of a team isn't prevented.
 - **Global role & `steam_id` are set by hand** (tinker) for now — the admin UI to list users,
   set the global role, and assign a SteamID is a later step. No self-service Steam linking.

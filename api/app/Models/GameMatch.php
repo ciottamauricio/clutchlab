@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 // "Match" is a reserved word in PHP, so the model is GameMatch on the `matches` table.
-#[Fillable(['original_filename', 'demo_key', 'status'])]
+#[Fillable(['original_filename', 'demo_key', 'status', 'team_id'])]
 class GameMatch extends Model
 {
     protected $table = 'matches';
@@ -25,6 +25,11 @@ class GameMatch extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
     }
 
     public function playerStats(): HasMany

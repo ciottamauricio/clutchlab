@@ -17,14 +17,24 @@ class MatchController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        return MatchResource::collection(
-            $request->user()->matches()->latest()->get()
-        )->response();
+        $user = $request->user();
+        $teamIds = $user->teams()->pluck('teams.id');
+
+        $matches = GameMatch::with(['team', 'owner'])
+            ->where(fn ($q) => $q->where('user_id', $user->id)->orWhereIn('team_id', $teamIds))
+            ->latest()
+            ->get();
+
+        return MatchResource::collection($matches)->response();
     }
 
     public function store(UploadDemoRequest $request, UploadDemoAction $action): JsonResponse
     {
-        $match = $action->execute($request->file('demo'), $request->user());
+        $match = $action->execute(
+            $request->file('demo'),
+            $request->user(),
+            $request->integer('team_id') ?: null,
+        );
 
         return (new MatchResource($match))->response()->setStatusCode(201);
     }

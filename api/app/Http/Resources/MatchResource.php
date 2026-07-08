@@ -24,6 +24,11 @@ class MatchResource extends JsonResource
             'knife_round_winner' => $this->knife_round_winner,
             'parsed_at' => $this->parsed_at,
             'created_at' => $this->created_at,
+            // The team this match is shared with (null = private to the uploader), and who
+            // uploaded it — so a teammate viewing the list knows whose match it is.
+            'team_id' => $this->team_id,
+            'team' => $this->whenLoaded('team', fn () => $this->team?->only('id', 'name')),
+            'uploaded_by' => $this->whenLoaded('owner', fn () => $this->owner?->name),
             // When the match was actually played, parsed from the demo filename
             // (`YYYY-MM-DD__HHMM__…`); null when the name doesn't carry it. Naive local time
             // (no timezone) so the frontend shows the wall-clock the demo was named with.

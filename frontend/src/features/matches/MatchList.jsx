@@ -5,6 +5,12 @@ function MatchCard({ match }) {
   const date = formatMatchDate(matchDate(match))
   const duration = formatDuration(match.duration_seconds)
 
+  const team = match.team?.name ? (
+    <span className="mc-team-tag" title={match.uploaded_by ? `Uploaded by ${match.uploaded_by}` : undefined}>
+      {match.team.name}
+    </span>
+  ) : null
+
   if (match.status !== 'parsed') {
     return (
       <>
@@ -12,7 +18,10 @@ function MatchCard({ match }) {
           <span className="mc-file">{match.original_filename}</span>
           <StatusBadge status={match.status} />
         </span>
-        {date && <span className="mc-date">{date}</span>}
+        <span className="mc-line">
+          {date && <span className="mc-date">{date}</span>}
+          {team}
+        </span>
       </>
     )
   }
@@ -27,6 +36,7 @@ function MatchCard({ match }) {
           {duration && <span className="mc-duration"> · {duration}</span>}
         </span>
       </span>
+      {team && <span className="mc-line">{team}</span>}
       <span className="mc-score">
         <span className="mc-team">{a.name}</span>
         <span className="mc-nums">{a.score} <span className="mc-x">×</span> {b.score}</span>

@@ -15,7 +15,7 @@ class UploadDemoAction
         private ParseQueue $queue,
     ) {}
 
-    public function execute(UploadedFile $file, User $owner): GameMatch
+    public function execute(UploadedFile $file, User $owner, ?int $teamId = null): GameMatch
     {
         $key = $this->storage->store($file);
 
@@ -23,6 +23,7 @@ class UploadDemoAction
             'original_filename' => $file->getClientOriginalName(),
             'demo_key' => $key,
             'status' => 'queued',
+            'team_id' => $teamId,
         ]);
 
         $this->queue->push($match->id, $key);

@@ -17,6 +17,7 @@ const MESSAGES = {
   'demo.wrong_extension': 'Only .dem files are accepted',
   'demo.file_too_large': 'That demo is too large (max 1 GB)',
   'demo.storage_failed': 'Uploading to storage failed',
+  'match.invalid_team': "You can't upload to that team",
 
   'auth.name_required': 'Please enter your name',
   'auth.email_required': 'Please enter your email',

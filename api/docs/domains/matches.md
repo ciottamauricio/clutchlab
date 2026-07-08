@@ -8,8 +8,9 @@ scoreboard are read back for a dashboard.
 
 ## Status
 
-Implemented in Step 1 (vertical slice); made **user-owned** in Step 2. Every match belongs
-to the user who uploaded it, and access is owner-only (see Authorization & ownership).
+Implemented in Step 1 (vertical slice); made **user-owned** in Step 2, then **team-shareable**:
+a match has an uploader and can be filed under a team so the whole team sees it (see
+Authorization & ownership).
 
 ## Ubiquitous language
 
@@ -29,7 +30,8 @@ to the user who uploaded it, and access is owner-only (see Authorization & owner
 | Field | Type | Written by | Notes |
 |---|---|---|---|
 | id | bigint | api | |
-| user_id | fk users, nullable | api | the uploader/owner (null for legacy pre-auth rows) |
+| user_id | fk users, nullable | api | the uploader (null for legacy pre-auth rows) |
+| team_id | fk teams, nullable | api | the team the match is shared with; null = private to the uploader |
 | original_filename | string | api | client-provided name; display only |
 | demo_key | string, unique | api | S3 object key `<uuid>.dem` |
 | status | string | api + worker | lifecycle code (see below) |
@@ -99,8 +101,9 @@ Transition rules:
    until `status = parsed`.
 8. A match that is not `parsed` exposes an **empty `players` array**. Consumers must
    treat non-`parsed` matches as "no stats yet", not "zero stats".
-9. A match belongs to the user who uploaded it (`user_id`); only the owner may view or
-   delete it (see Authorization & ownership).
+9. A match is uploaded by a user (`user_id`) and may be shared with a team (`team_id`). Any
+   member of that team may view it; the uploader and upload-capable roles may delete/reparse
+   it (see Authorization & ownership).
 10. **The pre-match knife round is excluded from the stats.** It only decides side choice, so
     the worker strips its kills from the scoreboard and `kill_events` and records the winning
     side in `knife_round_winner`. Knife-round kills are detected as knife kills landing before
@@ -125,19 +128,20 @@ PHP `upload_max_filesize` / `post_max_size` (512M, set in `api/php.ini`).
 
 ## API surface
 
-Base path `/api` (nginx preserves the prefix). **All match endpoints require `auth:sanctum`**
-and are scoped to the authenticated owner.
+Base path `/api` (nginx preserves the prefix). **All match endpoints require `auth:sanctum`**.
+"Visible" = the caller uploaded it or belongs to its team; write actions additionally need
+upload rights (owner/igl) on the team, or being the uploader.
 
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
-| GET | `/matches` | list the caller's matches, newest first | `{ data: [...] }` |
-| POST | `/matches` | upload a demo | multipart field `demo`; sets owner; 201; throttled 30/min |
-| GET | `/matches/{match}` | match detail + players | owner only (403 otherwise); players by kills desc |
-| GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | owner only; see [heatmap.md](heatmap.md) |
-| GET | `/matches/{match}/clutches` | clutches grouped by clutcher/round | owner only; each `{ round, size, killer_name, kills[] }` |
-| GET | `/matches/{match}/demo` | download the stored `.dem` | owner only; streamed from storage via `DemoStorage::download` |
-| POST | `/matches/{match}/reparse` | re-enqueue the stored demo | owner only; resets to `queued`; throttled 30/min; `ReparseMatchAction` |
-| DELETE | `/matches/{match}` | delete a match | owner only (403 otherwise); 204; `DeleteMatchAction` |
+| GET | `/matches` | list matches the caller can see, newest first | own uploads + their teams' matches; `{ data: [...] }` |
+| POST | `/matches` | upload a demo | multipart `demo`; optional `team_id` (owner/igl only); 201; throttled 30/min |
+| GET | `/matches/{match}` | match detail + players | visible only (403 otherwise); players by kills desc |
+| GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | visible only; see [heatmap.md](heatmap.md) |
+| GET | `/matches/{match}/clutches` | clutches grouped by clutcher/round | visible only; each `{ round, size, killer_name, kills[] }` |
+| GET | `/matches/{match}/demo` | download the stored `.dem` | visible only; streamed from storage via `DemoStorage::download` |
+| POST | `/matches/{match}/reparse` | re-enqueue the stored demo | uploader or owner/igl; resets to `queued`; throttled 30/min; `ReparseMatchAction` |
+| DELETE | `/matches/{match}` | delete a match | uploader or owner/igl (403 otherwise); 204; `DeleteMatchAction` |
 
 Responses use `MatchResource` / `MatchPlayerStatResource` (wrapped in `data`).
 `players` is present only when the relation is loaded (the detail endpoint).
@@ -167,13 +171,23 @@ is the only way to remove a match — there is no soft-delete.
 
 ## Authorization & ownership
 
-Matches are **user-owned** (`user_id` = uploader), enforced by `GameMatchPolicy`:
+A match has an **uploader** (`user_id`) and optionally belongs to a **team** (`team_id`).
+When it belongs to a team, **every member of that team can see it**; a match with no team is
+private to its uploader. Enforced by `GameMatchPolicy`:
 
-- `view` / `delete` → allowed only when `match.user_id === user.id`.
-- The list endpoint returns only the caller's matches; the detail endpoint authorizes
-  `view` and returns **403** for someone else's match (not 404).
-- All match endpoints require a valid bearer token (`auth:sanctum`). See
-  [teams-auth.md](teams-auth.md).
+- `view` → the uploader, or any member of the match's team.
+- `delete` / `reparse` → the uploader, or a member of the match's team whose role may upload
+  (`owner` / `igl`). View-only roles (`player` / `coach`) cannot delete.
+- The list endpoint returns the caller's own matches **plus** every match of the teams they
+  belong to. The detail endpoint authorizes `view` and returns **403** otherwise (not 404).
+- Uploading with a `team_id` requires `TeamPolicy::uploadMatch` (owner/igl) for that team;
+  an invalid or forbidden team returns the code `match.invalid_team`. Omitting it uploads a
+  private match.
+- The global `admin` passes all of the above (see [teams-auth.md](teams-auth.md)).
+- All match endpoints require a valid bearer token (`auth:sanctum`).
+
+Cross-match analytics (awards, search, player catalog, team stats) are still scoped to the
+caller's **own uploads** for now; re-scoping them to team visibility is the next step.
 
 ## Known limitations (intentional — future steps)
 
