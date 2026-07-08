@@ -79,10 +79,12 @@ the caller's **visible** matches — and stats are aggregated from `kill_events`
   matches (`GameMatch::visibleTo` — own uploads + their teams'), grouped by `steam_id`. Returns
   `{ steam_id, name (most recent), match_count }`. **No separate players table** — the catalog
   is a read projection over match data.
-- **Team stats** (`GET /teams/{team}/stats`): a Postgres aggregation over `kill_events`
+- **Team stats** (`GET /teams/{team}/stats?from=&to=`): a Postgres aggregation over `kill_events`
   (`ComputeTeamStatsAction`), scoped to **the team's own matches** (those filed under it) and
   the roster's `steam_id` set — so every member sees the same board, independent of who's
-  viewing. Per player: `games` (matches the player appears in), `kills`, `deaths`, `kd`,
+  viewing. Optional `from`/`to` (`YYYY-MM-DD`) restrict it to matches **played** in that range
+  (on `matches.played_at`); the UI defaults `from` to the first of the current month. No match
+  in range → empty board. Per player: `games` (matches the player appears in), `kills`, `deaths`, `kd`,
   `hs_pct`, `entry_kills` (opening kills), `first_deaths` (rounds the player was the opening
   victim), `clutches` (distinct won 1vN rounds). Analytics live in Postgres; Meilisearch stays
   the text-search read model only.
@@ -176,7 +178,7 @@ rostered ids performed in the team's games, and every member sees the same numbe
 | GET | `/api/teams` | teams I belong to |
 | POST | `/api/teams` | create a team (I become `owner`) |
 | GET | `/api/teams/{team}` | team + members + roster (member only) |
-| GET | `/api/teams/{team}/stats` | roster stat board (member only) |
+| GET | `/api/teams/{team}/stats` | roster stat board, optional `from`/`to` date range (member only) |
 | POST | `/api/teams/{team}/members` | add a member by email + role (owner only) |
 | DELETE | `/api/teams/{team}/members/{user}` | remove a member (owner only) |
 | POST | `/api/teams/{team}/players` | add a player to the roster by steam_id (owner only) |

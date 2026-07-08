@@ -3,19 +3,38 @@ import { useTeamStats } from './api'
 import PlayerClutchesModal from './PlayerClutchesModal'
 import { t } from '../../lib/i18n'
 
-// Roster stat board, aggregated across all the caller's matches (Postgres kill_events).
-// `reloadKey` bumps when the roster changes so the board refetches.
-export default function TeamStats({ teamId, reloadKey }) {
-  const { players, error, loading } = useTeamStats(teamId, reloadKey)
-  const [clutchPlayer, setClutchPlayer] = useState(null)
+// First day of the current month as YYYY-MM-DD — the default lower bound for the board.
+function monthStart() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+}
 
-  if (error) return <p className="error">{t(error)}</p>
-  if (loading && players.length === 0) return <p className="muted">Crunching stats…</p>
-  if (players.length === 0) return null
+// Roster stat board for the team's matches (Postgres kill_events), filtered to games played
+// within [from, to]. `reloadKey` bumps when the roster changes so the board refetches.
+export default function TeamStats({ teamId, reloadKey }) {
+  const [from, setFrom] = useState(monthStart)
+  const [to, setTo] = useState('')
+  const { players, error, loading } = useTeamStats(teamId, reloadKey, from, to)
+  const [clutchPlayer, setClutchPlayer] = useState(null)
 
   return (
     <div className="team-stats">
-      <h3>Stat board</h3>
+      <div className="board-head">
+        <h3>Stat board</h3>
+        <div className="board-filter">
+          <label>From <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+          <label>To <input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+          {from && (
+            <button type="button" className="link-btn" onClick={() => { setFrom(''); setTo('') }}>All time</button>
+          )}
+        </div>
+      </div>
+
+      {error && <p className="error">{t(error)}</p>}
+      {loading && players.length === 0 && <p className="muted">Crunching stats…</p>}
+      {!loading && players.length === 0 && <p className="muted">No games in this range.</p>}
+
+      {players.length > 0 && (
       <div className="board-wrap">
         <table className="scoreboard">
           <thead>
@@ -54,6 +73,7 @@ export default function TeamStats({ teamId, reloadKey }) {
           </tbody>
         </table>
       </div>
+      )}
 
       {clutchPlayer && <PlayerClutchesModal player={clutchPlayer} onClose={() => setClutchPlayer(null)} />}
     </div>

@@ -44,6 +44,7 @@ Authorization & ownership).
 | duration_seconds | float, nullable | worker | play time only: first round's freezetime-end to the last round's end (excludes warmup/post-game) |
 | knife_round_winner | string(2), nullable | worker | stable side (`CT`/`T`) that won the pre-match knife round; `null` if none |
 | parsed_at | timestamp, nullable | worker | set on success |
+| played_at | timestamp, nullable | api | when the match was played (UTC), parsed from the filename's `YYYY-MM-DD__HHMM` prefix at upload; filterable/sortable |
 | created_at / updated_at | timestamps | api + worker | |
 
 ### `MatchPlayerStat` — table `match_player_stats` (`app/Models/MatchPlayerStat.php`)

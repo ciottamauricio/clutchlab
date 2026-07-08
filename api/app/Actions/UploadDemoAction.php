@@ -19,11 +19,14 @@ class UploadDemoAction
     {
         $key = $this->storage->store($file);
 
+        $filename = $file->getClientOriginalName();
+
         $match = $owner->matches()->create([
-            'original_filename' => $file->getClientOriginalName(),
+            'original_filename' => $filename,
             'demo_key' => $key,
             'status' => 'queued',
             'team_id' => $teamId,
+            'played_at' => GameMatch::playedAtFromFilename($filename),
         ]);
 
         $this->queue->push($match->id, $key);

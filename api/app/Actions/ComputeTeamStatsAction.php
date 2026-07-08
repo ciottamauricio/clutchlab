@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 // own matches (those filed under it), so every member sees the same board — keyed on SteamID64.
 class ComputeTeamStatsAction
 {
-    public function execute(Team $team): array
+    public function execute(Team $team, ?string $from = null, ?string $to = null): array
     {
         $roster = $team->players()->get();
         $ids = $roster->pluck('steam_id')->all();
@@ -18,7 +18,17 @@ class ComputeTeamStatsAction
             return ['players' => []];
         }
 
-        $matchIds = $team->matches()->pluck('id')->all();
+        // Restrict to matches played within the date range (on played_at, the real game date).
+        // Matches with no played_at fall out once a bound is set — they can't be dated.
+        $matchIds = $team->matches()
+            ->when($from, fn ($q) => $q->where('played_at', '>=', $from.' 00:00:00'))
+            ->when($to, fn ($q) => $q->where('played_at', '<=', $to.' 23:59:59'))
+            ->pluck('id')->all();
+
+        // No games in range → an empty board (rather than the roster with all-zero rows).
+        if (empty($matchIds)) {
+            return ['players' => []];
+        }
 
         // Offence: everything keyed on the killer. A won clutch is one round, not one kill,
         // so count distinct (match, round) pairs the player clutched in.

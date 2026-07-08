@@ -308,6 +308,40 @@
   overflow-x: auto;
 }
 
+.team-stats .board-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-bottom: 14px;
+}
+
+.team-stats .board-head h3 {
+  margin: 0;
+}
+
+.board-filter {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font: 500 10px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.board-filter label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.board-filter input[type='date'] {
+  padding: 5px 8px;
+  font: 400 12px var(--mono);
+}
+
 /* ---------- Team comparison (CT vs T, per match) ---------- */
 
 .compare {

@@ -29,22 +29,11 @@ class MatchResource extends JsonResource
             'team_id' => $this->team_id,
             'team' => $this->whenLoaded('team', fn () => $this->team?->only('id', 'name')),
             'uploaded_by' => $this->whenLoaded('owner', fn () => $this->owner?->name),
-            // When the match was actually played, parsed from the demo filename
-            // (`YYYY-MM-DD__HHMM__…`); null when the name doesn't carry it. Naive local time
-            // (no timezone) so the frontend shows the wall-clock the demo was named with.
-            'played_at' => $this->playedAt(),
+            // When the match was actually played (UTC, from the demo filename); null when the
+            // name lacks it. Cast to datetime, so it serializes with a `Z` and the frontend
+            // renders it in the viewer's local timezone (2237 UTC → 19:37 in Brazil, UTC-3).
+            'played_at' => $this->played_at,
             'players' => MatchPlayerStatResource::collection($this->whenLoaded('playerStats')),
         ];
-    }
-
-    private function playedAt(): ?string
-    {
-        // The demo filename's `HHMM` is UTC. Emit it with a `Z` so the frontend renders it in
-        // the viewer's local timezone (e.g. 2237 UTC shows as 19:37 in Brazil, UTC-3).
-        if ($this->original_filename && preg_match('/(\d{4})-(\d{2})-(\d{2})__(\d{2})(\d{2})/', $this->original_filename, $m)) {
-            return sprintf('%s-%s-%sT%s:%s:00Z', $m[1], $m[2], $m[3], $m[4], $m[5]);
-        }
-
-        return null;
     }
 }

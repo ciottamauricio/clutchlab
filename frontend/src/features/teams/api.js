@@ -101,9 +101,10 @@ export function usePlayerClutches(steamId) {
   return { clutches, error, loading }
 }
 
-// Roster stat board for a team, aggregated across the caller's matches. Refetched when the
-// roster changes (bump `reloadKey`).
-export function useTeamStats(teamId, reloadKey = 0) {
+// Roster stat board for a team, aggregated across the team's matches played within an
+// optional [from, to] date range. Refetched when the roster changes (bump `reloadKey`) or the
+// range changes.
+export function useTeamStats(teamId, reloadKey = 0, from = '', to = '') {
   const [players, setPlayers] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -115,14 +116,18 @@ export function useTeamStats(teamId, reloadKey = 0) {
     }
     let active = true
     setLoading(true)
-    api.get(`/teams/${teamId}/stats`)
+    const qs = new URLSearchParams()
+    if (from) qs.set('from', from)
+    if (to) qs.set('to', to)
+    const suffix = qs.toString() ? `?${qs}` : ''
+    api.get(`/teams/${teamId}/stats${suffix}`)
       .then((d) => active && setPlayers(d.players ?? []))
       .catch((e) => active && setError(e.code ?? 'error.unknown'))
       .finally(() => active && setLoading(false))
     return () => {
       active = false
     }
-  }, [teamId, reloadKey])
+  }, [teamId, reloadKey, from, to])
 
   return { players, error, loading }
 }
