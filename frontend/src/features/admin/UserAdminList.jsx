@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { t } from '../../lib/i18n'
 
-function UserRow({ user, players, takenSteamIds, onUpdate }) {
+function UserRow({ user, players, takenSteamIds, currentUserId, onUpdate, onDelete }) {
   const [error, setError] = useState(null)
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -16,6 +16,19 @@ function UserRow({ user, players, takenSteamIds, onUpdate }) {
     } catch (e) {
       setError(e.code ?? 'error.unknown')
     } finally {
+      setBusy(false)
+    }
+  }
+
+  const del = async () => {
+    if (!window.confirm(`Delete ${user.name}? This can't be undone. Their uploaded matches are kept but lose their owner.`)) return
+    setBusy(true)
+    setError(null)
+    try {
+      await onDelete(user.id)
+      // Row unmounts on success — no state to reset.
+    } catch (e) {
+      setError(e.code ?? 'error.unknown')
       setBusy(false)
     }
   }
@@ -65,14 +78,17 @@ function UserRow({ user, players, takenSteamIds, onUpdate }) {
             ))
           : <span className="muted">—</span>}
       </td>
-      <td className="ua-status">
+      <td className="ua-actions">
         {error ? <span className="error">{t(error)}</span> : saved ? <span className="ua-saved">Saved</span> : null}
+        {user.id !== currentUserId && (
+          <button type="button" className="ua-del" onClick={del} disabled={busy}>Delete</button>
+        )}
       </td>
     </tr>
   )
 }
 
-export default function UserAdminList({ users, players, onUpdate }) {
+export default function UserAdminList({ users, players, currentUserId, onUpdate, onDelete }) {
   const takenSteamIds = new Set(users.map((u) => u.steam_id).filter(Boolean))
 
   return (
@@ -89,7 +105,15 @@ export default function UserAdminList({ users, players, onUpdate }) {
         </thead>
         <tbody>
           {users.map((user) => (
-            <UserRow key={user.id} user={user} players={players} takenSteamIds={takenSteamIds} onUpdate={onUpdate} />
+            <UserRow
+              key={user.id}
+              user={user}
+              players={players}
+              takenSteamIds={takenSteamIds}
+              currentUserId={currentUserId}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+            />
           ))}
         </tbody>
       </table>

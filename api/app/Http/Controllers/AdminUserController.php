@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\DeleteUserAction;
 use App\Actions\UpdateUserAction;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\AdminUserResource;
 use App\Models\MatchPlayerStat;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class AdminUserController extends Controller
 {
@@ -23,6 +25,13 @@ class AdminUserController extends Controller
         $action->execute($user, $request->validated());
 
         return new AdminUserResource($user->load('teams'));
+    }
+
+    public function destroy(Request $request, User $user, DeleteUserAction $action): JsonResponse
+    {
+        $action->execute($request->user(), $user);
+
+        return response()->json(status: 204);
     }
 
     // The pick list for linking an account to its demo identity: every distinct player seen

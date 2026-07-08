@@ -139,6 +139,9 @@ otherwise so non-admins fall through to the ordinary policy) — see Authorizati
    `/admin/users`; `role`/`steam_id` are set on the model explicitly (never via register/login).
 10. **The last admin can't be demoted** — an attempt returns `admin.last_admin` (422), so the
     platform always has at least one admin.
+11. **An admin can't delete their own account** (`admin.cannot_delete_self`, 422) — which also
+    means the last admin can never delete the platform's admin access away. Deleting a user
+    keeps their uploaded matches (owner set null); memberships and tokens are removed.
 
 ## Validation (boundary)
 
@@ -185,6 +188,7 @@ rostered ids performed in the team's games, and every member sees the same numbe
 |---|---|---|
 | GET | `/api/admin/users` | list every user (role, linked SteamID, teams) |
 | PATCH | `/api/admin/users/{user}` | set a user's global `role` and/or `steam_id` |
+| DELETE | `/api/admin/users/{user}` | delete a user (not yourself); memberships/tokens go, uploaded matches survive ownerless |
 | GET | `/api/admin/players` | catalog of players (SteamID64 + name) seen across all matches — the pick list for linking |
 
 ## Authorization (policies)
@@ -205,6 +209,7 @@ rostered ids performed in the team's games, and every member sees the same numbe
 - `user.invalid_steam_id` — linked SteamID isn't a 17-digit SteamID64.
 - `user.steam_id_taken` — that SteamID is already linked to another account.
 - `admin.last_admin` — refused: demoting this user would leave no admin.
+- `admin.cannot_delete_self` — an admin tried to delete their own account.
 - `team.already_member` — the user is already in the team.
 - `team.steam_id_required` — no player selected when adding to the roster.
 - 401 unauthenticated · 403 authorization · 422 validation (field codes).

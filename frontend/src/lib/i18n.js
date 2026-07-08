@@ -40,6 +40,7 @@ const MESSAGES = {
   'user.invalid_steam_id': 'A SteamID64 is 17 digits',
   'user.steam_id_taken': 'That SteamID is already linked to another user',
   'admin.last_admin': "You can't remove the last admin",
+  'admin.cannot_delete_self': "You can't delete your own account",
 
   'tactic.name_required': 'Please name the tactic',
 

@@ -1,10 +1,12 @@
 import { useUsers, useKnownPlayers } from '../features/admin/api'
+import { useAuth } from '../features/auth/AuthContext'
 import UserAdminList from '../features/admin/UserAdminList'
 import { t } from '../lib/i18n'
 
 export default function AdminPage() {
-  const { users, error, loading, update } = useUsers()
+  const { users, error, loading, update, remove } = useUsers()
   const players = useKnownPlayers()
+  const { user } = useAuth()
 
   return (
     <section className="admin">
@@ -15,7 +17,9 @@ export default function AdminPage() {
 
       {loading && <p className="muted">Loading…</p>}
       {error && <p className="error">{t(error)}</p>}
-      {!loading && !error && <UserAdminList users={users} players={players} onUpdate={update} />}
+      {!loading && !error && (
+        <UserAdminList users={users} players={players} currentUserId={user?.id} onUpdate={update} onDelete={remove} />
+      )}
     </section>
   )
 }

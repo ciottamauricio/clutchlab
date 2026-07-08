@@ -1722,11 +1722,31 @@ button.clutch-open:hover {
   padding: 2px 7px;
 }
 
-.ua-status {
+.ua-actions {
   white-space: nowrap;
   font-size: 12px;
+  text-align: right;
 }
 
 .ua-saved {
   color: var(--win);
+  margin-right: 10px;
+}
+
+.ua-actions .error {
+  margin-right: 10px;
+}
+
+.ua-del {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--danger);
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.ua-del:hover:not(:disabled) {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
 }

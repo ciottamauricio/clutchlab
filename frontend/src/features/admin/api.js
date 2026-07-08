@@ -30,7 +30,12 @@ export function useUsers() {
     return updated
   }, [])
 
-  return { users, error, loading, update }
+  const remove = useCallback(async (id) => {
+    await api.delete(`/admin/users/${id}`)
+    setUsers((list) => list.filter((u) => u.id !== id))
+  }, [])
+
+  return { users, error, loading, update, remove }
 }
 
 // Every player (SteamID64 + name) seen across all matches — the pick list for linking an
