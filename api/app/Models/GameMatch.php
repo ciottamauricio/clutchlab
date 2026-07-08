@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -30,6 +31,17 @@ class GameMatch extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    // Matches the user can see: their own uploads plus every match shared with a team they
+    // belong to. The single source of truth for "what's visible" — list and analytics alike.
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $teamIds = $user->teams()->pluck('teams.id');
+
+        return $query->where(fn (Builder $q) => $q
+            ->where('user_id', $user->id)
+            ->orWhereIn('team_id', $teamIds));
     }
 
     public function playerStats(): HasMany

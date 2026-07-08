@@ -24,8 +24,10 @@ is **eventual consistency** you can watch.
 - **Postgres is the source of truth.** The worker writes canonical `kill_events` /
   `round_events` rows, then projects them into Meilisearch. The index can be rebuilt from
   Postgres at any time (`php artisan search:reindex`).
-- **Owner-scoped.** Every document carries `owner_id`; the api always filters searches to the
-  authenticated user, so you only ever search your own matches.
+- **Visible-match-scoped.** The api always constrains searches to the matches the caller can
+  see — their own uploads plus their teams' matches — with a forced `match_id IN [visible ids]`
+  clause (`match_id` is already filterable, so no reindex was needed to move off owner-scoping).
+  Documents still carry `owner_id` (denormalized), but it is no longer the scope key.
 
 ## Ubiquitous language
 
@@ -43,7 +45,7 @@ is **eventual consistency** you can watch.
 |---|---|---|
 | id | bigint | Meilisearch primary key too |
 | match_id | fk matches, cascade | |
-| owner_id | bigint (denormalized from matches.user_id) | scoping |
+| owner_id | bigint (denormalized from matches.user_id) | legacy — still written, but scoping is now by `match_id` (visible set) |
 | map | string | e.g. `de_mirage` |
 | round | int | 1-based |
 | killer_steam_id / killer_name | string | |
@@ -60,7 +62,7 @@ is **eventual consistency** you can watch.
 |---|---|---|
 | id | bigint | Meilisearch primary key too |
 | match_id | fk matches, cascade | |
-| owner_id | bigint | scoping |
+| owner_id | bigint | legacy — scoping is now by `match_id` (visible set) |
 | map | string | |
 | round | int | |
 | winner | string | `CT`/`T` |
@@ -107,7 +109,7 @@ worker parses demo
   ├─ writes match summary + player stats           (existing)
   ├─ writes kill_events / round_events to Postgres  (source of truth)
   └─ projects those rows into Meilisearch           (read model)
-api  ── queries Meilisearch (owner-filtered) ──▶ results
+api  ── queries Meilisearch (visible-match-filtered) ──▶ results
 ```
 
 - Indexing failure does not fail the parse; the match still becomes `parsed`. Drift is
@@ -132,8 +134,8 @@ served by `/api/matches/{match}/clutches` (see matches.md).
 
 Query params: `q` (free text) plus filter params matching the filterable attributes
 (e.g. `weapon=awp&opening=1&map=de_mirage`, or `winner=CT&ct_alive=5&t_alive=3`). The api
-**always** adds `owner_id = <auth user>` — never trust a client-supplied owner. Response is
-`{ data: [...hits], total }`.
+**always** adds `match_id IN [the caller's visible matches]` — never trust a client-supplied
+scope. Response is `{ data: [...hits], total }`.
 
 The same endpoints back the **per-match search** on the match dashboard: the UI pins
 `match_id=<selected match>` and offers `killer_name` (drawn from that match's roster) + weapon
@@ -151,7 +153,8 @@ controller, or worker-logic changes.
 
 ## Error codes
 
-- 401 unauthenticated · results are always owner-scoped so cross-user access can't happen.
+- 401 unauthenticated · results are always scoped to the caller's visible matches (own + their
+  teams'), so cross-user access can't happen.
 - Search-engine unavailability surfaces `search.unavailable` (the api degrades, it doesn't 500).
 
 ## Known limitations / later

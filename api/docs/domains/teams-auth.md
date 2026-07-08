@@ -71,19 +71,21 @@ Step 1: matches become user-owned and access is enforced.
 ## Players catalog & team stats
 
 The roster is built by picking from the **player catalog** — every distinct player seen across
-the caller's own matches — and stats are aggregated from `kill_events` for the rostered ids.
+the caller's **visible** matches — and stats are aggregated from `kill_events` for the rostered ids.
 
-- **Catalog** (`GET /players`): derived from `match_player_stats` joined to owned `matches`,
-  grouped by `steam_id`. Returns `{ steam_id, name (most recent), match_count }`. **No separate
-  players table** — the catalog is a read projection over match data.
+- **Catalog** (`GET /players`): derived from `match_player_stats` over the caller's visible
+  matches (`GameMatch::visibleTo` — own uploads + their teams'), grouped by `steam_id`. Returns
+  `{ steam_id, name (most recent), match_count }`. **No separate players table** — the catalog
+  is a read projection over match data.
 - **Team stats** (`GET /teams/{team}/stats`): a Postgres aggregation over `kill_events`
-  (`ComputeTeamStatsAction`), scoped to the caller via `kill_events.owner_id` and the roster's
-  `steam_id` set. Per player: `games` (matches the player appears in), `kills`, `deaths`, `kd`,
+  (`ComputeTeamStatsAction`), scoped to **the team's own matches** (those filed under it) and
+  the roster's `steam_id` set — so every member sees the same board, independent of who's
+  viewing. Per player: `games` (matches the player appears in), `kills`, `deaths`, `kd`,
   `hs_pct`, `entry_kills` (opening kills), `first_deaths` (rounds the player was the opening
   victim), `clutches` (distinct won 1vN rounds). Analytics live in Postgres; Meilisearch stays
   the text-search read model only.
 - **Player clutches** (`GET /players/{steamId}/clutches`): every won 1vN the player made across
-  the caller's matches, grouped by `(match, round)` — the same shape as
+  the caller's visible matches, grouped by `(match, round)` — the same shape as
   [matches.md](matches.md)'s `clutches`, but each card carries its own `map`/`demo`/`tick_rate`
   so the "watch in game" jump works across matches. Powers the clickable clutch cell on the
   stat board.
@@ -141,8 +143,8 @@ otherwise so non-admins fall through to the ordinary policy) — see Authorizati
 - **Add roster player:** `steam_id` required/string; `nickname` nullable/string. Re-adding an
   existing `steam_id` is idempotent (updates the nickname), so there's no "already rostered" error.
 
-¹ Roster and stats are scoped to the **caller's own matches** (`kill_events.owner_id`): the board
-shows how the rostered ids performed in demos you uploaded.
+¹ The stat board is scoped to **the team's own matches** (those filed under it): it shows how the
+rostered ids performed in the team's games, and every member sees the same numbers.
 
 ## API surface
 
@@ -191,8 +193,6 @@ shows how the rostered ids performed in demos you uploaded.
 
 - Roles beyond `owner`/`igl` don't grant permissions yet (`igl` gained match-upload rights).
 - No invitation/acceptance flow — an owner adds existing users directly by email.
-- **Cross-match analytics** (awards, search, player catalog, team stats) are still scoped to
-  the caller's own uploads, not their teams' matches — re-scoping is the next step.
 - A match belongs to at most one team; there's no re-assigning a match's team after upload yet.
 - Removing the last `owner` of a team isn't prevented.
 - **Global role & `steam_id` are set by hand** (tinker) for now — the admin UI to list users,

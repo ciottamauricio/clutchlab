@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\GameMatch;
 use App\Models\KillEvent;
 use App\Models\MatchPlayerStat;
 use Illuminate\Http\JsonResponse;
@@ -10,16 +11,16 @@ use Illuminate\Http\Request;
 class PlayerController extends Controller
 {
     /**
-     * The catalog of every distinct player seen across the caller's matches — the pick
-     * list for building a team roster. Derived from match_player_stats (no separate
-     * players table); the display name is the most-recently-seen one, since demo names
-     * drift (clan tags, emojis) but the SteamID64 is stable.
+     * The catalog of every distinct player seen across the caller's visible matches (their
+     * own uploads + their teams') — the pick list for building a team roster. Derived from
+     * match_player_stats (no separate players table); the display name is the most-recently-
+     * seen one, since demo names drift (clan tags, emojis) but the SteamID64 is stable.
      */
     public function index(Request $request): JsonResponse
     {
         $players = MatchPlayerStat::query()
+            ->whereIn('match_player_stats.match_id', GameMatch::visibleTo($request->user())->pluck('id'))
             ->join('matches', 'matches.id', '=', 'match_player_stats.match_id')
-            ->where('matches.user_id', $request->user()->id)
             ->groupBy('match_player_stats.steam_id')
             ->selectRaw(<<<'SQL'
                 match_player_stats.steam_id,
@@ -33,15 +34,15 @@ class PlayerController extends Controller
     }
 
     /**
-     * Every clutch this player won across the caller's own matches, grouped by round like
+     * Every clutch this player won across the caller's visible matches, grouped by round like
      * MatchController@clutches but spanning matches — each carries its own match/demo/tick so
-     * the "watch in game" jump works. Scoped to the caller via kill_events.owner_id.
+     * the "watch in game" jump works. Scoped to the matches the caller may see.
      */
     public function clutches(Request $request, string $steamId): JsonResponse
     {
         $clutches = KillEvent::query()
             ->join('matches', 'matches.id', '=', 'kill_events.match_id')
-            ->where('kill_events.owner_id', $request->user()->id)
+            ->whereIn('kill_events.match_id', GameMatch::visibleTo($request->user())->pluck('id'))
             ->where('kill_events.killer_steam_id', $steamId)
             ->where('kill_events.clutch', '>', 0)
             ->orderBy('kill_events.match_id')

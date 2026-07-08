@@ -8,12 +8,14 @@ namespace App\Contracts;
 interface SearchIndex
 {
     /**
-     * Search one index, always scoped to the owner. Returns ['hits' => array, 'total' => int].
+     * Search one index, always scoped to a set of visible match ids. Returns
+     * ['hits' => array, 'total' => int].
      *
-     * @param  array<string, mixed>  $filters  field => value (ANDed with owner_id)
+     * @param  array<string, mixed>  $filters  field => value (ANDed with the match scope)
+     * @param  list<int>  $matchIds  the matches the caller may see; results never escape this set
      * @return array{hits: array<int, mixed>, total: int}
      */
-    public function search(string $index, string $query, array $filters, int $ownerId, int $limit = 50): array;
+    public function search(string $index, string $query, array $filters, array $matchIds, int $limit = 50): array;
 
     /**
      * @param  array<int, array<string, mixed>>  $documents
@@ -23,11 +25,12 @@ interface SearchIndex
     public function deleteByMatch(string $index, int $matchId): void;
 
     /**
-     * Owner-scoped facet distribution for one filterable field: [value => count].
+     * Facet distribution for one filterable field, scoped to the visible matches: [value => count].
      *
+     * @param  list<int>  $matchIds  the matches the caller may see
      * @return array<string, int>
      */
-    public function facets(string $index, string $field, int $ownerId): array;
+    public function facets(string $index, string $field, array $matchIds): array;
 
     /** Create the indexes and set their filterable/searchable/sortable attributes. */
     public function configure(): void;

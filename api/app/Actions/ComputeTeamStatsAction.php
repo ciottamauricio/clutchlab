@@ -3,15 +3,14 @@
 namespace App\Actions;
 
 use App\Models\Team;
-use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
-// Aggregates a team's roster stats from the canonical kill_events (Postgres is the source
-// of truth for analytics; Meilisearch is only the text-search read model). Scoped to the
-// caller's own matches via kill_events.owner_id, keyed on the stable SteamID64.
+// Aggregates a team's roster stats from the canonical kill_events (Postgres is the source of
+// truth for analytics; Meilisearch is only the text-search read model). Scoped to the team's
+// own matches (those filed under it), so every member sees the same board — keyed on SteamID64.
 class ComputeTeamStatsAction
 {
-    public function execute(Team $team, User $owner): array
+    public function execute(Team $team): array
     {
         $roster = $team->players()->get();
         $ids = $roster->pluck('steam_id')->all();
@@ -19,12 +18,12 @@ class ComputeTeamStatsAction
             return ['players' => []];
         }
 
-        $ownerId = $owner->id;
+        $matchIds = $team->matches()->pluck('id')->all();
 
         // Offence: everything keyed on the killer. A won clutch is one round, not one kill,
         // so count distinct (match, round) pairs the player clutched in.
         $offence = DB::table('kill_events')
-            ->where('owner_id', $ownerId)
+            ->whereIn('match_id', $matchIds)
             ->whereIn('killer_steam_id', $ids)
             ->groupBy('killer_steam_id')
             ->selectRaw(<<<'SQL'
@@ -38,7 +37,7 @@ class ComputeTeamStatsAction
 
         // Defence: keyed on the victim. An opening kill's victim is the round's first death.
         $defence = DB::table('kill_events')
-            ->where('owner_id', $ownerId)
+            ->whereIn('match_id', $matchIds)
             ->whereIn('victim_steam_id', $ids)
             ->groupBy('victim_steam_id')
             ->selectRaw(<<<'SQL'
@@ -48,11 +47,11 @@ class ComputeTeamStatsAction
                 SQL)
             ->get()->keyBy('steam_id');
 
-        // Most-recently-seen demo name and how many of the caller's matches each player
-        // appears in, so the board is self-contained.
+        // Most-recently-seen demo name and how many of the team's matches each player appears
+        // in, so the board is self-contained.
         $meta = DB::table('match_player_stats')
+            ->whereIn('match_player_stats.match_id', $matchIds)
             ->join('matches', 'matches.id', '=', 'match_player_stats.match_id')
-            ->where('matches.user_id', $ownerId)
             ->whereIn('match_player_stats.steam_id', $ids)
             ->groupBy('match_player_stats.steam_id')
             ->selectRaw(<<<'SQL'

@@ -23,10 +23,11 @@ class MeilisearchIndex implements SearchIndex
 
     public function __construct(private Client $client) {}
 
-    public function search(string $index, string $query, array $filters, int $ownerId, int $limit = 50): array
+    public function search(string $index, string $query, array $filters, array $matchIds, int $limit = 50): array
     {
-        // owner_id is forced server-side — never trust a client-supplied owner.
-        $clauses = ['owner_id = '.$ownerId];
+        // The visible-match scope is forced server-side — results never escape what the caller
+        // may see, regardless of client-supplied filters.
+        $clauses = [$this->matchScope($matchIds)];
         foreach ($filters as $field => $value) {
             // An array value becomes an IN clause (e.g. a team's roster steam_ids); a scalar
             // is plain equality.
@@ -62,15 +63,22 @@ class MeilisearchIndex implements SearchIndex
         $this->client->index($index)->deleteDocuments(['filter' => 'match_id = '.$matchId]);
     }
 
-    public function facets(string $index, string $field, int $ownerId): array
+    public function facets(string $index, string $field, array $matchIds): array
     {
         $result = $this->client->index($index)->search('', [
-            'filter' => 'owner_id = '.$ownerId,
+            'filter' => $this->matchScope($matchIds),
             'facets' => [$field],
             'limit' => 0,
         ]);
 
         return $result->getFacetDistribution()[$field] ?? [];
+    }
+
+    // Restrict a query to the caller's visible matches. Empty set → a sentinel that matches
+    // nothing, so search never falls open to the whole index.
+    private function matchScope(array $matchIds): string
+    {
+        return 'match_id IN ['.implode(', ', $matchIds ?: [-1]).']';
     }
 
     public function configure(): void

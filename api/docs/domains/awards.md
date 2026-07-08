@@ -15,10 +15,11 @@ question — "who dies first the most?", "who's the biggest one-trick?" — with
 
 - **Analytics live in Postgres**, not Meilisearch: awards are `GROUP BY` aggregations over
   `kill_events` (Meili stays the text-search read model). Same rationale as team stats.
-- **Owner-scoped.** Only the caller's matches (`kill_events.owner_id`) are counted.
+- **Visible-match-scoped.** Counts every match the caller can see — their own uploads plus
+  their teams' matches (`GameMatch::visibleTo`) — not just what they uploaded.
 - **Optional narrowing.** `team_id` (one of the caller's roster teams → its steam_ids) and
-  `map` restrict the field. With no team, *every* player seen across the caller's matches is
-  ranked; with a team, only its roster.
+  `map` restrict the field. With no team, *every* player seen across the caller's visible
+  matches is ranked; with a team, only its roster.
 
 ## The awards
 

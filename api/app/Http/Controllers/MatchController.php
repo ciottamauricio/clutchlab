@@ -17,11 +17,8 @@ class MatchController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $teamIds = $user->teams()->pluck('teams.id');
-
         $matches = GameMatch::with(['team', 'owner'])
-            ->where(fn ($q) => $q->where('user_id', $user->id)->orWhereIn('team_id', $teamIds))
+            ->visibleTo($request->user())
             ->latest()
             ->get();
 

@@ -61,7 +61,7 @@ class TeamController extends Controller
     {
         $this->authorize('view', $team);
 
-        return response()->json(['data' => $action->execute($team, $request->user())]);
+        return response()->json(['data' => $action->execute($team)]);
     }
 
     public function addMember(AddTeamMemberRequest $request, Team $team, AddTeamMemberAction $action): TeamResource

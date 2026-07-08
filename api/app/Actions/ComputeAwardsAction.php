@@ -2,15 +2,16 @@
 
 namespace App\Actions;
 
+use App\Models\GameMatch;
 use App\Models\KillEvent;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
-// Superlative leaderboards ("awards") from kill_events across the caller's matches. Postgres
-// is the analytics source of truth; each award ranks players by one metric. An optional team
-// (roster steam_ids) and map narrow the scope. Scoped to the caller via kill_events.owner_id.
+// Superlative leaderboards ("awards") from kill_events across every match the caller can see
+// (their own uploads + their teams' matches). Postgres is the analytics source of truth; each
+// award ranks players by one metric. An optional team (roster steam_ids) and map narrow it.
 class ComputeAwardsAction
 {
     // Pistols + knife — the "eco" weapons (mirrors the frontend weapon registry's Pistols group).
@@ -31,11 +32,12 @@ class ComputeAwardsAction
 
     public function execute(User $owner, ?Team $team, ?string $map): array
     {
+        $matchIds = GameMatch::visibleTo($owner)->pluck('id')->all();
         $ids = $team?->players()->pluck('steam_id')->all();
         $eco = "'".implode("','", self::ECO_WEAPONS)."'";
         $legs = self::LEGS_DOMINANT;
 
-        $offence = $this->base($owner->id, $map, 'killer_steam_id', $ids)
+        $offence = $this->base($matchIds, $map, 'killer_steam_id', $ids)
             ->groupBy('killer_steam_id')
             ->selectRaw(<<<SQL
                 killer_steam_id AS steam_id,
@@ -47,18 +49,18 @@ class ComputeAwardsAction
                 SQL)
             ->get()->keyBy('steam_id');
 
-        $defence = $this->base($owner->id, $map, 'victim_steam_id', $ids)
+        $defence = $this->base($matchIds, $map, 'victim_steam_id', $ids)
             ->groupBy('victim_steam_id')
             ->selectRaw('victim_steam_id AS steam_id, count(*) FILTER (WHERE opening) AS first_blood')
             ->get()->keyBy('steam_id');
 
-        $byWeapon = $this->base($owner->id, $map, 'killer_steam_id', $ids)
+        $byWeapon = $this->base($matchIds, $map, 'killer_steam_id', $ids)
             ->where('weapon', '<>', '')
             ->groupBy('killer_steam_id', 'weapon')
             ->selectRaw('killer_steam_id AS steam_id, weapon, count(*) AS c')
             ->get()->groupBy('steam_id');
 
-        $names = $this->names($owner->id, $offence->keys()->merge($defence->keys())->unique()->all());
+        $names = $this->names($matchIds, $offence->keys()->merge($defence->keys())->unique()->all());
         $nameOf = fn ($id) => $names[$id] ?? $id;
 
         // one-trick: each player's biggest single-weapon share of their kills.
@@ -90,9 +92,11 @@ class ComputeAwardsAction
             return ['kills' => []];
         }
 
+        $matchIds = GameMatch::visibleTo($owner)->pluck('id')->all();
+
         $q = KillEvent::query()
             ->join('matches', 'matches.id', '=', 'kill_events.match_id')
-            ->where('kill_events.owner_id', $owner->id);
+            ->whereIn('kill_events.match_id', $matchIds);
         if ($map) {
             $q->where('kill_events.map', $map);
         }
@@ -102,7 +106,7 @@ class ComputeAwardsAction
             'eco' => $q->where('kill_events.killer_steam_id', $steamId)->whereIn('kill_events.weapon', self::ECO_WEAPONS),
             'clutches' => $q->where('kill_events.killer_steam_id', $steamId)->where('kill_events.clutch', '>', 0),
             'headshot' => $q->where('kill_events.killer_steam_id', $steamId)->where('kill_events.headshot', true),
-            'one_trick' => $q->where('kill_events.killer_steam_id', $steamId)->where('kill_events.weapon', (string) $this->topWeapon($owner->id, $steamId, $map)),
+            'one_trick' => $q->where('kill_events.killer_steam_id', $steamId)->where('kill_events.weapon', (string) $this->topWeapon($matchIds, $steamId, $map)),
             'first_blood' => $q->where('kill_events.victim_steam_id', $steamId)->where('kill_events.opening', true),
         };
 
@@ -130,10 +134,10 @@ class ComputeAwardsAction
         return ['kills' => $kills];
     }
 
-    private function topWeapon(int $ownerId, string $steamId, ?string $map): ?string
+    private function topWeapon(array $matchIds, string $steamId, ?string $map): ?string
     {
         $q = DB::table('kill_events')
-            ->where('owner_id', $ownerId)
+            ->whereIn('match_id', $matchIds)
             ->where('killer_steam_id', $steamId)
             ->where('weapon', '<>', '');
         if ($map) {
@@ -143,9 +147,9 @@ class ComputeAwardsAction
         return $q->groupBy('weapon')->orderByRaw('count(*) DESC')->value('weapon');
     }
 
-    private function base(int $ownerId, ?string $map, string $idColumn, ?array $ids)
+    private function base(array $matchIds, ?string $map, string $idColumn, ?array $ids)
     {
-        $q = DB::table('kill_events')->where('owner_id', $ownerId);
+        $q = DB::table('kill_events')->whereIn('match_id', $matchIds);
         if ($map) {
             $q->where('map', $map);
         }
@@ -156,7 +160,7 @@ class ComputeAwardsAction
         return $q;
     }
 
-    private function names(int $ownerId, array $ids): Collection
+    private function names(array $matchIds, array $ids): Collection
     {
         if (empty($ids)) {
             return collect();
@@ -164,7 +168,7 @@ class ComputeAwardsAction
 
         return DB::table('match_player_stats')
             ->join('matches', 'matches.id', '=', 'match_player_stats.match_id')
-            ->where('matches.user_id', $ownerId)
+            ->whereIn('match_player_stats.match_id', $matchIds)
             ->whereIn('match_player_stats.steam_id', $ids)
             ->groupBy('match_player_stats.steam_id')
             ->selectRaw("match_player_stats.steam_id, (array_agg(match_player_stats.name ORDER BY matches.created_at DESC))[1] AS name")

@@ -24,6 +24,12 @@ class Team extends Model
         return $this->hasMany(TeamPlayer::class);
     }
 
+    /** Matches filed under this team — the source scope for the team's stat board. */
+    public function matches(): HasMany
+    {
+        return $this->hasMany(GameMatch::class);
+    }
+
     /**
      * The role of a given user in this team, or null if they're not a member.
      */

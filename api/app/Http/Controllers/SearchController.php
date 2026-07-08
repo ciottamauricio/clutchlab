@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Contracts\SearchIndex;
+use App\Models\GameMatch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -50,7 +51,7 @@ class SearchController extends Controller
     public function clutchSizes(Request $request, SearchIndex $index): JsonResponse
     {
         try {
-            $dist = $index->facets('kills', 'clutch', $request->user()->id);
+            $dist = $index->facets('kills', 'clutch', $this->visibleMatchIds($request));
         } catch (\Throwable) {
             return response()->json(['message' => 'search.unavailable'], 503);
         }
@@ -71,13 +72,19 @@ class SearchController extends Controller
         }
 
         try {
-            $result = $index->search($name, (string) $request->query('q', ''), $filters, $request->user()->id);
+            $result = $index->search($name, (string) $request->query('q', ''), $filters, $this->visibleMatchIds($request));
         } catch (\Throwable) {
             // The engine is a read model — degrade instead of 500ing the request.
             return response()->json(['message' => 'search.unavailable'], 503);
         }
 
         return response()->json(['data' => ['hits' => $result['hits'], 'total' => $result['total']]]);
+    }
+
+    /** The matches the caller may see (own uploads + their teams'), the scope for every search. */
+    private function visibleMatchIds(Request $request): array
+    {
+        return GameMatch::visibleTo($request->user())->pluck('id')->all();
     }
 
     private function coerce(mixed $value, string $type): mixed
