@@ -20,6 +20,7 @@ export default function AppLayout() {
             <NavLink to="/tactics">Tactics</NavLink>
             <NavLink to="/search">Search</NavLink>
             <NavLink to="/awards">Awards</NavLink>
+            {user?.is_admin && <NavLink to="/admin">Admin</NavLink>}
           </nav>
           <div className="user">
             <ThemeToggle />

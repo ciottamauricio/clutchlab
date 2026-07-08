@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AwardsController;
 use App\Http\Controllers\MatchController;
@@ -52,4 +53,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/search/kills', [SearchController::class, 'kills']);
     Route::get('/search/rounds', [SearchController::class, 'rounds']);
     Route::get('/search/clutch-sizes', [SearchController::class, 'clutchSizes']);
+
+    // Master-admin only: manage every user's global role and linked SteamID.
+    Route::middleware('can:admin')->group(function () {
+        Route::get('/admin/users', [AdminUserController::class, 'index']);
+        Route::patch('/admin/users/{user}', [AdminUserController::class, 'update']);
+    });
 });

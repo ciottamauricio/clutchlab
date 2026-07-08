@@ -8,6 +8,7 @@ import TeamsPage from './pages/TeamsPage'
 import TacticsPage from './pages/TacticsPage'
 import SearchPage from './pages/SearchPage'
 import AwardsPage from './pages/AwardsPage'
+import AdminPage from './pages/AdminPage'
 import './App.css'
 
 function Protected({ children }) {
@@ -15,6 +16,12 @@ function Protected({ children }) {
   if (loading) return <p className="muted center">Loading…</p>
   if (!user) return <Navigate to="/login" replace />
   return children
+}
+
+// Admin-only route guard — non-admins are bounced home (the API enforces it regardless).
+function AdminOnly({ children }) {
+  const { user } = useAuth()
+  return user?.is_admin ? children : <Navigate to="/" replace />
 }
 
 export default function App() {
@@ -36,6 +43,7 @@ export default function App() {
             <Route path="/tactics" element={<TacticsPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/awards" element={<AwardsPage />} />
+            <Route path="/admin" element={<AdminOnly><AdminPage /></AdminOnly>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

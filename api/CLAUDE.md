@@ -18,7 +18,7 @@ changes.** The code follows the doc, not the other way around.
 | Domain | Status | Doc |
 |--------|--------|-----|
 | Matches — demo upload + parsing | Implemented (Step 1) | `docs/domains/matches.md` |
-| Teams & Auth — roles, ownership | Planned (Step 2) | `docs/domains/teams-auth.md` |
+| Teams & Auth — roles, ownership, team-shared matches, master admin | Implemented | `docs/domains/teams-auth.md` |
 | Tactics board | Implemented (Step 3) | `docs/domains/tactics.md` |
 | Search | Implemented (Step 4) | `docs/domains/search.md` |
 | Kill heatmap — kill positions on radar | Implemented | `docs/domains/heatmap.md` |

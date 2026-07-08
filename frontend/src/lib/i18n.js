@@ -36,6 +36,11 @@ const MESSAGES = {
   'team.already_member': 'That user is already on the team',
   'team.steam_id_required': 'Pick a player to add',
 
+  'user.invalid_role': 'That role is not allowed',
+  'user.invalid_steam_id': 'A SteamID64 is 17 digits',
+  'user.steam_id_taken': 'That SteamID is already linked to another user',
+  'admin.last_admin': "You can't remove the last admin",
+
   'tactic.name_required': 'Please name the tactic',
 
   'search.unavailable': 'Search is temporarily unavailable',

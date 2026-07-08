@@ -59,5 +59,11 @@ export const api = {
       ...opts,
     }),
   postForm: (path, formData) => request(path, { method: 'POST', body: formData }),
+  patch: (path, data) =>
+    request(path, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data ?? {}),
+    }),
   delete: (path) => request(path, { method: 'DELETE' }),
 }

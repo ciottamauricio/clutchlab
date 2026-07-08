@@ -1654,3 +1654,90 @@ button.clutch-open:hover {
     font-size: 26px;
   }
 }
+
+/* ---------- Admin: user management ---------- */
+
+.admin-head {
+  margin-bottom: 20px;
+}
+
+.admin-head h2 {
+  font: 600 24px var(--display);
+  letter-spacing: 0.02em;
+}
+
+.ua-wrap {
+  overflow-x: auto;
+}
+
+.ua-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.ua-table th,
+.ua-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.ua-table th {
+  font: 500 10px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.ua-table tbody tr:hover td {
+  background: var(--hover);
+}
+
+.ua-name {
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.ua-email {
+  font: 400 11.5px var(--mono);
+  color: var(--text-dim);
+}
+
+.ua-steam {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ua-steam input {
+  width: 17ch;
+  font: 400 12.5px var(--mono);
+}
+
+.ua-teams {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ua-team-tag {
+  font: 500 10.5px var(--sans);
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+.ua-status {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.ua-saved {
+  color: var(--win);
+}

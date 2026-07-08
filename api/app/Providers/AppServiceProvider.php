@@ -36,5 +36,9 @@ class AppServiceProvider extends ServiceProvider
         // The master admin passes every policy check. Returning null (not false) lets
         // non-admins fall through to the ordinary policy.
         Gate::before(fn (User $user) => $user->isAdmin() ? true : null);
+
+        // Named ability for admin-only routes (`->middleware('can:admin')`). Non-admins fall
+        // here from Gate::before and are denied; admins never reach it (short-circuited above).
+        Gate::define('admin', fn (User $user) => $user->isAdmin());
     }
 }

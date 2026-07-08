@@ -133,6 +133,10 @@ otherwise so non-admins fall through to the ordinary policy) — see Authorizati
 7. Match upload sets `user_id` = the authenticated user and optionally `team_id`; the match
    list returns the caller's own matches plus every match of the teams they belong to.
 8. Auth endpoints are rate-limited.
+9. **Global role & SteamID are admin-only and not mass-assignable.** Only `admin` users reach
+   `/admin/users`; `role`/`steam_id` are set on the model explicitly (never via register/login).
+10. **The last admin can't be demoted** — an attempt returns `admin.last_admin` (422), so the
+    platform always has at least one admin.
 
 ## Validation (boundary)
 
@@ -173,9 +177,18 @@ rostered ids performed in the team's games, and every member sees the same numbe
 | POST | `/api/teams/{team}/players` | add a player to the roster by steam_id (owner only) |
 | DELETE | `/api/teams/{team}/players/{steamId}` | remove a rostered player (owner only) |
 
+**Admin (`auth:sanctum` + `can:admin`)**
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/admin/users` | list every user (role, linked SteamID, teams) |
+| PATCH | `/api/admin/users/{user}` | set a user's global `role` and/or `steam_id` |
+
 ## Authorization (policies)
 
 - `Gate::before` (in `AppServiceProvider::boot`): a global `admin` passes every check.
+- `Gate::define('admin')`: the named ability behind admin-only routes (`->middleware('can:admin')`).
+  Admins short-circuit via `Gate::before`; non-admins fall here and are denied (**403**).
 - `GameMatchPolicy`: `view` → uploader or any member of `match.team_id`; `delete` / `reparse`
   → uploader or an `owner`/`igl` of `match.team_id`.
 - `TeamPolicy`: `view` → user is a member; `manageMembers` / `update` / `delete` → the user's
@@ -185,6 +198,10 @@ rostered ids performed in the team's games, and every member sees the same numbe
 
 - `auth.invalid_credentials` — bad email/password (login).
 - `match.invalid_team` — upload `team_id` isn't a team the caller may upload to (owner/igl).
+- `user.invalid_role` — admin set a global role other than `member`/`admin`.
+- `user.invalid_steam_id` — linked SteamID isn't a 17-digit SteamID64.
+- `user.steam_id_taken` — that SteamID is already linked to another account.
+- `admin.last_admin` — refused: demoting this user would leave no admin.
 - `team.already_member` — the user is already in the team.
 - `team.steam_id_required` — no player selected when adding to the roster.
 - 401 unauthenticated · 403 authorization · 422 validation (field codes).
@@ -195,9 +212,9 @@ rostered ids performed in the team's games, and every member sees the same numbe
 - No invitation/acceptance flow — an owner adds existing users directly by email.
 - A match belongs to at most one team; there's no re-assigning a match's team after upload yet.
 - Removing the last `owner` of a team isn't prevented.
-- **Global role & `steam_id` are set by hand** (tinker) for now — the admin UI to list users,
-  set the global role, and assign a SteamID is a later step. No self-service Steam linking.
-- No guard against demoting the last `admin`.
+- **SteamID linking is admin-assigned only** — no self-service "Sign in through Steam" flow yet.
+- The admin panel manages the global role and SteamID; it doesn't edit team membership (that's
+  the team owner's job) — it only shows each user's teams read-only.
 
 ## Related
 
