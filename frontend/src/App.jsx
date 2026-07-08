@@ -9,6 +9,7 @@ import TacticsPage from './pages/TacticsPage'
 import SearchPage from './pages/SearchPage'
 import AwardsPage from './pages/AwardsPage'
 import AdminPage from './pages/AdminPage'
+import ProfilePage from './pages/ProfilePage'
 import './App.css'
 
 function Protected({ children }) {
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/tactics" element={<TacticsPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/awards" element={<AwardsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/admin" element={<AdminOnly><AdminPage /></AdminOnly>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

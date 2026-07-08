@@ -42,6 +42,9 @@ const MESSAGES = {
   'admin.last_admin': "You can't remove the last admin",
   'admin.cannot_delete_self': "You can't delete your own account",
 
+  'profile.invalid_role': 'Please pick a valid role',
+  'profile.bio_too_long': 'Bio is too long (max 500 characters)',
+
   'tactic.name_required': 'Please name the tactic',
 
   'search.unavailable': 'Search is temporarily unavailable',

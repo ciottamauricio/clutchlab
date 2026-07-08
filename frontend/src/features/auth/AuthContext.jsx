@@ -43,6 +43,14 @@ export function AuthProvider({ children }) {
     setUser(user)
   }
 
+  // Re-hydrate the current user from /me — call after a profile edit so the shell (navbar
+  // name) and any consumer reflect the change.
+  const refreshUser = async () => {
+    const u = await api.get('/me')
+    setUser(u)
+    return u
+  }
+
   const logout = async () => {
     try {
       await api.post('/logout')
@@ -54,7 +62,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

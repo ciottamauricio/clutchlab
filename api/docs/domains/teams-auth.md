@@ -46,6 +46,10 @@ Step 1: matches become user-owned and access is enforced.
 - **`role`** (default `member`): global role, cast to `App\Enums\UserRole` (`member` | `admin`).
   **Out of `Fillable`** — register/login can never set it; an admin assigns it deliberately.
 - **`steam_id`** (nullable, unique, string): the account's own SteamID64. Also out of `Fillable`.
+- **Profile fields** (all nullable, user-editable): `player_role` (in-game role: awper/rifler/igl/
+  entry/lurker/support/coach), `bio`, and gear — `pc`, `mouse`, `keyboard`, `headset`, `monitor`,
+  `mousepad`. A user edits these on their own profile; they're in `Fillable` (the self-edit path
+  only fills these + `name`, never role/steam_id/email/password).
 - Relations: `matches` (hasMany), `teams` (belongsToMany via `team_user`, `withPivot('role')`).
 
 ### `teams`
@@ -171,7 +175,9 @@ rostered ids performed in the team's games, and every member sees the same numbe
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/api/logout` | revoke the current token |
-| GET | `/api/me` | current user |
+| GET | `/api/me` | current user (incl. profile fields, role, linked SteamID) |
+| PATCH | `/api/profile` | edit own profile (name + player_role/bio/gear) |
+| GET | `/api/profile/stats` | own aggregate stats across visible matches, or null if no SteamID linked |
 | GET/POST/GET | `/api/matches…` | uploader + team-shared (see [matches.md](matches.md)) |
 | GET | `/api/players` | catalog of players seen across my matches |
 | GET | `/api/players/{steamId}/clutches` | a player's won clutches across my matches |

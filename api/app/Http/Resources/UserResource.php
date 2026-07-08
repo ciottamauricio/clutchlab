@@ -18,6 +18,17 @@ class UserResource extends JsonResource
             'is_admin' => $this->isAdmin(),
             'steam_id' => $this->steam_id,
             'created_at' => $this->created_at,
+            // Self-maintained profile: in-game role, bio, and gear/setup.
+            'player_role' => $this->player_role,
+            'bio' => $this->bio,
+            'gear' => [
+                'pc' => $this->pc,
+                'mouse' => $this->mouse,
+                'keyboard' => $this->keyboard,
+                'headset' => $this->headset,
+                'monitor' => $this->monitor,
+                'mousepad' => $this->mousepad,
+            ],
         ];
     }
 }
