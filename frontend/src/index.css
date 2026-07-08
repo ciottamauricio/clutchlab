@@ -24,6 +24,15 @@
   --danger-bg: rgba(224, 99, 91, 0.12);
   --win: #56b87b;
 
+  /* Primary button: "flashbang white" in dark; inverts to dark ink in light. */
+  --btn-bg: #e6ecf3;
+  --btn-text: #10151b;
+  --btn-bg-hover: #ffffff;
+
+  /* Frosted top bar + subtle row/card hover — both theme-aware. */
+  --bar-bg: rgba(14, 17, 22, 0.86);
+  --hover: rgba(255, 255, 255, 0.03);
+
   /* Legacy aliases still referenced by feature styles. */
   --accent: var(--ct);
   --accent-bg: var(--ct-bg);
@@ -38,6 +47,38 @@
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Light mode — same console layout, inverted surfaces. The two side colours stay the brand
+   accents (darkened for contrast on white); the primary button flips to dark ink. */
+:root[data-theme='light'] {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --surface-2: #eceff4;
+  --border: #dde2ea;
+  --border-strong: #c4ccd8;
+
+  --text: #515c6b;
+  --text-h: #11161c;
+  --text-dim: #8b96a5;
+
+  --ct: #2b6cb0;
+  --ct-bg: rgba(43, 108, 176, 0.1);
+  --t: #b07714;
+  --t-bg: rgba(176, 119, 20, 0.12);
+
+  --danger: #cf3b45;
+  --danger-bg: rgba(207, 59, 69, 0.1);
+  --win: #2f9e5f;
+
+  --btn-bg: #10151b;
+  --btn-text: #f3f5f8;
+  --btn-bg-hover: #232c38;
+
+  --bar-bg: rgba(243, 245, 248, 0.82);
+  --hover: rgba(0, 0, 0, 0.04);
+
+  color-scheme: light;
 }
 
 * {
@@ -132,9 +173,9 @@ input[type='checkbox'] {
    its own class (.link-btn, .copy-btn, .match-open, …). */
 button {
   font: 500 14px var(--sans);
-  color: #10151b;
-  background: #e6ecf3;
-  border: 1px solid #e6ecf3;
+  color: var(--btn-text);
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-bg);
   border-radius: 6px;
   padding: 8px 18px;
   cursor: pointer;
@@ -142,8 +183,8 @@ button {
 }
 
 button:hover:not(:disabled) {
-  background: #ffffff;
-  border-color: #ffffff;
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-bg-hover);
 }
 
 button:disabled {

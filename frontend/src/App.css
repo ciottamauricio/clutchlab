@@ -18,7 +18,7 @@
   z-index: 50;
   width: 100%;
   border-bottom: 1px solid var(--border);
-  background: rgba(14, 17, 22, 0.86);
+  background: var(--bar-bg);
   backdrop-filter: saturate(1.3) blur(12px);
   -webkit-backdrop-filter: saturate(1.3) blur(12px);
 }
@@ -122,6 +122,32 @@
   border: none;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+/* Theme toggle: a quiet icon button (overrides the primary-button base). */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.theme-toggle:hover:not(:disabled) {
+  color: var(--text-h);
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+.auth-topbar {
+  position: absolute;
+  top: 20px;
+  right: 20px;
 }
 
 .center {
@@ -447,7 +473,7 @@
 }
 
 .award-leader:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--hover);
 }
 
 .award-rank {
@@ -819,7 +845,7 @@
 }
 
 .scoreboard tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--hover);
 }
 
 .scoreboard tbody tr:last-child td {
@@ -852,7 +878,7 @@
 }
 
 .members tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--hover);
 }
 
 .members tbody tr:last-child td {
@@ -941,7 +967,7 @@
 
 .kill-row.open td,
 .kill-row:hover td {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--hover);
 }
 
 .kill-expand td {
@@ -1538,7 +1564,7 @@ button.clutch-open:hover {
 }
 
 .add-piece:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--hover);
 }
 
 .presence {

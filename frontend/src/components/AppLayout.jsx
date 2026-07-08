@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
+import ThemeToggle from './ThemeToggle'
 
 // The authenticated app shell: branding, nav, current user + logout, then the page.
 export default function AppLayout() {
@@ -21,6 +22,7 @@ export default function AppLayout() {
             <NavLink to="/awards">Awards</NavLink>
           </nav>
           <div className="user">
+            <ThemeToggle />
             <span className="muted">{user?.name}</span>
             <button type="button" className="link-btn" onClick={logout}>Log out</button>
           </div>
