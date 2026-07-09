@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { usePlayerCatalog, addPlayer, removePlayer } from './api'
+import SearchableSelect from '../../components/SearchableSelect'
 import { t } from '../../lib/i18n'
 
 // The in-game roster: pick players (by steam_id) from the catalog of everyone seen across
@@ -64,14 +65,16 @@ export default function TeamRoster({ teamId, roster, canManage, onChanged }) {
 
       {canManage && (
         <form className="inline-form" onSubmit={add}>
-          <select value={steamId} onChange={(e) => setSteamId(e.target.value)}>
-            <option value="">Add a player…</option>
-            {available.map((c) => (
-              <option key={c.steam_id} value={c.steam_id}>
-                {c.name} · {c.match_count} {c.match_count === 1 ? 'match' : 'matches'}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            value={steamId}
+            onChange={setSteamId}
+            options={available.map((c) => ({
+              value: c.steam_id,
+              label: c.name,
+              hint: `${c.match_count} ${c.match_count === 1 ? 'match' : 'matches'}`,
+            }))}
+            placeholder="Add a player…"
+          />
           <input
             type="text"
             placeholder="nickname (optional)"

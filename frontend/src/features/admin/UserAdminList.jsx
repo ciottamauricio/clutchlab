@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import SearchableSelect from '../../components/SearchableSelect'
 import { t } from '../../lib/i18n'
 
 function UserRow({ user, players, takenSteamIds, currentUserId, onUpdate, onDelete }) {
@@ -37,6 +38,15 @@ function UserRow({ user, players, takenSteamIds, currentUserId, onUpdate, onDele
   // selectable so it still shows and can be changed.
   const linkedKnown = players.some((p) => p.steam_id === user.steam_id)
 
+  const playerOptions = [
+    { value: '', label: '— Not linked —' },
+    ...(user.steam_id && !linkedKnown ? [{ value: user.steam_id, label: user.steam_id }] : []),
+    ...players.map((p) => {
+      const taken = p.steam_id !== user.steam_id && takenSteamIds.has(p.steam_id)
+      return { value: p.steam_id, label: p.name + (taken ? ' (linked)' : ''), hint: `${p.match_count} ${p.match_count === 1 ? 'match' : 'matches'}`, disabled: taken }
+    }),
+  ]
+
   return (
     <tr>
       <td>
@@ -50,26 +60,13 @@ function UserRow({ user, players, takenSteamIds, currentUserId, onUpdate, onDele
         </select>
       </td>
       <td>
-        <select
+        <SearchableSelect
           value={user.steam_id ?? ''}
-          onChange={(e) => run({ steam_id: e.target.value })}
+          onChange={(v) => run({ steam_id: v })}
+          options={playerOptions}
+          placeholder="— Not linked —"
           disabled={busy}
-          aria-label={`Player for ${user.name}`}
-        >
-          <option value="">— Not linked —</option>
-          {user.steam_id && !linkedKnown && (
-            <option value={user.steam_id}>{user.steam_id}</option>
-          )}
-          {players.map((p) => (
-            <option
-              key={p.steam_id}
-              value={p.steam_id}
-              disabled={p.steam_id !== user.steam_id && takenSteamIds.has(p.steam_id)}
-            >
-              {p.name}{takenSteamIds.has(p.steam_id) && p.steam_id !== user.steam_id ? ' (linked)' : ''}
-            </option>
-          ))}
-        </select>
+        />
       </td>
       <td>
         {user.teams?.length
