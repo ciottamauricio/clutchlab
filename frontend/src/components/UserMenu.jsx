@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
-import ChangePasswordModal from '../features/profile/ChangePasswordModal'
+import { useTheme } from '../lib/theme'
 
 const GEAR_PATH = 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'
 
-// The account menu: gear + name in the top bar opens a dropdown (profile / change password /
-// log out) instead of linking straight to a page — the modern "account menu" pattern.
+// The account menu: gear + name in the top bar opens a dropdown (profile / theme / log out)
+// instead of linking straight to a page — the modern "account menu" pattern. Editing and the
+// password change both live on the profile page itself.
 export default function UserMenu() {
   const { user, logout } = useAuth()
+  const { theme, toggle } = useTheme()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
   const rootRef = useRef(null)
 
   useEffect(() => {
@@ -30,7 +31,7 @@ export default function UserMenu() {
 
   const goProfile = () => {
     setOpen(false)
-    navigate('/', { state: { edit: true } })
+    navigate('/')
   }
 
   return (
@@ -45,14 +46,14 @@ export default function UserMenu() {
 
       {open && (
         <div className="user-menu-panel" role="menu">
-          <button type="button" role="menuitem" onClick={goProfile}>Edit profile</button>
-          <button type="button" role="menuitem" onClick={() => { setOpen(false); setShowPassword(true) }}>Change password</button>
+          <button type="button" role="menuitem" onClick={goProfile}>Profile</button>
+          <button type="button" role="menuitemcheckbox" aria-checked={theme === 'dark'} onClick={toggle}>
+            {theme === 'light' ? 'Dark mode' : 'Light mode'}
+          </button>
           <div className="user-menu-divider" />
           <button type="button" role="menuitem" className="user-menu-danger" onClick={logout}>Log out</button>
         </div>
       )}
-
-      {showPassword && <ChangePasswordModal onClose={() => setShowPassword(false)} />}
     </div>
   )
 }

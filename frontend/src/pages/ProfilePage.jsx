@@ -1,28 +1,21 @@
-import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useState } from 'react'
 import { useAuth } from '../features/auth/AuthContext'
 import { useProfileStats, PLAYER_ROLES, GEAR_FIELDS } from '../features/profile/api'
 import ProfileForm from '../features/profile/ProfileForm'
 import ProfileStats from '../features/profile/ProfileStats'
 import RecentForm from '../features/profile/RecentForm'
+import RecentClutches from '../features/profile/RecentClutches'
 import WeaponBreakdown from '../features/profile/WeaponBreakdown'
 
 const roleLabel = (value) => PLAYER_ROLES.find((r) => r.value === value)?.label
 
 // The landing page after login: a player-card readout of who you are (role, bio, linked
-// stats) plus your loadout and account details. "Edit profile" — here or from the account
-// menu — swaps the card for the edit form in place.
+// stats) plus your loadout and account details. "Edit profile" swaps the card for the edit
+// form in place — where changing your password also lives.
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth()
-  const { stats, recent, weapons } = useProfileStats()
-  const location = useLocation()
-  const [editing, setEditing] = useState(Boolean(location.state?.edit))
-
-  // The account-menu shortcut navigates here with { state: { edit: true } } — react to it
-  // even if we're already on this page (location.key changes on every navigate() call).
-  useEffect(() => {
-    if (location.state?.edit) setEditing(true)
-  }, [location.key]) // eslint-disable-line react-hooks/exhaustive-deps
+  const { stats, recent, weapons, clutches } = useProfileStats()
+  const [editing, setEditing] = useState(false)
 
   if (!user) return null
 
@@ -62,6 +55,8 @@ export default function ProfilePage() {
       ) : (
         <>
           <RecentForm recent={recent} />
+
+          {stats && <RecentClutches clutches={clutches} playerName={user.name} />}
 
           <div className="pf-grid">
             <WeaponBreakdown weapons={weapons} />

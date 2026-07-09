@@ -17,6 +17,13 @@ export function formatMatchDate(iso) {
   return `${date}, ${time}`
 }
 
+// Time of day only (HH:MM), locale-aware, in the viewer's timezone. For tight labels where
+// the date is redundant (e.g. a list of recent matches).
+export function formatMatchTime(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
 // Compact duration (e.g. "1h 12m", "48m", "36s"). Minutes are dropped when there are hours
 // and it's an even hour; seconds only show for sub-minute durations.
 export function formatDuration(seconds) {
@@ -28,6 +35,14 @@ export function formatDuration(seconds) {
   if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`
   if (m > 0) return `${m}m`
   return `${s}s`
+}
+
+// A compact map name for tight labels: drop the "de_"/"cs_" prefix and title-case
+// (e.g. "de_dust2" → "Dust2"). Falls back to the raw value for unknown formats.
+export function mapLabel(name) {
+  if (!name) return '—'
+  const bare = name.replace(/^(de|cs|ar)_/, '')
+  return bare.charAt(0).toUpperCase() + bare.slice(1)
 }
 
 // The two teams as { name, score, side }, higher score first (winner on the left).

@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { updateProfile, PLAYER_ROLES, GEAR_FIELDS } from './api'
+import ChangePasswordModal from './ChangePasswordModal'
 import { t } from '../../lib/i18n'
 
 // Edit form for the caller's own profile. Seeded from the current user; on save it patches
-// and hands the updated user back so the shell can refresh.
+// and hands the updated user back so the shell can refresh. The password change lives here
+// too — one place to manage your own account.
 export default function ProfileForm({ user, onSaved, onCancel }) {
   const [form, setForm] = useState({
     name: user.name ?? '',
@@ -13,6 +15,7 @@ export default function ProfileForm({ user, onSaved, onCancel }) {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [showPassword, setShowPassword] = useState(false)
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
@@ -65,6 +68,16 @@ export default function ProfileForm({ user, onSaved, onCancel }) {
         <button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</button>
         <button type="button" className="link-btn" onClick={onCancel} disabled={saving}>Cancel</button>
       </div>
+
+      <div className="pf-security">
+        <div>
+          <span className="pf-security-title">Password</span>
+          <span className="muted">Change the password you use to sign in.</span>
+        </div>
+        <button type="button" className="link-btn" onClick={() => setShowPassword(true)}>Change password</button>
+      </div>
+
+      {showPassword && <ChangePasswordModal onClose={() => setShowPassword(false)} />}
     </form>
   )
 }

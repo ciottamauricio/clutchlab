@@ -21,13 +21,14 @@ class ComputePlayerStatsAction
         $matchIds = GameMatch::visibleTo($user)->pluck('id')->all();
 
         if (empty($matchIds)) {
-            return ['stats' => $this->zeroed(), 'recent' => [], 'weapons' => []];
+            return ['stats' => $this->zeroed(), 'recent' => [], 'weapons' => [], 'clutches' => []];
         }
 
         return [
             'stats' => $this->aggregate($id, $matchIds),
             'recent' => $this->recent($id, $matchIds),
             'weapons' => $this->weapons($id, $matchIds),
+            'clutches' => $this->clutches($id, $matchIds),
         ];
     }
 
@@ -85,11 +86,12 @@ class ComputePlayerStatsAction
             ->where('mps.steam_id', $id)
             ->orderByRaw('coalesce(m.played_at, m.created_at) desc')
             ->limit(10)
-            ->get(['m.id', 'm.map_name', 'm.played_at', 'm.score_ct', 'm.score_t', 'mps.kills', 'mps.deaths', 'mps.team_side'])
+            ->get(['m.id', 'm.map_name', 'm.played_at', 'm.duration_seconds', 'm.score_ct', 'm.score_t', 'mps.kills', 'mps.deaths', 'mps.team_side'])
             ->map(fn ($r) => [
                 'match_id' => (int) $r->id,
                 'map' => $r->map_name,
                 'played_at' => $r->played_at,
+                'duration_seconds' => $r->duration_seconds !== null ? (int) $r->duration_seconds : null,
                 'kills' => (int) $r->kills,
                 'deaths' => (int) $r->deaths,
                 'kd' => $r->deaths > 0 ? round($r->kills / $r->deaths, 2) : (float) $r->kills,
@@ -124,6 +126,63 @@ class ComputePlayerStatsAction
             ->get()
             ->map(fn ($w) => ['weapon' => $w->weapon, 'kills' => (int) $w->kills])
             ->all();
+    }
+
+    // The player's most recent clutches (rounds won while last alive), newest first, each with
+    // the match it happened in and the kills that won it — so a clutch expands to its kills
+    // (hitgroups + demo jump) right on the profile, like the search results do.
+    private function clutches(string $id, array $matchIds): array
+    {
+        // The 8 most recent (match, round) clutches for this player, newest first.
+        $recent = DB::table('kill_events as ke')
+            ->join('matches as m', 'm.id', '=', 'ke.match_id')
+            ->whereIn('ke.match_id', $matchIds)
+            ->where('ke.killer_steam_id', $id)
+            ->where('ke.clutch', '>', 0)
+            ->groupBy('ke.match_id', 'ke.round', 'm.map_name', 'm.played_at', 'm.created_at', 'm.tick_rate', 'm.original_filename')
+            ->orderByRaw('coalesce(m.played_at, m.created_at) desc, ke.round desc')
+            ->limit(8)
+            ->get([
+                'ke.match_id',
+                'ke.round',
+                'm.map_name',
+                'm.played_at',
+                'm.tick_rate',
+                'm.original_filename as demo',
+                DB::raw('max(ke.clutch) AS size'),
+            ]);
+
+        if ($recent->isEmpty()) {
+            return [];
+        }
+
+        // The kills behind those clutches: fetch this player's clutch kills from the recent
+        // matches in one pass, grouped by (match, round) for lookup below.
+        $kills = DB::table('kill_events')
+            ->whereIn('match_id', $recent->pluck('match_id')->unique()->all())
+            ->where('killer_steam_id', $id)
+            ->where('clutch', '>', 0)
+            ->orderBy('tick')
+            ->get(['match_id', 'round', 'victim_name', 'weapon', 'side', 'headshot', 'tick', 'hitgroups'])
+            ->groupBy(fn ($k) => $k->match_id.'-'.$k->round);
+
+        return $recent->map(fn ($c) => [
+            'match_id' => (int) $c->match_id,
+            'round' => (int) $c->round,
+            'map' => $c->map_name,
+            'played_at' => $c->played_at,
+            'tick_rate' => $c->tick_rate,
+            'demo' => $c->demo,
+            'size' => (int) $c->size,
+            'kills' => ($kills[$c->match_id.'-'.$c->round] ?? collect())->map(fn ($k) => [
+                'victim_name' => $k->victim_name,
+                'weapon' => $k->weapon,
+                'side' => $k->side,
+                'headshot' => $k->headshot,
+                'tick' => $k->tick,
+                'hitgroups' => $k->hitgroups,
+            ])->values()->all(),
+        ])->all();
     }
 
     private function zeroed(): array

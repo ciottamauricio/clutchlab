@@ -1,6 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
-import ThemeToggle from './ThemeToggle'
 import UserMenu from './UserMenu'
 
 // The authenticated app shell: branding, nav, account menu, then the page.
@@ -16,6 +15,7 @@ export default function AppLayout() {
             <span className="brand-word">Clutchlab</span>
           </NavLink>
           <nav className="nav">
+            <NavLink to="/" end>Profile</NavLink>
             <NavLink to="/matches">Matches</NavLink>
             <NavLink to="/teams">Teams</NavLink>
             <NavLink to="/tactics">Tactics</NavLink>
@@ -24,7 +24,6 @@ export default function AppLayout() {
             {user?.is_admin && <NavLink to="/admin">Admin</NavLink>}
           </nav>
           <div className="user">
-            <ThemeToggle />
             <UserMenu />
           </div>
         </div>

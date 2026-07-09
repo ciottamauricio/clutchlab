@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import UploadDemo from '../features/matches/UploadDemo'
 import MatchList from '../features/matches/MatchList'
 import MatchDashboard from '../features/matches/MatchDashboard'
@@ -6,9 +7,11 @@ import { useMatches, useDeleteMatch } from '../features/matches/api'
 import { t } from '../lib/i18n'
 
 // Thin route: composes the matches feature, holds only UI state (which match is
-// selected). Server state lives in the feature's hooks.
+// selected). Server state lives in the feature's hooks. A caller may deep-link a match
+// (e.g. from the profile's recent form) by navigating here with { state: { matchId } }.
 export default function DashboardPage() {
-  const [selectedId, setSelectedId] = useState(null)
+  const location = useLocation()
+  const [selectedId, setSelectedId] = useState(location.state?.matchId ?? null)
   const { matches, refresh } = useMatches()
   const { remove, deletingId, error: deleteError } = useDeleteMatch((id) => {
     refresh()

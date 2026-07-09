@@ -52,7 +52,10 @@ export default function ChangePasswordModal({ onClose }) {
               <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" minLength={8} required />
             </label>
             {error && <p className="error">{t(error)}</p>}
-            <button type="submit" disabled={saving}>{saving ? 'Changing…' : 'Change password'}</button>
+            <div className="cp-actions">
+              <button type="submit" disabled={saving}>{saving ? 'Changing…' : 'Change password'}</button>
+              <button type="button" className="link-btn" onClick={onClose} disabled={saving}>Cancel</button>
+            </div>
           </form>
         )}
       </div>

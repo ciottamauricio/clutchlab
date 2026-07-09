@@ -27,15 +27,20 @@ export const updateProfile = (data) => api.patch('/profile', data)
 export const changePassword = (data) => api.patch('/profile/password', data)
 
 // The caller's own profile analytics: aggregate stats (null when no SteamID is linked),
-// recent-form series, and top weapons.
+// recent-form series, top weapons, and recent clutches.
 export function useProfileStats() {
-  const [data, setData] = useState({ stats: null, recent: [], weapons: [] })
+  const [data, setData] = useState({ stats: null, recent: [], weapons: [], clutches: [] })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let active = true
     api.get('/profile/stats')
-      .then((d) => active && setData({ stats: d.stats ?? null, recent: d.recent ?? [], weapons: d.weapons ?? [] }))
+      .then((d) => active && setData({
+        stats: d.stats ?? null,
+        recent: d.recent ?? [],
+        weapons: d.weapons ?? [],
+        clutches: d.clutches ?? [],
+      }))
       .catch(() => {})
       .finally(() => active && setLoading(false))
     return () => {
