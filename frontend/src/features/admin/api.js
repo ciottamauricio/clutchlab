@@ -38,6 +38,36 @@ export function useUsers() {
   return { users, error, loading, update, remove }
 }
 
+// The permission grant matrix (catalog + roles per scope + which roles hold each ability) and a
+// saver that replaces one role's grants. Admin-only server-side.
+export function usePermissionMatrix() {
+  const [matrix, setMatrix] = useState(null)
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    api.get('/admin/permissions')
+      .then((d) => active && setMatrix(d))
+      .catch((e) => active && setError(e.code ?? 'error.unknown'))
+      .finally(() => active && setLoading(false))
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // Replace one (scope, role)'s grants with `keys`, then reflect it locally.
+  const setRole = useCallback(async (scope, role, keys) => {
+    await api.put('/admin/permissions', { scope, role, keys })
+    setMatrix((m) => ({
+      ...m,
+      grants: { ...m.grants, [scope]: { ...m.grants[scope], [role]: keys } },
+    }))
+  }, [])
+
+  return { matrix, error, loading, setRole }
+}
+
 // Every player (SteamID64 + name) seen across all matches — the pick list for linking an
 // account to its demo identity. Admin-only server-side.
 export function useKnownPlayers() {

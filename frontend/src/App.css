@@ -2642,3 +2642,109 @@ a.brand:hover .brand-mark {
 .pf-account {
   margin-top: 18px;
 }
+
+/* ---------- Admin: permission matrix ---------- */
+
+.admin-head-sub {
+  margin-top: 40px;
+}
+
+.perm-grid-wrap {
+  margin-bottom: 28px;
+}
+
+.perm-grid-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.perm-grid-head h3 {
+  font: 500 11px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text);
+  margin: 0;
+}
+
+.perm-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.perm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.perm-table th,
+.perm-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.perm-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.perm-table th {
+  font: 500 10px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  background: var(--surface);
+}
+
+.perm-table th.perm-role {
+  text-align: center;
+  min-width: 62px;
+}
+
+.perm-area {
+  text-align: left;
+  padding: 14px 12px 6px;
+  font: 600 10px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ct);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.perm-table .perm-ability {
+  min-width: 200px;
+}
+
+.perm-label {
+  display: block;
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.perm-desc {
+  display: block;
+  font-size: 11.5px;
+  margin-top: 2px;
+}
+
+.perm-table td.perm-cell {
+  text-align: center;
+}
+
+.perm-cell input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ct);
+  cursor: pointer;
+}
+
+.perm-cell input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}

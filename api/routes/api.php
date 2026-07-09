@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminPermissionController;
 use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AwardsController;
@@ -46,18 +47,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/teams/{team}/players', [TeamController::class, 'addPlayer']);
     Route::delete('/teams/{team}/players/{steamId}', [TeamController::class, 'removePlayer']);
 
-    Route::get('/tactics', [TacticController::class, 'index']);
-    Route::post('/tactics', [TacticController::class, 'store']);
-    Route::get('/tactics/{tactic}', [TacticController::class, 'show']);
-    Route::put('/tactics/{tactic}', [TacticController::class, 'update']);
-    Route::delete('/tactics/{tactic}', [TacticController::class, 'destroy']);
+    Route::middleware('can:tactics.view')->group(function () {
+        Route::get('/tactics', [TacticController::class, 'index']);
+        Route::post('/tactics', [TacticController::class, 'store']);
+        Route::get('/tactics/{tactic}', [TacticController::class, 'show']);
+        Route::put('/tactics/{tactic}', [TacticController::class, 'update']);
+        Route::delete('/tactics/{tactic}', [TacticController::class, 'destroy']);
+    });
 
-    Route::get('/awards', [AwardsController::class, 'index']);
-    Route::get('/awards/kills', [AwardsController::class, 'kills']);
+    Route::middleware('can:awards.view')->group(function () {
+        Route::get('/awards', [AwardsController::class, 'index']);
+        Route::get('/awards/kills', [AwardsController::class, 'kills']);
+    });
 
-    Route::get('/search/kills', [SearchController::class, 'kills']);
-    Route::get('/search/rounds', [SearchController::class, 'rounds']);
-    Route::get('/search/clutch-sizes', [SearchController::class, 'clutchSizes']);
+    Route::middleware('can:search.use')->group(function () {
+        Route::get('/search/kills', [SearchController::class, 'kills']);
+        Route::get('/search/rounds', [SearchController::class, 'rounds']);
+        Route::get('/search/clutch-sizes', [SearchController::class, 'clutchSizes']);
+    });
 
     // Master-admin only: manage every user's global role and linked SteamID.
     Route::middleware('can:admin')->group(function () {
@@ -65,5 +72,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/admin/users/{user}', [AdminUserController::class, 'update']);
         Route::delete('/admin/users/{user}', [AdminUserController::class, 'destroy']);
         Route::get('/admin/players', [AdminUserController::class, 'players']);
+        Route::get('/admin/permissions', [AdminPermissionController::class, 'index']);
+        Route::put('/admin/permissions', [AdminPermissionController::class, 'update']);
     });
 });

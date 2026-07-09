@@ -1,10 +1,13 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { useAuth } from '../features/auth/AuthContext'
+import { useAuth, useCan } from '../features/auth/AuthContext'
 import UserMenu from './UserMenu'
 
 // The authenticated app shell: branding, nav, account menu, then the page.
 export default function AppLayout() {
   const { user } = useAuth()
+  const canTactics = useCan('tactics.view')
+  const canSearch = useCan('search.use')
+  const canAwards = useCan('awards.view')
 
   return (
     <div className="app-shell">
@@ -18,9 +21,9 @@ export default function AppLayout() {
             <NavLink to="/" end>Profile</NavLink>
             <NavLink to="/matches">Matches</NavLink>
             <NavLink to="/teams">Teams</NavLink>
-            <NavLink to="/tactics">Tactics</NavLink>
-            <NavLink to="/search">Search</NavLink>
-            <NavLink to="/awards">Awards</NavLink>
+            {canTactics && <NavLink to="/tactics">Tactics</NavLink>}
+            {canSearch && <NavLink to="/search">Search</NavLink>}
+            {canAwards && <NavLink to="/awards">Awards</NavLink>}
             {user?.is_admin && <NavLink to="/admin">Admin</NavLink>}
           </nav>
           <div className="user">

@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { AuthProvider, useAuth } from './features/auth/AuthContext'
+import { AuthProvider, useAuth, useCan } from './features/auth/AuthContext'
 import AppLayout from './components/AppLayout'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -25,6 +25,12 @@ function AdminOnly({ children }) {
   return user?.is_admin ? children : <Navigate to="/" replace />
 }
 
+// App-ability route guard — a user without the ability is bounced home even if they type the
+// URL. The API enforces it regardless (403); this just avoids a broken page.
+function RequireCan({ ability, children }) {
+  return useCan(ability) ? children : <Navigate to="/" replace />
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -42,9 +48,9 @@ export default function App() {
             <Route path="/" element={<ProfilePage />} />
             <Route path="/matches" element={<DashboardPage />} />
             <Route path="/teams" element={<TeamsPage />} />
-            <Route path="/tactics" element={<TacticsPage />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/awards" element={<AwardsPage />} />
+            <Route path="/tactics" element={<RequireCan ability="tactics.view"><TacticsPage /></RequireCan>} />
+            <Route path="/search" element={<RequireCan ability="search.use"><SearchPage /></RequireCan>} />
+            <Route path="/awards" element={<RequireCan ability="awards.view"><AwardsPage /></RequireCan>} />
             <Route path="/admin" element={<AdminOnly><AdminPage /></AdminOnly>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

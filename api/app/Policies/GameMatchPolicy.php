@@ -2,43 +2,29 @@
 
 namespace App\Policies;
 
+use App\Contracts\PermissionService;
 use App\Models\GameMatch;
 use App\Models\User;
 
+// Thin policy: every match ability is a team-scope permission, resolved by the service against
+// the user's role in the match's team (plus the uploader carve-out). Master admins are handled
+// upstream by Gate::before.
 class GameMatchPolicy
 {
-    // Any team member sees the team's matches; the uploader always sees their own.
+    public function __construct(private PermissionService $permissions) {}
+
     public function view(User $user, GameMatch $match): bool
     {
-        return $match->user_id === $user->id || $this->onMatchTeam($user, $match);
+        return $this->permissions->canOnMatch($user, 'match.view', $match);
     }
 
-    // Write actions are the uploader, or a team member who may upload to that team.
     public function delete(User $user, GameMatch $match): bool
     {
-        return $match->user_id === $user->id || $this->onMatchTeam($user, $match, ['owner', 'igl']);
+        return $this->permissions->canOnMatch($user, 'match.delete', $match);
     }
 
     public function reparse(User $user, GameMatch $match): bool
     {
-        return $this->delete($user, $match);
-    }
-
-    /**
-     * @param  list<string>|null  $roles  restrict to these team roles; null = any member
-     */
-    private function onMatchTeam(User $user, GameMatch $match, ?array $roles = null): bool
-    {
-        if (! $match->team_id) {
-            return false;
-        }
-
-        $query = $user->teams()->whereKey($match->team_id);
-
-        if ($roles !== null) {
-            $query->wherePivotIn('role', $roles);
-        }
-
-        return $query->exists();
+        return $this->permissions->canOnMatch($user, 'match.reparse', $match);
     }
 }

@@ -48,7 +48,7 @@ export default function MatchDashboard({ matchId }) {
         </div>
         <div className="dh-actions">
           <StatusBadge status={match.status} />
-          {!inProgress && (
+          {!inProgress && match.can?.reparse && (
             <button type="button" className="link-btn" disabled={reparsing} onClick={() => reparse(matchId)}>
               {reparsing ? 'Re-parsing…' : 'Re-parse'}
             </button>

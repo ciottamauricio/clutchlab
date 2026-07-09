@@ -1,6 +1,7 @@
 import { useUsers, useKnownPlayers } from '../features/admin/api'
 import { useAuth } from '../features/auth/AuthContext'
 import UserAdminList from '../features/admin/UserAdminList'
+import PermissionMatrix from '../features/admin/PermissionMatrix'
 import { t } from '../lib/i18n'
 
 export default function AdminPage() {
@@ -20,6 +21,12 @@ export default function AdminPage() {
       {!loading && !error && (
         <UserAdminList users={users} players={players} currentUserId={user?.id} onUpdate={update} onDelete={remove} />
       )}
+
+      <div className="admin-head admin-head-sub">
+        <h2>Permissions</h2>
+        <p className="muted">What each role can do. Changes take effect immediately.</p>
+      </div>
+      <PermissionMatrix />
     </section>
   )
 }

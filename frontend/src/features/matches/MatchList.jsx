@@ -58,16 +58,18 @@ export default function MatchList({ matches, selectedId, onSelect, onDelete, del
           <button type="button" className="match-open" onClick={() => onSelect(match.id)}>
             <MatchCard match={match} />
           </button>
-          <button
-            type="button"
-            className="match-delete"
-            title="Delete match"
-            aria-label="Delete match"
-            disabled={deletingId === match.id}
-            onClick={() => onDelete(match)}
-          >
-            ✕
-          </button>
+          {match.can?.delete && (
+            <button
+              type="button"
+              className="match-delete"
+              title="Delete match"
+              aria-label="Delete match"
+              disabled={deletingId === match.id}
+              onClick={() => onDelete(match)}
+            >
+              ✕
+            </button>
+          )}
         </li>
       ))}
     </ul>

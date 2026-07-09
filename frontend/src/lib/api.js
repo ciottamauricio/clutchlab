@@ -65,5 +65,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data ?? {}),
     }),
+  put: (path, data) =>
+    request(path, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data ?? {}),
+    }),
   delete: (path) => request(path, { method: 'DELETE' }),
 }

@@ -100,6 +100,15 @@ the caller's **visible** matches — and stats are aggregated from `kill_events`
 - Stats need `kill_events.victim_steam_id` (present since the Step 4 search read model) so
   death-side metrics key on the victim's stable id, not the name.
 
+### `permissions`, `global_role_permissions`, `team_role_permissions`
+
+- **`permissions`** — the ability catalog: `key` (unique, e.g. `match.delete`), `scope`
+  (`app`|`team`), `label`, `description`. Kept in sync with `PermissionCatalog::abilities()`.
+- **`global_role_permissions`** — app-scope grants: `role` (global role) × `permission_id`,
+  `unique(role, permission_id)`.
+- **`team_role_permissions`** — team-scope grants: `role` (team role) × `permission_id`,
+  `unique(role, permission_id)`.
+
 ### `matches` (addition)
 
 - `user_id` (fk `users`, nullable, indexed) — the uploader. Legacy pre-auth rows are null.
@@ -109,23 +118,44 @@ the caller's **visible** matches — and stats are aggregated from `kill_events`
 
 ## Roles & permissions
 
-| Action | Who |
-|---|---|
-| Create a team | any authenticated user (becomes its `owner`) |
-| View a team + members | any member |
-| Add / remove members, change roles, rename/delete team | members with role `owner` |
-| Add / remove roster players, view team stats¹ | members with role `owner` (view stats: any member) |
-| Upload a match to a team | members with role `owner` or `igl` |
-| View a team's match | any member of that team |
-| Delete / reparse a match | the uploader, or the team's `owner` / `igl` |
-| Everything above, on any resource | global `admin` (master admin) |
+**Permissions are data, not hard-coded.** Each *ability* (e.g. `match.delete`, `awards.view`) is
+granted to a *role*, and a master admin edits the grant matrix at runtime. There are two scopes,
+matching the two role axes:
 
-`igl` / `player` / `coach` are descriptive roles for now; they gain permissions when later
-features attach behavior to them.
+- **Team-scope** abilities are granted to a **team role** (`owner`/`igl`/`player`/`coach`) and
+  resolved against the relevant team — a match's team, or a team directly. A user "has" a
+  team-scope ability if their role *in that team* is granted it.
+- **App-scope** abilities are granted to a **global role** (`member`/`admin`) and gate whole
+  pages, independent of any team.
 
-The global **`admin`** is orthogonal to team roles: it isn't a team owner, it overrides every
-policy. Implemented as a single `Gate::before` short-circuit (returns `true` for admins, `null`
-otherwise so non-admins fall through to the ordinary policy) — see Authorization below.
+The **catalog** of abilities and the **default grants** (which reproduce the original
+hard-coded rules exactly) live in `App\Authorization\PermissionCatalog`; the seeder writes them
+to the DB on first run and never clobbers later admin edits. Current abilities:
+
+| Ability | Scope | Meaning |
+|---|---|---|
+| `match.view` | team | See a team's matches |
+| `match.delete` | team | Delete a team match |
+| `match.reparse` | team | Re-parse a team match |
+| `team.upload_match` | team | Upload a demo to the team |
+| `team.manage_members` | team | Add/remove members, change team roles |
+| `team.manage_roster` | team | Edit the in-game roster (SteamIDs) |
+| `team.update` | team | Rename / delete the team |
+| `awards.view` | app | Open the awards page |
+| `search.use` | app | Use kill search |
+| `tactics.view` | app | Open the tactics board |
+
+**Default grants** (seeded; editable): owner → all team abilities; igl → view/delete/reparse/
+upload; player & coach → view. member → all three app pages; admin → (needs none, bypasses).
+
+Two rules stay outside the grant tables, on purpose:
+- **The match uploader** always keeps `view`/`delete`/`reparse` over their own upload, even with
+  no team — a carve-out in the service, not a grant.
+- **Viewing a team you belong to** is plain membership, not a grantable ability.
+
+The global **`admin`** is orthogonal: it overrides every check via a single `Gate::before`
+short-circuit (returns `true` for admins, `null` otherwise so non-admins fall through) — so it
+needs no grant rows and can never lock itself out by editing the matrix.
 
 ## Rules & invariants
 
@@ -175,7 +205,7 @@ rostered ids performed in the team's games, and every member sees the same numbe
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/api/logout` | revoke the current token |
-| GET | `/api/me` | current user (incl. profile fields, role, linked SteamID) |
+| GET | `/api/me` | current user (incl. profile fields, role, linked SteamID, app-scope `abilities`) |
 | PATCH | `/api/profile` | edit own profile (name + player_role/bio/gear) |
 | GET | `/api/profile/stats` | own profile analytics across visible matches — aggregate stats (null if no SteamID linked), recent form (K/D + W/L per match), top weapons |
 | PATCH | `/api/profile/password` | self-service password change (current password required); revokes every other session, keeps this one |
@@ -199,16 +229,29 @@ rostered ids performed in the team's games, and every member sees the same numbe
 | PATCH | `/api/admin/users/{user}` | set a user's global `role` and/or `steam_id` |
 | DELETE | `/api/admin/users/{user}` | delete a user (not yourself); memberships/tokens go, uploaded matches survive ownerless |
 | GET | `/api/admin/players` | catalog of players (SteamID64 + name) seen across all matches — the pick list for linking |
+| GET | `/api/admin/permissions` | the grant matrix: ability catalog, roles per scope, current grants |
+| PUT | `/api/admin/permissions` | replace one `(scope, role)`'s grants (`{ scope, role, keys[] }`) |
 
 ## Authorization (policies)
 
+`App\Contracts\PermissionService` (bound to `DbPermissionService`, a **singleton** so its
+grant-table cache is shared across a request) is the single source of truth. It reads the live
+grant tables — nothing is hard-coded.
+
 - `Gate::before` (in `AppServiceProvider::boot`): a global `admin` passes every check.
-- `Gate::define('admin')`: the named ability behind admin-only routes (`->middleware('can:admin')`).
-  Admins short-circuit via `Gate::before`; non-admins fall here and are denied (**403**).
-- `GameMatchPolicy`: `view` → uploader or any member of `match.team_id`; `delete` / `reparse`
-  → uploader or an `owner`/`igl` of `match.team_id`.
-- `TeamPolicy`: `view` → user is a member; `manageMembers` / `update` / `delete` → the user's
-  role in that team is `owner`; `uploadMatch` → role `owner` or `igl`.
+- **App-scope gates** are registered from the catalog in `boot()` — every app ability becomes a
+  named gate (`->middleware('can:awards.view')` etc.) resolved by `PermissionService::canApp`.
+- `Gate::define('admin')`: the named ability behind admin-only routes. Admins short-circuit via
+  `Gate::before`; non-admins fall here and are denied (**403**).
+- `GameMatchPolicy`: `view`/`delete`/`reparse` all delegate to `canOnMatch($user, $key, $match)`
+  — the uploader carve-out OR the user's team-role grant in `match.team_id`.
+- `TeamPolicy`: `view` → plain membership; `manageMembers`/`manageRoster`/`update`/`delete`/
+  `uploadMatch` → `canOnTeam($user, $key, $team)` against the user's role in that team.
+- **The client** learns app-scope abilities from `/me` (`abilities: [...]`, full set for admins)
+  and per-match team-scope abilities from each match's `can: { delete, reparse }` (resolved
+  through the policy). The UI hides what it can't use; the server still enforces every request.
+- **Editing the matrix**: admin-only `GET/PUT /admin/permissions` — `PUT` replaces one
+  `(scope, role)`'s grants with the posted `keys` (`UpdateRolePermissionsAction`, transactional).
 
 ## Error codes
 
@@ -220,13 +263,18 @@ rostered ids performed in the team's games, and every member sees the same numbe
 - `user.steam_id_taken` — that SteamID is already linked to another account.
 - `admin.last_admin` — refused: demoting this user would leave no admin.
 - `admin.cannot_delete_self` — an admin tried to delete their own account.
+- `permission.invalid_scope` / `permission.invalid_role` / `permission.unknown_ability` — a grant
+  edit named a scope, role, or ability key that doesn't exist (or is out of scope).
 - `team.already_member` — the user is already in the team.
 - `team.steam_id_required` — no player selected when adding to the roster.
 - 401 unauthenticated · 403 authorization · 422 validation (field codes).
 
 ## Known limitations / later
 
-- Roles beyond `owner`/`igl` don't grant permissions yet (`igl` gained match-upload rights).
+- **Permissions are per-role, not per-user** — an admin edits what a *role* can do; there's no
+  grant to an individual user, and no custom roles beyond the fixed four team / two global ones.
+- App-scope abilities cover whole pages (awards/search/tactics); finer within-page gating (e.g.
+  tactics view vs. edit) isn't split out yet — the tactics write endpoints ride `tactics.view`.
 - No invitation/acceptance flow — an owner adds existing users directly by email.
 - A match belongs to at most one team; there's no re-assigning a match's team after upload yet.
 - Removing the last `owner` of a team isn't prevented.

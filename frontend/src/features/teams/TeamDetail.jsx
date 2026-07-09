@@ -25,7 +25,10 @@ export default function TeamDetail({ teamId }) {
   if (error) return <p className="error">{t(error)}</p>
   if (!team) return <p className="muted">Loading…</p>
 
-  const canManage = team.members.find((m) => m.id === user.id)?.role === 'owner'
+  // Capabilities come from the server (live grants + admin bypass), per ability — not a
+  // hardcoded role. Managing members and the roster are separate permissions.
+  const canManageMembers = team.can?.manage_members
+  const canManageRoster = team.can?.manage_roster
 
   const add = async (e) => {
     e.preventDefault()
@@ -52,7 +55,7 @@ export default function TeamDetail({ teamId }) {
           <tr>
             <th>Member</th>
             <th>Role</th>
-            {canManage && <th />}
+            {canManageMembers && <th />}
           </tr>
         </thead>
         <tbody>
@@ -60,7 +63,7 @@ export default function TeamDetail({ teamId }) {
             <tr key={m.id}>
               <td>{m.name} <span className="muted">{m.email}</span></td>
               <td><span className="role">{m.role}</span></td>
-              {canManage && (
+              {canManageMembers && (
                 <td>
                   {m.id !== user.id && (
                     <button type="button" className="link-btn" onClick={() => remove(m.id)}>remove</button>
@@ -72,7 +75,7 @@ export default function TeamDetail({ teamId }) {
         </tbody>
       </table>
 
-      {canManage && (
+      {canManageMembers && (
         <form className="inline-form" onSubmit={add}>
           <input type="email" placeholder="member email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <select value={role} onChange={(e) => setRole(e.target.value)}>
@@ -83,7 +86,7 @@ export default function TeamDetail({ teamId }) {
         </form>
       )}
 
-      <TeamRoster teamId={team.id} roster={team.players ?? []} canManage={canManage} onChanged={onRosterChanged} />
+      <TeamRoster teamId={team.id} roster={team.players ?? []} canManage={canManageRoster} onChanged={onRosterChanged} />
       <TeamStats teamId={team.id} reloadKey={rosterKey} />
     </section>
   )

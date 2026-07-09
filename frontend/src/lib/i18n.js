@@ -18,6 +18,7 @@ const MESSAGES = {
   'demo.file_too_large': 'That demo is too large (max 1 GB)',
   'demo.storage_failed': 'Uploading to storage failed',
   'match.invalid_team': "You can't upload to that team",
+  'match.upload_forbidden': "You don't have permission to upload matches",
 
   'auth.name_required': 'Please enter your name',
   'auth.email_required': 'Please enter your email',
@@ -36,6 +37,7 @@ const MESSAGES = {
   'team.role_required': 'Please pick a role',
   'team.role_invalid': 'That role is not allowed',
   'team.already_member': 'That user is already on the team',
+  'team.owner_only': 'Only an owner can add or remove an owner',
   'team.steam_id_required': 'Pick a player to add',
 
   'user.invalid_role': 'That role is not allowed',
@@ -43,6 +45,9 @@ const MESSAGES = {
   'user.steam_id_taken': 'That SteamID is already linked to another user',
   'admin.last_admin': "You can't remove the last admin",
   'admin.cannot_delete_self': "You can't delete your own account",
+  'permission.invalid_scope': 'Unknown permission scope',
+  'permission.invalid_role': 'Unknown role for that scope',
+  'permission.unknown_ability': 'Unknown ability',
 
   'profile.invalid_role': 'Please pick a valid role',
   'profile.bio_too_long': 'Bio is too long (max 500 characters)',

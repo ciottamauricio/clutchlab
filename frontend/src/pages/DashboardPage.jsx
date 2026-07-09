@@ -4,6 +4,7 @@ import UploadDemo from '../features/matches/UploadDemo'
 import MatchList from '../features/matches/MatchList'
 import MatchDashboard from '../features/matches/MatchDashboard'
 import { useMatches, useDeleteMatch } from '../features/matches/api'
+import { useAuth } from '../features/auth/AuthContext'
 import { t } from '../lib/i18n'
 
 // Thin route: composes the matches feature, holds only UI state (which match is
@@ -11,6 +12,7 @@ import { t } from '../lib/i18n'
 // (e.g. from the profile's recent form) by navigating here with { state: { matchId } }.
 export default function DashboardPage() {
   const location = useLocation()
+  const { user } = useAuth()
   const [selectedId, setSelectedId] = useState(location.state?.matchId ?? null)
   const { matches, refresh } = useMatches()
   const { remove, deletingId, error: deleteError } = useDeleteMatch((id) => {
@@ -31,7 +33,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <UploadDemo onUploaded={handleUploaded} />
+      {user?.can_upload && <UploadDemo onUploaded={handleUploaded} />}
       {deleteError && <p className="error">{t(deleteError)}</p>}
       <div className="layout">
         <aside>

@@ -17,6 +17,15 @@ class TeamResource extends JsonResource
             'players' => TeamPlayerResource::collection($this->whenLoaded('players')),
             // On list responses (members not loaded) expose the caller's own role.
             'my_role' => $this->whenPivotLoaded('team_user', fn () => $this->pivot->role),
+            // What the caller may do with this team, resolved through the policy (so it honors
+            // the live grants and the admin bypass). The client shows controls accordingly; the
+            // server still enforces each request.
+            'can' => [
+                'manage_members' => (bool) $request->user()?->can('manageMembers', $this->resource),
+                'manage_roster' => (bool) $request->user()?->can('manageRoster', $this->resource),
+                'update' => (bool) $request->user()?->can('update', $this->resource),
+                'upload_match' => (bool) $request->user()?->can('uploadMatch', $this->resource),
+            ],
         ];
     }
 }

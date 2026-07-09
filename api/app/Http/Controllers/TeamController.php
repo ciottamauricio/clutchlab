@@ -37,7 +37,7 @@ class TeamController extends Controller
 
     public function addPlayer(AddTeamPlayerRequest $request, Team $team): TeamResource
     {
-        $this->authorize('manageMembers', $team);
+        $this->authorize('manageRoster', $team);
 
         // Idempotent: re-adding the same steam_id updates its nickname instead of erroring.
         $team->players()->updateOrCreate(
@@ -50,7 +50,7 @@ class TeamController extends Controller
 
     public function removePlayer(Team $team, string $steamId): TeamResource
     {
-        $this->authorize('manageMembers', $team);
+        $this->authorize('manageRoster', $team);
 
         $team->players()->where('steam_id', $steamId)->delete();
 
@@ -78,17 +78,39 @@ class TeamController extends Controller
     {
         $this->authorize('manageMembers', $team);
 
+        // Creating a new owner is an owner-only act, so a non-owner manager can't promote
+        // (including themselves) to owner.
+        if ($request->validated('role') === 'owner') {
+            $this->ownerOnly($request->user(), $team);
+        }
+
         $action->execute($team, $request->validated('email'), $request->validated('role'));
 
         return new TeamResource($team->load('members'));
     }
 
-    public function removeMember(Team $team, User $user): TeamResource
+    public function removeMember(Request $request, Team $team, User $user): TeamResource
     {
         $this->authorize('manageMembers', $team);
+
+        // Only an owner may remove another owner; a non-owner manager can manage everyone else.
+        if ($team->roleOf($user) === 'owner') {
+            $this->ownerOnly($request->user(), $team);
+        }
 
         $team->members()->detach($user->id);
 
         return new TeamResource($team->load('members'));
+    }
+
+    // Guard an owner-only action: the actor must be an owner of the team (admins bypass every
+    // check upstream and never reach this). 403 with a code, per the ownership convention.
+    private function ownerOnly(User $actor, Team $team): void
+    {
+        if ($actor->isAdmin() || $team->roleOf($actor) === 'owner') {
+            return;
+        }
+
+        abort(403, 'team.owner_only');
     }
 }

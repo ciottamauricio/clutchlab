@@ -71,3 +71,11 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   return useContext(AuthContext)
 }
+
+// App-scope ability check for the current user — drives whether whole pages (Awards, Search,
+// Tactics) show. Admins receive the full app-ability set from /me, so this needs no special
+// case. Team-scope abilities are contextual and enforced by the server, not gated here.
+export function useCan(ability) {
+  const { user } = useContext(AuthContext)
+  return Boolean(user?.abilities?.includes(ability))
+}
