@@ -27,6 +27,8 @@ const MESSAGES = {
   'auth.password_mismatch': "Passwords don't match",
   'auth.password_too_short': 'Password must be at least 8 characters',
   'auth.invalid_credentials': 'Wrong email or password',
+  'auth.current_password_required': 'Please enter your current password',
+  'auth.current_password_incorrect': 'That current password is wrong',
 
   'team.name_required': 'Please name the team',
   'team.email_required': 'Please enter an email',

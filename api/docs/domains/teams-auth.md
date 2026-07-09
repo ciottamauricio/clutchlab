@@ -178,6 +178,7 @@ rostered ids performed in the team's games, and every member sees the same numbe
 | GET | `/api/me` | current user (incl. profile fields, role, linked SteamID) |
 | PATCH | `/api/profile` | edit own profile (name + player_role/bio/gear) |
 | GET | `/api/profile/stats` | own aggregate stats across visible matches, or null if no SteamID linked |
+| PATCH | `/api/profile/password` | self-service password change (current password required); revokes every other session, keeps this one |
 | GET/POST/GET | `/api/matches…` | uploader + team-shared (see [matches.md](matches.md)) |
 | GET | `/api/players` | catalog of players seen across my matches |
 | GET | `/api/players/{steamId}/clutches` | a player's won clutches across my matches |
@@ -212,6 +213,7 @@ rostered ids performed in the team's games, and every member sees the same numbe
 ## Error codes
 
 - `auth.invalid_credentials` — bad email/password (login).
+- `auth.current_password_incorrect` — wrong current password on a self-service password change.
 - `match.invalid_team` — upload `team_id` isn't a team the caller may upload to (owner/igl).
 - `user.invalid_role` — admin set a global role other than `member`/`admin`.
 - `user.invalid_steam_id` — linked SteamID isn't a 17-digit SteamID64.
@@ -231,6 +233,8 @@ rostered ids performed in the team's games, and every member sees the same numbe
 - **SteamID linking is admin-assigned only** — no self-service "Sign in through Steam" flow yet.
 - The admin panel manages the global role and SteamID; it doesn't edit team membership (that's
   the team owner's job) — it only shows each user's teams read-only.
+- **Password reset is self-service only** (you must know your current password). A "forgot
+  password" email flow is a later step.
 
 ## Related
 

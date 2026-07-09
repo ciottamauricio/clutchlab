@@ -24,6 +24,8 @@ export const GEAR_FIELDS = [
 
 export const updateProfile = (data) => api.patch('/profile', data)
 
+export const changePassword = (data) => api.patch('/profile/password', data)
+
 // The caller's own aggregate stats, or null when no SteamID is linked to their account.
 export function useProfileStats() {
   const [stats, setStats] = useState(null)

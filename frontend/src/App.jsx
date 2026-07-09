@@ -39,12 +39,12 @@ export default function App() {
               </Protected>
             }
           >
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/" element={<ProfilePage />} />
+            <Route path="/matches" element={<DashboardPage />} />
             <Route path="/teams" element={<TeamsPage />} />
             <Route path="/tactics" element={<TacticsPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/awards" element={<AwardsPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/admin" element={<AdminOnly><AdminPage /></AdminOnly>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

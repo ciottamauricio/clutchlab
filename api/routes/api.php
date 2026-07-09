@@ -22,6 +22,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::patch('/profile', [ProfileController::class, 'update']);
     Route::get('/profile/stats', [ProfileController::class, 'stats']);
+    Route::patch('/profile/password', [ProfileController::class, 'changePassword'])->middleware('throttle:10,1');
 
     Route::get('/matches', [MatchController::class, 'index']);
     Route::post('/matches', [MatchController::class, 'store'])->middleware('throttle:30,1');
