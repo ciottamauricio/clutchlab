@@ -4,6 +4,8 @@ import { useAuth } from '../features/auth/AuthContext'
 import { useProfileStats, PLAYER_ROLES, GEAR_FIELDS } from '../features/profile/api'
 import ProfileForm from '../features/profile/ProfileForm'
 import ProfileStats from '../features/profile/ProfileStats'
+import RecentForm from '../features/profile/RecentForm'
+import WeaponBreakdown from '../features/profile/WeaponBreakdown'
 
 const roleLabel = (value) => PLAYER_ROLES.find((r) => r.value === value)?.label
 
@@ -12,7 +14,7 @@ const roleLabel = (value) => PLAYER_ROLES.find((r) => r.value === value)?.label
 // menu — swaps the card for the edit form in place.
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth()
-  const { stats } = useProfileStats()
+  const { stats, recent, weapons } = useProfileStats()
   const location = useLocation()
   const [editing, setEditing] = useState(Boolean(location.state?.edit))
 
@@ -58,24 +60,30 @@ export default function ProfilePage() {
       {editing ? (
         <ProfileForm user={user} onSaved={onSaved} onCancel={() => setEditing(false)} />
       ) : (
-        <div className="pf-grid">
-          <div className="pf-card">
-            <h3>Loadout</h3>
-            {gear.length > 0 ? (
-              <dl className="pf-gear">
-                {gear.map((g) => (
-                  <div className="pf-gear-row" key={g.label}>
-                    <dt>{g.label}</dt>
-                    <dd>{g.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : (
-              <p className="muted">No setup added yet.</p>
-            )}
+        <>
+          <RecentForm recent={recent} />
+
+          <div className="pf-grid">
+            <WeaponBreakdown weapons={weapons} />
+
+            <div className="pf-card">
+              <h3>Loadout</h3>
+              {gear.length > 0 ? (
+                <dl className="pf-gear">
+                  {gear.map((g) => (
+                    <div className="pf-gear-row" key={g.label}>
+                      <dt>{g.label}</dt>
+                      <dd>{g.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <p className="muted">No setup added yet.</p>
+              )}
+            </div>
           </div>
 
-          <div className="pf-card">
+          <div className="pf-card pf-account">
             <h3>Account</h3>
             <dl className="pf-gear">
               <div className="pf-gear-row">
@@ -88,7 +96,7 @@ export default function ProfilePage() {
               </div>
             </dl>
           </div>
-        </div>
+        </>
       )}
     </section>
   )

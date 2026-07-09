@@ -2287,3 +2287,173 @@ button.clutch-open:hover {
   color: var(--text-h);
   line-height: 1.6;
 }
+
+/* ---------- Home (brand) link ---------- */
+
+a.brand {
+  text-decoration: none;
+}
+
+a.brand:hover {
+  text-decoration: none;
+}
+
+a.brand:hover .brand-mark {
+  transform: scale(1.06);
+  transition: transform 0.12s ease;
+}
+
+/* ---------- Profile: recent-form chart ---------- */
+
+.rf-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rf-head h3 {
+  margin: 0;
+}
+
+.rf-legend {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font: 500 11px var(--mono);
+}
+
+.rf-key.rf-win {
+  color: var(--win);
+}
+
+.rf-key.rf-loss {
+  color: var(--danger);
+}
+
+.rf-chart {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  height: 150px;
+  margin: 18px 0 22px;
+}
+
+.rf-baseline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px dashed var(--border-strong);
+  pointer-events: none;
+}
+
+.rf-baseline span {
+  position: absolute;
+  left: 0;
+  top: -8px;
+  padding: 0 4px;
+  font: 500 9px var(--mono);
+  color: var(--text-dim);
+  background: var(--surface);
+}
+
+.rf-col {
+  position: relative;
+  flex: 1;
+  height: 100%;
+}
+
+.rf-bar {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64%;
+  max-width: 26px;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+}
+
+.rf-bar.rf-win {
+  background: var(--win);
+}
+
+.rf-bar.rf-loss {
+  background: var(--danger);
+}
+
+.rf-bar.rf-tie {
+  background: var(--text-dim);
+}
+
+.rf-tick {
+  position: absolute;
+  bottom: -19px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font: 600 10px var(--mono);
+}
+
+.rf-tick.rf-win {
+  color: var(--win);
+}
+
+.rf-tick.rf-loss {
+  color: var(--danger);
+}
+
+.rf-tick.rf-tie {
+  color: var(--text-dim);
+}
+
+/* ---------- Profile: weapon breakdown ---------- */
+
+.wb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.wb-row {
+  display: grid;
+  grid-template-columns: 70px 1fr 30px;
+  align-items: center;
+  gap: 10px;
+}
+
+.wb-name {
+  font: 500 12px var(--mono);
+  color: var(--text-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-track {
+  height: 10px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.wb-bar {
+  height: 100%;
+  min-width: 2px;
+  background: var(--accent);
+  border-radius: 3px;
+}
+
+.wb-count {
+  font: 600 13px var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-h);
+  text-align: right;
+}
+
+.pf-account {
+  margin-top: 18px;
+}

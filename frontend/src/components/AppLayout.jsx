@@ -11,10 +11,10 @@ export default function AppLayout() {
     <div className="app-shell">
       <header className="app-bar">
         <div className="app-bar-inner">
-          <div className="brand">
+          <NavLink to="/" className="brand" title="Home">
             <img className="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" />
             <span className="brand-word">Clutchlab</span>
-          </div>
+          </NavLink>
           <nav className="nav">
             <NavLink to="/matches">Matches</NavLink>
             <NavLink to="/teams">Teams</NavLink>

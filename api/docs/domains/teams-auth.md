@@ -177,7 +177,7 @@ rostered ids performed in the team's games, and every member sees the same numbe
 | POST | `/api/logout` | revoke the current token |
 | GET | `/api/me` | current user (incl. profile fields, role, linked SteamID) |
 | PATCH | `/api/profile` | edit own profile (name + player_role/bio/gear) |
-| GET | `/api/profile/stats` | own aggregate stats across visible matches, or null if no SteamID linked |
+| GET | `/api/profile/stats` | own profile analytics across visible matches — aggregate stats (null if no SteamID linked), recent form (K/D + W/L per match), top weapons |
 | PATCH | `/api/profile/password` | self-service password change (current password required); revokes every other session, keeps this one |
 | GET/POST/GET | `/api/matches…` | uploader + team-shared (see [matches.md](matches.md)) |
 | GET | `/api/players` | catalog of players seen across my matches |

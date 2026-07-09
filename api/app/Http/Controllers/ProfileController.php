@@ -25,9 +25,12 @@ class ProfileController extends Controller
         return response()->json(['data' => ['ok' => true]]);
     }
 
-    // The caller's own aggregate stats, or null when their account has no linked SteamID.
+    // The caller's own profile analytics: aggregate stats, recent form, top weapons. Stats is
+    // null when the account has no linked SteamID.
     public function stats(Request $request, ComputePlayerStatsAction $action): JsonResponse
     {
-        return response()->json(['data' => ['stats' => $action->execute($request->user())]]);
+        $data = $action->execute($request->user()) ?? ['stats' => null, 'recent' => [], 'weapons' => []];
+
+        return response()->json(['data' => $data]);
     }
 }
