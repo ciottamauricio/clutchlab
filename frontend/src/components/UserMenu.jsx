@@ -29,9 +29,9 @@ export default function UserMenu() {
     }
   }, [open])
 
-  const goProfile = () => {
+  const go = (path) => () => {
     setOpen(false)
-    navigate('/')
+    navigate(path)
   }
 
   return (
@@ -46,7 +46,8 @@ export default function UserMenu() {
 
       {open && (
         <div className="user-menu-panel" role="menu">
-          <button type="button" role="menuitem" onClick={goProfile}>Profile</button>
+          <button type="button" role="menuitem" onClick={go('/')}>Profile</button>
+          <button type="button" role="menuitem" onClick={go('/study')}>The study</button>
           <button type="button" role="menuitemcheckbox" aria-checked={theme === 'dark'} onClick={toggle}>
             {theme === 'light' ? 'Dark mode' : 'Light mode'}
           </button>

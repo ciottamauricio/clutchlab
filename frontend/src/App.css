@@ -2748,3 +2748,413 @@ a.brand:hover .brand-mark {
   cursor: not-allowed;
   opacity: 0.55;
 }
+
+/* ---------- Study: the decision ledger ---------- */
+
+.study {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.study-hero {
+  padding: 8px 0 30px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 26px;
+}
+
+.study-eyebrow {
+  display: inline-block;
+  font: 500 11px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--ct);
+  margin-bottom: 14px;
+}
+
+.study-title {
+  font: 600 46px/1.02 var(--display);
+  letter-spacing: 0.01em;
+  color: var(--text-h);
+  margin: 0 0 16px;
+  max-width: 15ch;
+}
+
+.study-lede {
+  max-width: 62ch;
+  font-size: 15.5px;
+  line-height: 1.62;
+  color: var(--text);
+  margin: 0 0 20px;
+}
+
+.study-lede strong {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.study-lede em {
+  font-style: normal;
+  color: var(--t);
+}
+
+.study-expand {
+  padding: 6px 12px;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text);
+  font: 500 11px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.study-expand:hover {
+  background: var(--hover);
+  border-color: var(--ct);
+  color: var(--text-h);
+}
+
+/* Topology — a drawn diagram organized around the seam. Nodes colored by runtime. */
+.topo {
+  margin: 0 0 30px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.topo-cap {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 16px;
+  font: 500 10px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-h);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.topo-cap-sub {
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+
+.topo-frame {
+  padding: 16px;
+  overflow-x: auto;
+}
+
+.topo-svg {
+  display: block;
+  width: 100%;
+  min-width: 560px;
+  height: auto;
+}
+
+/* zones */
+.topo-zone { fill: var(--surface-2); stroke: var(--border); stroke-width: 1; }
+.topo-zone-web { fill: color-mix(in srgb, var(--ct) 5%, var(--surface-2)); }
+.topo-zone-compute { fill: color-mix(in srgb, var(--t) 6%, var(--surface-2)); }
+.topo-zonelabel {
+  font: 600 9px var(--mono);
+  letter-spacing: 0.14em;
+  fill: var(--text-dim);
+}
+
+/* the boundary line — the seam */
+.topo-boundary {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.topo-boundary-label {
+  font: 600 9px var(--mono);
+  letter-spacing: 0.14em;
+  fill: var(--t);
+}
+
+/* edges */
+.topo-edges line,
+.topo-edges path { stroke: var(--border-strong); stroke-width: 1.5; fill: none; }
+.topo-edge-data { stroke: var(--border-strong); stroke-width: 1.5; fill: none; opacity: 0.6; }
+.topo-edge-queue { stroke: var(--win); stroke-width: 2; fill: none; stroke-dasharray: 5 4; }
+.topo-queuelabel { font: 600 10px var(--mono); fill: var(--win); }
+
+/* nodes */
+.topo-node rect { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1.5; }
+.topo-node text { fill: var(--text-h); text-anchor: middle; font: 500 13px var(--mono); }
+.topo-node .topo-name { font: 600 14px var(--display); letter-spacing: 0.02em; }
+.topo-node .topo-role { fill: var(--text-dim); font: 400 10px var(--mono); }
+
+.topo-node-host rect { fill: none; stroke: var(--border); stroke-dasharray: 3 3; }
+.topo-node-host text { fill: var(--text-dim); font: 500 11px var(--mono); }
+.topo-node-infra rect { stroke: var(--text-dim); }
+.topo-node-infra text { fill: var(--text-h); }
+
+.topo-node-php rect { stroke: var(--ct); }
+.topo-node-php .topo-name { fill: var(--ct); }
+.topo-node-go rect { stroke: var(--t); }
+.topo-node-go .topo-name { fill: var(--t); }
+.topo-node-react rect { stroke: var(--text-h); }
+.topo-node-seamnode rect { stroke: var(--win); }
+.topo-node-seamnode text { fill: var(--win); font-size: 12px; }
+.topo-node-data rect { fill: var(--surface-2); stroke: var(--border); }
+.topo-node-data text { fill: var(--text); font-size: 12px; }
+
+.topo-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.topo-key {
+  position: relative;
+  padding-left: 16px;
+  font: 500 11px var(--mono);
+  color: var(--text);
+}
+
+.topo-key::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1.5px solid currentColor;
+}
+
+.topo-key-php { color: var(--ct); }
+.topo-key-go { color: var(--t); }
+.topo-key-react { color: var(--text-h); }
+.topo-key-infra { color: var(--text-dim); }
+
+.topo-legend-note {
+  margin-left: auto;
+  font: 400 11px var(--mono);
+  color: var(--text-dim);
+}
+
+@media (max-width: 600px) {
+  .topo-legend-note { margin-left: 0; flex-basis: 100%; }
+}
+
+.study-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.study-topic {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.study-topic.open {
+  border-color: var(--border-strong);
+}
+
+.study-topic-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+  padding: 18px 20px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.study-topic-head:hover {
+  background: var(--hover);
+  border: none;
+}
+
+.study-n {
+  font: 600 13px var(--mono);
+  color: var(--ct);
+  padding-top: 3px;
+  min-width: 22px;
+}
+
+.study-topic-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.study-topic-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  font: 600 20px var(--display);
+  letter-spacing: 0.01em;
+  color: var(--text-h);
+}
+
+.study-topic-tag {
+  font: 500 9.5px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+.study-topic-summary {
+  display: block;
+  margin-top: 5px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.study-chevron {
+  font: 400 20px var(--mono);
+  color: var(--text-dim);
+  line-height: 1;
+  padding-top: 2px;
+}
+
+.study-topic.open .study-chevron {
+  color: var(--ct);
+}
+
+.study-topic-body {
+  padding: 4px 20px 22px;
+  animation: study-in 0.2s ease both;
+}
+
+@keyframes study-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* The signature: gained | paid, side by side — the study's thesis made structural. */
+.study-ledger {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 6px 0 20px;
+}
+
+.study-col {
+  background: var(--surface-2);
+  padding: 14px 16px 16px;
+}
+
+.study-col-label {
+  display: block;
+  font: 600 10px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin-bottom: 10px;
+}
+
+.study-gained .study-col-label { color: var(--win); }
+.study-paid .study-col-label { color: var(--danger); }
+
+.study-col ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.study-col li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.study-col li::before {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font: 600 13px var(--mono);
+}
+
+.study-gained li::before { content: '+'; color: var(--win); }
+.study-paid li::before { content: '−'; color: var(--danger); }
+
+.study-prose {
+  max-width: 68ch;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--text);
+  margin: 0 0 14px;
+}
+
+.study-prose:last-of-type {
+  margin-bottom: 0;
+}
+
+.study-code {
+  margin: 18px 0 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.study-code figcaption {
+  padding: 7px 12px;
+  font: 500 10px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.study-code pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  font: 400 13px var(--mono);
+  color: var(--ct);
+}
+
+.study-foot {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.study-foot .muted {
+  font: 500 12px var(--mono);
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 600px) {
+  .study-title { font-size: 34px; }
+  .study-ledger { grid-template-columns: 1fr; }
+}
