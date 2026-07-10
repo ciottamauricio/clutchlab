@@ -15,7 +15,7 @@ class UploadDemoAction
         private ParseQueue $queue,
     ) {}
 
-    public function execute(UploadedFile $file, User $owner, ?int $teamId = null): GameMatch
+    public function execute(UploadedFile $file, User $owner, ?int $teamId = null, ?string $contentHash = null): GameMatch
     {
         $key = $this->storage->store($file);
 
@@ -24,6 +24,7 @@ class UploadDemoAction
         $match = $owner->matches()->create([
             'original_filename' => $filename,
             'demo_key' => $key,
+            'content_hash' => $contentHash,
             'status' => 'queued',
             'team_id' => $teamId,
             'played_at' => GameMatch::playedAtFromFilename($filename),

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 // "Match" is a reserved word in PHP, so the model is GameMatch on the `matches` table.
-#[Fillable(['original_filename', 'demo_key', 'status', 'team_id', 'played_at'])]
+#[Fillable(['original_filename', 'demo_key', 'content_hash', 'status', 'team_id', 'played_at'])]
 class GameMatch extends Model
 {
     protected $table = 'matches';

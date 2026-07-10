@@ -787,6 +787,45 @@
   color: var(--border-strong);
 }
 
+/* Match visibility — private vs. shared-with-a-team, with an inline switcher. */
+.mv {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+  font: 400 12px var(--mono);
+}
+
+.mv-label {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+}
+
+.mv-value {
+  color: var(--ct);
+  font-weight: 500;
+}
+
+.mv-value.mv-private {
+  color: var(--text-dim);
+}
+
+.mv-edit {
+  font-size: 11px;
+}
+
+.mv-select {
+  font: 400 12px var(--mono);
+  padding: 3px 8px;
+}
+
+.mv-error {
+  font-size: 11px;
+}
+
 .dh-actions {
   display: flex;
   align-items: center;

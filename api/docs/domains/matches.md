@@ -34,6 +34,7 @@ Authorization & ownership).
 | team_id | fk teams, nullable | api | the team the match is shared with; null = private to the uploader |
 | original_filename | string | api | client-provided name; display only |
 | demo_key | string, unique | api | S3 object key `<uuid>.dem` |
+| content_hash | string(64), nullable | api | sha256 of the uploaded demo's bytes; `unique(user_id, content_hash)` so a user can't upload the same demo twice. Null for legacy pre-hash rows. |
 | status | string | api + worker | lifecycle code (see below) |
 | error_code | string, nullable | worker | set only when `status = failed` |
 | map_name | string, nullable | worker | e.g. `de_mirage` |
@@ -136,12 +137,13 @@ upload rights (owner/igl) on the team, or being the uploader.
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
 | GET | `/matches` | list matches the caller can see, newest first | own uploads + their teams' matches; `{ data: [...] }` |
-| POST | `/matches` | upload a demo | multipart `demo`; optional `team_id` (owner/igl only); 201; throttled 30/min |
+| POST | `/matches` | upload a demo | multipart `demo`; optional `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
 | GET | `/matches/{match}` | match detail + players | visible only (403 otherwise); players by kills desc |
 | GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | visible only; see [heatmap.md](heatmap.md) |
 | GET | `/matches/{match}/clutches` | clutches grouped by clutcher/round | visible only; each `{ round, size, killer_name, kills[] }` |
 | GET | `/matches/{match}/demo` | download the stored `.dem` | visible only; streamed from storage via `DemoStorage::download` |
 | POST | `/matches/{match}/reparse` | re-enqueue the stored demo | uploader or owner/igl; resets to `queued`; throttled 30/min; `ReparseMatchAction` |
+| PATCH | `/matches/{match}` | move a match between private and a team | body `team_id` (int = share, null = private); manage bar (uploader/owner/igl); target team needs `uploadMatch` or `match.invalid_team`; `UpdateMatchTeamAction` |
 | DELETE | `/matches/{match}` | delete a match | uploader or owner/igl (403 otherwise); 204; `DeleteMatchAction` |
 
 Responses use `MatchResource` / `MatchPlayerStatResource` (wrapped in `data`).
@@ -168,7 +170,10 @@ is the only way to remove a match — there is no soft-delete.
 | `parse_failed_corrupt` | The demo couldn't be parsed — corrupt/unsupported (includes parser panics). |
 | `parse_failed_internal` | Parsing succeeded but persisting the results failed. |
 
-**Upload** (HTTP 422/500): the `demo.*` codes listed under Validation.
+**Upload / reassignment** (HTTP 422/500): the `demo.*` codes under Validation, plus
+`match.invalid_team` (team the caller can't upload to), `match.upload_forbidden` (caller
+isn't an uploader anywhere), and `match.duplicate` (caller has already uploaded this exact
+demo — dedup is by sha256 of the file content, unique per uploader).
 
 ## Authorization & ownership
 
@@ -184,6 +189,9 @@ private to its uploader. Enforced by `GameMatchPolicy`:
 - Uploading with a `team_id` requires `TeamPolicy::uploadMatch` (owner/igl) for that team;
   an invalid or forbidden team returns the code `match.invalid_team`. Omitting it uploads a
   private match.
+- **Reassigning** a match's team (`PATCH /matches/{match}`) is authorized like `delete` (the
+  manage bar); moving it *to* a team additionally requires `uploadMatch` on the target. Passing
+  `team_id: null` makes it private again.
 - The global `admin` passes all of the above (see [teams-auth.md](teams-auth.md)).
 - All match endpoints require a valid bearer token (`auth:sanctum`).
 

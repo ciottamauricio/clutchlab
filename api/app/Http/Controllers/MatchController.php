@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Actions\DeleteMatchAction;
 use App\Actions\ReparseMatchAction;
+use App\Actions\UpdateMatchTeamAction;
 use App\Actions\UploadDemoAction;
 use App\Contracts\DemoStorage;
+use App\Http\Requests\UpdateMatchRequest;
 use App\Http\Requests\UploadDemoRequest;
 use App\Http\Resources\MatchResource;
 use App\Models\GameMatch;
@@ -31,16 +33,28 @@ class MatchController extends Controller
             $request->file('demo'),
             $request->user(),
             $request->integer('team_id') ?: null,
+            $request->contentHash(),
         );
 
         return (new MatchResource($match))->response()->setStatusCode(201);
+    }
+
+    // Move a match between private and a team (or between teams). Authorized like any other
+    // write on the match; the request also checks the caller may upload to the target team.
+    public function update(UpdateMatchRequest $request, GameMatch $match, UpdateMatchTeamAction $action): MatchResource
+    {
+        $this->authorize('delete', $match);
+
+        $action->execute($match, $request->validated('team_id') ?: null);
+
+        return new MatchResource($match->fresh(['team', 'owner']));
     }
 
     public function show(Request $request, GameMatch $match): MatchResource
     {
         $this->authorize('view', $match);
 
-        $match->load(['playerStats' => fn ($q) => $q->orderByDesc('kills')]);
+        $match->load(['team', 'owner', 'playerStats' => fn ($q) => $q->orderByDesc('kills')]);
 
         return new MatchResource($match);
     }

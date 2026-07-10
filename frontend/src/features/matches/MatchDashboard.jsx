@@ -1,5 +1,6 @@
 import { useMatch, useReparseMatch } from './api'
 import { t } from '../../lib/i18n'
+import MatchVisibility from './MatchVisibility'
 import Scoreboard from './Scoreboard'
 import StatusBadge from './StatusBadge'
 import Heatmap from './Heatmap'
@@ -45,6 +46,7 @@ export default function MatchDashboard({ matchId }) {
             {parsed && <span>{match.total_rounds} rounds</span>}
             {duration && <span>{duration}</span>}
           </div>
+          <MatchVisibility match={match} onChanged={reload} />
         </div>
         <div className="dh-actions">
           <StatusBadge status={match.status} />

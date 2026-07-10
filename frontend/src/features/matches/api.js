@@ -8,6 +8,7 @@ const getClutches = (id) => api.get(`/matches/${id}/clutches`)
 const getTeamStats = (id) => api.get(`/matches/${id}/team-stats`)
 const deleteMatch = (id) => api.delete(`/matches/${id}`)
 const reparseMatch = (id) => api.post(`/matches/${id}/reparse`)
+const updateMatchTeam = (id, teamId) => api.patch(`/matches/${id}`, { team_id: teamId })
 const uploadDemo = (file, teamId) => {
   const form = new FormData()
   form.append('demo', file)
@@ -109,6 +110,29 @@ export function useReparseMatch(onReparsed) {
   }, [onReparsed])
 
   return { reparse, reparsing, error }
+}
+
+// Move a match between private and a team. onUpdated receives the updated match.
+export function useUpdateMatchTeam(onUpdated) {
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  const setTeam = useCallback(async (id, teamId) => {
+    setSaving(true)
+    setError(null)
+    try {
+      const updated = await updateMatchTeam(id, teamId)
+      onUpdated?.(updated)
+      return updated
+    } catch (e) {
+      setError(e.code ?? 'error.unknown')
+      throw e
+    } finally {
+      setSaving(false)
+    }
+  }, [onUpdated])
+
+  return { setTeam, saving, error }
 }
 
 // Loads every kill position for a match once (see api/docs/domains/heatmap.md); the

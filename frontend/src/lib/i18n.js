@@ -19,6 +19,7 @@ const MESSAGES = {
   'demo.storage_failed': 'Uploading to storage failed',
   'match.invalid_team': "You can't upload to that team",
   'match.upload_forbidden': "You don't have permission to upload matches",
+  'match.duplicate': "You've already uploaded this demo",
 
   'auth.name_required': 'Please enter your name',
   'auth.email_required': 'Please enter your email',
