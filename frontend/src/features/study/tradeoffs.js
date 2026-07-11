@@ -214,4 +214,27 @@ export const TOPICS = [
       'A monorepo in the "one git repo" sense, not a shared-tooling swamp. The compose file references ./api, ./frontend, ./worker as siblings. The middle path for later is per-service CI within the monorepo, triggered by path filters — independent build/test without losing atomic commits.',
     ],
   },
+  {
+    id: 'orchestration',
+    n: '12',
+    title: 'Orchestration: compose vs. cloud',
+    tag: 'leaving the laptop',
+    summary: 'docker-compose.yml does four jobs at once; in the cloud each job goes to a different owner.',
+    gained: [
+      'The service graph, the private network, env_file config, and restart policies — one file declares all of it, and `docker compose up` is the whole deployment.',
+      'Cloud orchestrators (Container Apps, ECS, Kubernetes) do the lifecycle jobs better than compose: desired replica counts, health probes, automatic restarts, name-based service discovery.',
+      'The stateful trio (Postgres, Redis, object storage) stops being your containers at all — it moves to managed services outside the orchestrator.',
+    ],
+    paid: [
+      'depends_on does not exist in the cloud. Compose lets you cheat on startup order; an orchestrator starts services in any order and restarts them freely, so every service must retry its connections at boot instead of assuming Redis is already up.',
+      'One file becomes several artifacts: container manifests for the orchestrator, secret-store entries replacing env_file, ingress rules replacing the nginx port mapping.',
+      'Named volumes vanish — only genuinely stateful containers (Meilisearch here) still need a mounted disk; the rest must be stateless or gone.',
+    ],
+    body: [
+      'The compose file is doing four jobs: declaring the service graph, wiring a private network where redis resolves by name, injecting config from the root .env, and supervising restarts. Locally that is one file; in the cloud each job has a different owner. Discovery survives everywhere — "services talk by name, never localhost" is exactly how Container Apps, ECS Service Connect, and Kubernetes DNS work — so that rule was cloud-ready from day one.',
+      'The honest casualty is depends_on. It papers over startup ordering locally, and no orchestrator honors it. The cloud-ready posture is crash-and-retry: a consumer that tolerates its dependencies being briefly unreachable, not one that assumes the compose file ordered the world for it. Compose stays the local truth; a Terraform (or Bicep/Copilot) description becomes the cloud truth — and the diff between the two files is this whole topic made concrete. Both translations are written down in the repo: infra/azure (Container Apps) and infra/aws (ECS Fargate), the same architecture spelled twice.',
+    ],
+    code: 'depends_on: [postgres, redis, minio]  # compose-only comfort — no cloud equivalent',
+    codeLabel: 'the line that does not survive the move',
+  },
 ]

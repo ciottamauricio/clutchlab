@@ -1,0 +1,5 @@
+# Provider caches and state never belong in git; *.tfvars may carry secrets.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
