@@ -2025,10 +2025,11 @@ button.clutch-open:hover {
   flex: 0 0 auto;
 }
 
-/* The stat strip — the biggest numerals on the page, scoreboard-readout style. */
+/* The stat strip — the biggest numerals on the page, scoreboard-readout style.
+   Ranked, not flat: the K/D lead cell is widest and largest, paired records sit smaller. */
 .pc-stat-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  grid-template-columns: minmax(150px, 1.5fr) repeat(5, minmax(84px, 1fr));
   gap: 2px;
   background: var(--border);
   border: 1px solid var(--border);
@@ -2040,6 +2041,7 @@ button.clutch-open:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   padding: 16px 8px;
   background: var(--surface-2);
@@ -2051,6 +2053,46 @@ button.clutch-open:hover {
   letter-spacing: 0.01em;
   color: var(--text-h);
   font-variant-numeric: tabular-nums;
+}
+
+.pc-stat-lead .pc-stat-v {
+  font-size: 46px;
+  line-height: 1;
+}
+
+/* Which side of the 1.0 break-even the K/D sits on — arrow + words, never color alone. */
+.pc-kd-tag {
+  font: 600 10px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pc-kd-tag.up {
+  color: var(--win);
+}
+
+.pc-kd-tag.down {
+  color: var(--danger);
+}
+
+/* Paired records (K–D, opening duels): two numbers, one duel — sized as a record, not a rate. */
+.pc-stat-v.pc-pair {
+  font-size: 22px;
+}
+
+@media (max-width: 720px) {
+  .pc-stat-strip {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .pc-stat-lead {
+    grid-column: 1 / -1;
+  }
+
+  /* 5 tiles in 3 columns leaves a hole; the last tile absorbs it. */
+  .pc-stat:last-child {
+    grid-column: span 2;
+  }
 }
 
 .pc-stat-l {
