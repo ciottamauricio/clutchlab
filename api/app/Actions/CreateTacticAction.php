@@ -7,10 +7,11 @@ use App\Models\User;
 
 class CreateTacticAction
 {
-    public function execute(User $owner, string $name): Tactic
+    public function execute(User $owner, string $name, ?string $map = null): Tactic
     {
         return $owner->tactics()->create([
             'name' => $name,
+            'map' => $map,
             'board' => ['pieces' => []],
         ]);
     }

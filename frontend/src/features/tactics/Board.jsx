@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { useTacticBoard } from './api'
+import { radarUrl } from '../matches/radar'
 
 // Piece kinds and their colours. `kind` is stored on each piece; the label/colour
 // are presentational only.
@@ -15,7 +16,7 @@ const KINDS = [
 const colorOf = (kind) => (KINDS.find((k) => k.kind === kind) ?? KINDS[0]).color
 const labelOf = (kind) => (KINDS.find((k) => k.kind === kind) ?? KINDS[0]).label
 
-export default function Board({ tacticId }) {
+export default function Board({ tacticId, map }) {
   const { board, presence, connected, update } = useTacticBoard(tacticId)
   const fieldRef = useRef(null)
   const dragId = useRef(null)
@@ -63,7 +64,8 @@ export default function Board({ tacticId }) {
       </div>
 
       <div
-        className="board-field"
+        className={map ? 'board-field has-radar' : 'board-field'}
+        style={map ? { backgroundImage: `url(${radarUrl(map)})` } : undefined}
         ref={fieldRef}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}

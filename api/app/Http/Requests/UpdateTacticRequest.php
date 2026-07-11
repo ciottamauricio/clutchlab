@@ -15,6 +15,7 @@ class UpdateTacticRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'map' => ['sometimes', 'nullable', 'string', 'max:32'],
             'board' => ['sometimes', 'array'],
         ];
     }
