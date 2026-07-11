@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Actions\CreateTacticAction;
+use App\Actions\UpdateTacticTeamAction;
 use App\Http\Requests\StoreTacticRequest;
 use App\Http\Requests\UpdateTacticRequest;
+use App\Http\Requests\UpdateTacticTeamRequest;
 use App\Http\Resources\TacticResource;
 use App\Models\Tactic;
 use Illuminate\Http\JsonResponse;
@@ -16,13 +18,13 @@ class TacticController extends Controller
     public function index(Request $request): JsonResponse
     {
         return TacticResource::collection(
-            $request->user()->tactics()->latest()->get()
+            Tactic::visibleTo($request->user())->with(['team', 'owner'])->latest()->get()
         )->response();
     }
 
     public function store(StoreTacticRequest $request, CreateTacticAction $action): JsonResponse
     {
-        $tactic = $action->execute($request->user(), $request->validated('name'));
+        $tactic = $action->execute($request->user(), $request->validated('name'), $request->validated('map'));
 
         return (new TacticResource($tactic))->response()->setStatusCode(201);
     }
@@ -41,6 +43,17 @@ class TacticController extends Controller
         $tactic->update($request->validated());
 
         return new TacticResource($tactic);
+    }
+
+    // Move a tactic between private and a team. Sharing stays with the creator
+    // (authorized like delete); the request checks membership of the target team.
+    public function updateTeam(UpdateTacticTeamRequest $request, Tactic $tactic, UpdateTacticTeamAction $action): TacticResource
+    {
+        $this->authorize('delete', $tactic);
+
+        $action->execute($tactic, $request->validated('team_id') ?: null);
+
+        return new TacticResource($tactic->fresh(['team', 'owner']));
     }
 
     public function destroy(Tactic $tactic): Response

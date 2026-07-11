@@ -24,8 +24,33 @@ export function useTactics() {
   return { tactics, error, loading, refresh }
 }
 
-export const createTactic = (name) => api.post('/tactics', { name })
+export const createTactic = (name, map = null) => api.post('/tactics', { name, map })
 export const deleteTactic = (id) => api.delete(`/tactics/${id}`)
+
+const updateTacticTeam = (id, teamId) => api.patch(`/tactics/${id}`, { team_id: teamId })
+
+// Moves a tactic between private and a team (owner only server-side).
+export function useUpdateTacticTeam(onUpdated) {
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  const setTeam = useCallback(async (id, teamId) => {
+    setSaving(true)
+    setError(null)
+    try {
+      const tactic = await updateTacticTeam(id, teamId)
+      onUpdated?.(tactic)
+      return tactic
+    } catch (e) {
+      setError(e.code ?? 'error.unknown')
+      throw e
+    } finally {
+      setSaving(false)
+    }
+  }, [onUpdated])
+
+  return { setTeam, saving, error }
+}
 
 // Opens the websocket to the realtime service for one tactic. Returns the live
 // board, presence count, and an update() that applies locally and broadcasts.

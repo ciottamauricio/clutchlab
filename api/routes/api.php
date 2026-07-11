@@ -53,6 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/tactics', [TacticController::class, 'store']);
         Route::get('/tactics/{tactic}', [TacticController::class, 'show']);
         Route::put('/tactics/{tactic}', [TacticController::class, 'update']);
+        Route::patch('/tactics/{tactic}', [TacticController::class, 'updateTeam']);
         Route::delete('/tactics/{tactic}', [TacticController::class, 'destroy']);
     });
 

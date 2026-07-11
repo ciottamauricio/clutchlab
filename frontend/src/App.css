@@ -1673,6 +1673,34 @@ button.clutch-open:hover {
   overflow: hidden;
 }
 
+/* Radar boards: the overview PNGs are square, light linework on transparency —
+   they need a dark backing in both themes (the inline style carries the image). */
+.board-field.has-radar {
+  aspect-ratio: 1 / 1;
+  max-width: 720px;
+  margin: 0 auto;
+  background-color: #10151c;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.tactic-map {
+  margin-left: 8px;
+  font: 500 10px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+/* A tactic someone else shared with one of my teams — credit its creator. */
+.tactic-shared {
+  margin-left: 8px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-dim);
+}
+
 .piece {
   position: absolute;
   width: 30px;

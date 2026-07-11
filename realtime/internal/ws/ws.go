@@ -56,12 +56,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ownerID, err := h.store.TacticOwnerID(r.Context(), id)
+	allowed, err := h.store.TacticAccess(r.Context(), id, userID)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	if ownerID != userID {
+	if !allowed {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}

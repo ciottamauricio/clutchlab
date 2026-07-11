@@ -48,10 +48,18 @@ func (s *Store) UserIDForToken(ctx context.Context, token string) (int64, error)
 	return userID, nil
 }
 
-func (s *Store) TacticOwnerID(ctx context.Context, tacticID int64) (int64, error) {
-	var ownerID int64
-	err := s.db.QueryRowContext(ctx, `SELECT user_id FROM tactics WHERE id = $1`, tacticID).Scan(&ownerID)
-	return ownerID, err
+// TacticAccess reports whether the user may open the tactic's room: the owner, or
+// any member of the team it's shared with — the same rule as Laravel's TacticPolicy
+// (keep the two in sync; api/docs/domains/tactics.md). sql.ErrNoRows = unknown tactic.
+func (s *Store) TacticAccess(ctx context.Context, tacticID, userID int64) (bool, error) {
+	var allowed bool
+	err := s.db.QueryRowContext(ctx,
+		`SELECT t.user_id = $2 OR EXISTS (
+		     SELECT 1 FROM team_user tu WHERE tu.team_id = t.team_id AND tu.user_id = $2
+		 )
+		 FROM tactics t WHERE t.id = $1`,
+		tacticID, userID).Scan(&allowed)
+	return allowed, err
 }
 
 // LoadBoard returns the board JSON (empty string if null/absent).
