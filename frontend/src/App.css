@@ -1641,9 +1641,31 @@ button.clutch-open:hover {
   margin-bottom: 12px;
 }
 
+/* One colour per piece kind. Buttons/chips read --k (theme-aware side tokens, legible
+   as text on the page); discs read --k-disc — fixed bright fills that keep dark ink
+   readable on the radar in both themes. */
+.k-ct { --k: var(--ct); --k-disc: #4a90d9; }
+.k-t { --k: var(--t); --k-disc: #d9a520; }
+.k-smoke { --k: #8b8b8b; }
+.k-flash { --k: #d8d84a; }
+.k-he { --k: #4caf50; }
+.k-molly { --k: #e0592a; }
+
+.board-group {
+  display: flex;
+  gap: 8px;
+}
+
+.board-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border-strong);
+}
+
 .add-piece {
   background: transparent;
-  border: 1px solid;
+  border: 1px solid var(--k);
+  color: var(--k);
   border-radius: 6px;
   padding: 4px 12px;
   font: 500 12px var(--mono);
@@ -1653,10 +1675,32 @@ button.clutch-open:hover {
   background: var(--hover);
 }
 
+.board-clear {
+  margin-left: auto;
+}
+
 .presence {
   margin-left: auto;
   font: 400 11px var(--mono);
   color: var(--text-dim);
+}
+
+/* When the clear button is present it takes the free space; presence sits beside it. */
+.board-clear + .presence {
+  margin-left: 12px;
+}
+
+.presence-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  margin-right: 6px;
+}
+
+.presence.live .presence-dot {
+  background: var(--win);
 }
 
 .board-field {
@@ -1710,6 +1754,7 @@ button.clutch-open:hover {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--k-disc, var(--k));
   color: #0e1116;
   font: 700 10px var(--mono);
   cursor: grab;
@@ -1719,6 +1764,55 @@ button.clutch-open:hover {
 
 .piece:active {
   cursor: grabbing;
+}
+
+.piece.selected {
+  outline: 2px solid var(--text-h);
+  outline-offset: 2px;
+  z-index: 2;
+}
+
+/* A utility piece's note, pinned under the disc ("jump throw", "on go"…). */
+.piece-tag {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(10, 13, 18, 0.75);
+  color: #e8ebf0;
+  font: 500 9px var(--mono);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.board-inspector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.board-inspector input {
+  flex: 1;
+  max-width: 280px;
+}
+
+/* The inspector's kind swatch reuses the piece look, minus the board positioning. */
+.piece.piece-chip {
+  position: static;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  cursor: default;
+  box-shadow: none;
+  flex: 0 0 auto;
 }
 
 /* ---------- Responsive ---------- */

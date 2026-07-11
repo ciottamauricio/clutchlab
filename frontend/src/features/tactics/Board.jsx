@@ -1,32 +1,50 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useTacticBoard } from './api'
 import { radarUrl } from '../matches/radar'
 
-// Piece kinds and their colours. `kind` is stored on each piece; the label/colour
-// are presentational only.
-const KINDS = [
-  { kind: 'ct', label: 'CT', color: '#4a90d9' },
-  { kind: 't', label: 'T', color: '#d9a520' },
-  { kind: 'smoke', label: 'S', color: '#8b8b8b' },
-  { kind: 'flash', label: 'F', color: '#d8d84a' },
-  { kind: 'he', label: 'HE', color: '#4caf50' },
-  { kind: 'molly', label: 'M', color: '#e0592a' },
+// Piece kinds. Colours live in CSS (.piece.k-<kind>), on the app's side tokens.
+// The board JSON shape { id, kind, x, y, label } is the realtime contract — unchanged.
+const PLAYERS = [
+  { kind: 'ct', label: 'CT' },
+  { kind: 't', label: 'T' },
 ]
-
-const colorOf = (kind) => (KINDS.find((k) => k.kind === kind) ?? KINDS[0]).color
-const labelOf = (kind) => (KINDS.find((k) => k.kind === kind) ?? KINDS[0]).label
+const UTILITY = [
+  { kind: 'smoke', label: 'Smoke' },
+  { kind: 'flash', label: 'Flash' },
+  { kind: 'he', label: 'HE' },
+  { kind: 'molly', label: 'Molly' },
+]
+const SHORT = { ct: 'CT', t: 'T', smoke: 'S', flash: 'F', he: 'HE', molly: 'M' }
 
 export default function Board({ tacticId, map }) {
   const { board, presence, connected, update } = useTacticBoard(tacticId)
   const fieldRef = useRef(null)
   const dragId = useRef(null)
+  const dragMoved = useRef(false)
+  const [selectedId, setSelectedId] = useState(null)
 
   const pieces = board?.pieces ?? []
+  const selected = pieces.find((p) => p.id === selectedId)
 
-  const addPiece = (kind) =>
-    update({ pieces: [...pieces, { id: crypto.randomUUID(), kind, x: 0.5, y: 0.5, label: '' }] }, true)
+  // Player pieces number themselves (CT 1–5, T 1–5); utility starts unlabeled.
+  const addPiece = (kind) => {
+    const isPlayer = kind === 'ct' || kind === 't'
+    const label = isPlayer ? String(pieces.filter((p) => p.kind === kind).length + 1) : ''
+    update({ pieces: [...pieces, { id: crypto.randomUUID(), kind, x: 0.5, y: 0.5, label }] }, true)
+  }
 
-  const removePiece = (id) => update({ pieces: pieces.filter((p) => p.id !== id) }, true)
+  const removePiece = (id) => {
+    if (selectedId === id) setSelectedId(null)
+    update({ pieces: pieces.filter((p) => p.id !== id) }, true)
+  }
+
+  const setLabel = (id, label, force = false) =>
+    update({ pieces: pieces.map((p) => (p.id === id ? { ...p, label } : p)) }, force)
+
+  const clearBoard = () => {
+    setSelectedId(null)
+    update({ pieces: [] }, true)
+  }
 
   const moveTo = (clientX, clientY) => {
     const r = fieldRef.current.getBoundingClientRect()
@@ -36,31 +54,49 @@ export default function Board({ tacticId, map }) {
   }
 
   const onPointerMove = (e) => {
-    if (dragId.current) moveTo(e.clientX, e.clientY)
+    if (dragId.current) {
+      dragMoved.current = true
+      moveTo(e.clientX, e.clientY)
+    }
   }
 
+  // A press that never moved is a select; a drag persists its final position.
   const endDrag = () => {
-    if (dragId.current) {
-      update(board, true) // force the final position to persist + broadcast
-      dragId.current = null
+    if (!dragId.current) return
+    if (dragMoved.current) {
+      update(board, true)
+    } else {
+      setSelectedId((cur) => (cur === dragId.current ? null : dragId.current))
     }
+    dragId.current = null
+    dragMoved.current = false
   }
 
   return (
     <section className="board-wrap">
       <div className="board-toolbar">
-        {KINDS.map((k) => (
-          <button
-            key={k.kind}
-            type="button"
-            className="add-piece"
-            style={{ borderColor: k.color, color: k.color }}
-            onClick={() => addPiece(k.kind)}
-          >
-            + {k.label}
-          </button>
-        ))}
-        <span className="presence">{connected ? `${presence} online` : 'connecting…'}</span>
+        <span className="board-group">
+          {PLAYERS.map((k) => (
+            <button key={k.kind} type="button" className={`add-piece k-${k.kind}`} onClick={() => addPiece(k.kind)}>
+              + {k.label}
+            </button>
+          ))}
+        </span>
+        <span className="board-sep" aria-hidden="true" />
+        <span className="board-group">
+          {UTILITY.map((k) => (
+            <button key={k.kind} type="button" className={`add-piece k-${k.kind}`} onClick={() => addPiece(k.kind)}>
+              + {k.label}
+            </button>
+          ))}
+        </span>
+        {pieces.length > 0 && (
+          <button type="button" className="link-btn board-clear" onClick={clearBoard}>clear board</button>
+        )}
+        <span className={`presence${connected ? ' live' : ''}`}>
+          <span className="presence-dot" aria-hidden="true" />
+          {connected ? `${presence} online` : 'connecting…'}
+        </span>
       </div>
 
       <div
@@ -74,21 +110,41 @@ export default function Board({ tacticId, map }) {
         {pieces.map((p) => (
           <div
             key={p.id}
-            className="piece"
-            style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%`, background: colorOf(p.kind) }}
-            title="drag to move · double-click to remove"
+            className={`piece k-${p.kind}${p.id === selectedId ? ' selected' : ''}`}
+            style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%` }}
+            title="drag to move · click to name · double-click to remove"
             onPointerDown={(e) => {
               e.preventDefault()
               dragId.current = p.id
+              dragMoved.current = false
             }}
             onDoubleClick={() => removePiece(p.id)}
           >
-            {labelOf(p.kind)}
+            {(p.kind === 'ct' || p.kind === 't') && p.label ? p.label : SHORT[p.kind] ?? '?'}
+            {p.label && p.kind !== 'ct' && p.kind !== 't' && (
+              <span className="piece-tag">{p.label}</span>
+            )}
           </div>
         ))}
       </div>
 
-      <p className="muted">Drag pieces to move · double-click to remove · edits sync live to everyone on this tactic.</p>
+      {selected ? (
+        <div className="board-inspector">
+          <span className={`piece piece-chip k-${selected.kind}`}>{SHORT[selected.kind]}</span>
+          <input
+            value={selected.label ?? ''}
+            placeholder={selected.kind === 'ct' || selected.kind === 't' ? 'number / name' : 'note (e.g. "jump throw")'}
+            maxLength={24}
+            onChange={(e) => setLabel(selected.id, e.target.value)}
+            onBlur={() => update(board, true)}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          />
+          <button type="button" className="link-btn" onClick={() => removePiece(selected.id)}>remove</button>
+          <button type="button" className="link-btn" onClick={() => setSelectedId(null)}>done</button>
+        </div>
+      ) : (
+        <p className="muted">Drag to move · click to name · double-click to remove · edits sync live to everyone on this tactic.</p>
+      )}
     </section>
   )
 }
