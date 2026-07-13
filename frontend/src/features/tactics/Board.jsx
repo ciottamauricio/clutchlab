@@ -16,6 +16,14 @@ const UTILITY = [
 ]
 const SHORT = { ct: 'CT', t: 'T', smoke: 'S', flash: 'F', he: 'HE', molly: 'M' }
 
+// crypto.randomUUID only exists on secure origins (https / localhost) — opening the app
+// via a LAN or WSL IP would make every add-piece click throw. Ids just need uniqueness
+// within one board, so a timestamp+random fallback is plenty.
+const newId = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+
 export default function Board({ tacticId, map }) {
   const { board, presence, connected, update } = useTacticBoard(tacticId)
   const fieldRef = useRef(null)
@@ -30,7 +38,7 @@ export default function Board({ tacticId, map }) {
   const addPiece = (kind) => {
     const isPlayer = kind === 'ct' || kind === 't'
     const label = isPlayer ? String(pieces.filter((p) => p.kind === kind).length + 1) : ''
-    update({ pieces: [...pieces, { id: crypto.randomUUID(), kind, x: 0.5, y: 0.5, label }] }, true)
+    update({ pieces: [...pieces, { id: newId(), kind, x: 0.5, y: 0.5, label }] }, true)
   }
 
   const removePiece = (id) => {
