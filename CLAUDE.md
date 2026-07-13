@@ -11,8 +11,8 @@ features. Solo learning project, monorepo.
 - **Why the services are split** (boundaries, async, polyglot queue): [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - **What comes next** (ordered so each step teaches one concept): [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - **Per-service notes:** each service has its own `CLAUDE.md` —
-  [`api/CLAUDE.md`](api/CLAUDE.md), [`frontend/CLAUDE.md`](frontend/CLAUDE.md), and
-  [`worker/CLAUDE.md`](worker/CLAUDE.md).
+  [`api/CLAUDE.md`](api/CLAUDE.md), [`frontend/CLAUDE.md`](frontend/CLAUDE.md),
+  [`worker/CLAUDE.md`](worker/CLAUDE.md), and [`notifier/CLAUDE.md`](notifier/CLAUDE.md).
   The api's domain business rules live in [`api/docs/domains/`](api/docs/domains/) (read the
   relevant one before changing a domain); the frontend deep-dive is
   [`frontend/ENGINEERING.md`](frontend/ENGINEERING.md) and the Go one is
@@ -21,7 +21,9 @@ features. Solo learning project, monorepo.
 ## Services
 
 `nginx` (gateway) · `frontend` (React/Vite) · `api` (Laravel, CRUD) · `worker`
-(Go, demo parsing) · `postgres` · `redis` (cross-language queue) · `minio` (S3 storage).
+(Go, demo parsing) · `realtime` (Go, tactics websockets) · `notifier` (Go, events →
+Discord) · `postgres` · `redis` (cross-language queue + event channel) · `minio`
+(S3 storage) · `meilisearch` (search read model).
 Only nginx is exposed to the host; services talk over the Docker network by **service
 name**, never `localhost`.
 
@@ -33,4 +35,6 @@ name**, never `localhost`.
   codes → localized text.
 - The parse queue is a **plain Redis list** with JSON `{ "match_id", "demo_key" }`, shared
   with Go — change both sides in the same commit.
+- Events are **Redis pub/sub** JSON on `clutch_events` (`{ "event", "v", "match_id", … }`),
+  worker → notifier. Additive changes only; publisher and subscribers in the same commit.
 - Config comes from Compose `env_file` (repo-root `.env`); do **not** create `api/.env`.

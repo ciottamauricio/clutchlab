@@ -7,6 +7,7 @@ import (
 
 	"clutchlab/worker/internal/config"
 	"clutchlab/worker/internal/db"
+	"clutchlab/worker/internal/events"
 	"clutchlab/worker/internal/matches"
 	"clutchlab/worker/internal/parser"
 	"clutchlab/worker/internal/queue"
@@ -25,6 +26,7 @@ type worker struct {
 	store   *matches.Store
 	storage *storage.Client
 	indexer search.Indexer
+	events  events.Publisher
 }
 
 func main() {
@@ -54,10 +56,17 @@ func main() {
 	defer consumer.Close()
 	log.Print("connected to redis")
 
+	publisher, err := events.NewRedis(ctx, cfg.RedisAddr, cfg.EventsChannel)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer publisher.Close()
+
 	w := &worker{
 		store:   matches.NewStore(conn),
 		storage: store,
 		indexer: search.NewMeili(cfg.MeiliHost, cfg.MeiliKey),
+		events:  publisher,
 	}
 
 	log.Printf("ready, blocking on redis list %q", cfg.Queue)
@@ -86,7 +95,7 @@ func (w *worker) handle(ctx context.Context, payload string) {
 	obj, err := w.storage.Download(ctx, job.DemoKey)
 	if err != nil {
 		log.Printf("match %d: download failed: %v", job.MatchID, err)
-		w.store.Fail(job.MatchID, "parse_failed_download")
+		w.fail(ctx, job.MatchID, "parse_failed_download")
 		return
 	}
 	defer obj.Close()
@@ -94,13 +103,13 @@ func (w *worker) handle(ctx context.Context, payload string) {
 	res, err := parser.ParseDemo(obj)
 	if err != nil {
 		log.Printf("match %d: parse failed: %v", job.MatchID, err)
-		w.store.Fail(job.MatchID, "parse_failed_corrupt")
+		w.fail(ctx, job.MatchID, "parse_failed_corrupt")
 		return
 	}
 
 	if err := w.store.Save(job.MatchID, res); err != nil {
 		log.Printf("match %d: save failed: %v", job.MatchID, err)
-		w.store.Fail(job.MatchID, "parse_failed_internal")
+		w.fail(ctx, job.MatchID, "parse_failed_internal")
 		return
 	}
 	log.Printf("match %d: parsed %s %d-%d (%d players)", job.MatchID, res.MapName, res.ScoreCT, res.ScoreT, len(res.Players))
@@ -108,6 +117,27 @@ func (w *worker) handle(ctx context.Context, payload string) {
 	// Project events into the search read model. Failure here is logged, not fatal —
 	// the match is already parsed and the index can be rebuilt from Postgres.
 	w.index(ctx, job.MatchID, res)
+
+	w.publish(ctx, events.Event{
+		Event: "match.parsed", V: 1, MatchID: job.MatchID,
+		Demo: w.store.Filename(job.MatchID), Map: res.MapName,
+		ScoreCT: int(res.ScoreCT), ScoreT: int(res.ScoreT),
+	})
+}
+
+// fail marks the match failed and announces the fact. The status write is the source
+// of truth; the event is best-effort on top of it.
+func (w *worker) fail(ctx context.Context, matchID int64, code string) {
+	w.store.Fail(matchID, code)
+	w.publish(ctx, events.Event{Event: "match.failed", V: 1, MatchID: matchID, ErrorCode: code})
+}
+
+// publish is fire-and-forget by design: notifications must never hold a parse hostage,
+// so a publish failure is logged and the loop moves on (same rule as search indexing).
+func (w *worker) publish(ctx context.Context, e events.Event) {
+	if err := w.events.Publish(ctx, e); err != nil {
+		log.Printf("match %d: event %s publish failed: %v", e.MatchID, e.Event, err)
+	}
 }
 
 func (w *worker) index(ctx context.Context, matchID int64, res *parser.ParseResult) {

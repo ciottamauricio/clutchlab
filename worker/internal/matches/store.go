@@ -37,6 +37,13 @@ func (s *Store) OwnerID(matchID int64) int64 {
 	return owner.Int64
 }
 
+// Filename returns the match's original demo filename (display only, may be empty).
+func (s *Store) Filename(matchID int64) string {
+	var name sql.NullString
+	_ = s.db.QueryRow("SELECT original_filename FROM matches WHERE id=$1", matchID).Scan(&name)
+	return name.String
+}
+
 // Save writes the whole result atomically. Delete-then-insert makes redelivery
 // of the same job idempotent instead of doubling a player's stats.
 func (s *Store) Save(id int64, res *parser.ParseResult) error {

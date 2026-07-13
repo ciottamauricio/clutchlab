@@ -1,0 +1,5 @@
+root = "."
+[build]
+  cmd = "go build -o ./tmp/notifier ./cmd/notifier"
+  bin = "./tmp/notifier"
+  include_ext = ["go"]

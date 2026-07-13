@@ -11,6 +11,7 @@ type Config struct {
 	DBHost, DBPort, DBUser, DBPass, DBName string
 	RedisAddr                              string
 	Queue                                  string
+	EventsChannel                          string
 	MinioEndpoint, MinioKey, MinioSecret   string
 	Bucket                                 string
 	MeiliHost, MeiliKey                    string
@@ -25,6 +26,7 @@ func Load() Config {
 		DBName:        env("DB_DATABASE", "clutchlab"),
 		RedisAddr:     env("REDIS_HOST", "redis") + ":" + env("REDIS_PORT", "6379"),
 		Queue:         env("PARSE_QUEUE", "demo_parse_jobs"),
+		EventsChannel: env("EVENTS_CHANNEL", "clutch_events"),
 		MinioEndpoint: env("AWS_ENDPOINT", "http://minio:9000"),
 		MinioKey:      env("AWS_ACCESS_KEY_ID", "minioadmin"),
 		MinioSecret:   env("AWS_SECRET_ACCESS_KEY", "minioadmin"),

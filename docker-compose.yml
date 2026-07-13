@@ -43,6 +43,16 @@ services:
     depends_on: [postgres]
     networks: [clutchnet]
 
+  # Event subscriber (Go): listens to the pub/sub channel the worker publishes on and
+  # posts to a Discord webhook (log-only when DISCORD_WEBHOOK_URL is unset).
+  notifier:
+    build: ./notifier
+    volumes:
+      - ./notifier:/app
+    env_file: .env
+    depends_on: [redis]
+    networks: [clutchnet]
+
   postgres:
     image: postgres:16-alpine
     environment:

@@ -53,6 +53,10 @@ behind nginx but on a separate `/realtime/*` websocket route — it earns its ow
 different reason than the worker does (see below). The queue is the only thing connecting the
 web world and the compute world — that's the physical shape of the async boundary.
 
+Not drawn above: the `notifier` (Go), a third no-inbound-HTTP service. It subscribes to the
+Redis pub/sub events channel the worker publishes on and posts to a Discord webhook — see
+"Event-driven notifications" below.
+
 ## Why each boundary earns its place
 
 ### Go worker vs Laravel (the core split)
@@ -131,6 +135,39 @@ Queue contract (keep both sides in sync — same commit when it changes):
 ```json
 { "match_id": 123, "demo_key": "demos/abc.dem" }
 ```
+
+### Event-driven notifications: commands vs events (Step 5)
+
+```
+worker ──PUBLISH──► redis channel ──SUBSCRIBE──► notifier ──https──► Discord webhook
+```
+
+The parse queue carries **commands** ("parse this") — one producer telling exactly one
+consumer to do work. The events channel carries **facts** ("this happened") — the worker
+PUBLISHes `match.parsed` / `match.failed` to a Redis pub/sub channel (`clutch_events`)
+and does not know who listens. The `notifier` service subscribes and posts to a Discord
+webhook; a future subscriber (email, cache warmer, a re-homed search projection) can join
+without the worker changing. Publishers who don't know their subscribers — the pattern.
+
+Event contract (cross-language, one-to-many — **additive changes only**, bump `v` for
+breaking ones; publisher `worker/internal/events`, subscriber `notifier/internal/sub`,
+same commit when it changes):
+
+```json
+{ "event": "match.parsed", "v": 1, "match_id": 42, "demo": "x.dem", "map": "de_mirage", "score_ct": 13, "score_t": 9 }
+```
+
+The deliberate weaknesses, kept visible:
+
+- **Fire-and-forget**: pub/sub reaches only subscribers connected at that instant. A
+  notifier restart loses the events in the gap — acceptable for pings, and exactly the
+  at-most-once lesson. The earned upgrade is Redis Streams (consumer groups + acks)
+  behind the same `Publisher`/subscriber interfaces.
+- **Dual write**: the worker writes Postgres, then publishes; a crash between the two
+  loses the event (the status row stays correct — it is the source of truth). The
+  industrial fix is a transactional outbox; accepting the gap is a documented decision.
+- Publishing is best-effort by the same rule as search indexing: a notification must
+  never fail a parse.
 
 ### Data ownership (a deliberate later refactor)
 
