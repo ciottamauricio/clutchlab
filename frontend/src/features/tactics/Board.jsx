@@ -16,6 +16,10 @@ const UTILITY = [
 ]
 const SHORT = { ct: 'CT', t: 'T', smoke: 'S', flash: 'F', he: 'HE', molly: 'M' }
 
+// Pen colors are token names, not hexes — CSS maps .ink-<name> to the theme vars, so
+// strokes recolor with the theme. Lines saved before colors existed default to accent.
+const INKS = ['accent', 'ct', 't', 'danger']
+
 // crypto.randomUUID only exists on secure origins (https / localhost) — opening the app
 // via a LAN or WSL IP would make every add-piece click throw. Ids just need uniqueness
 // within one board, so a timestamp+random fallback is plenty.
@@ -24,52 +28,139 @@ const newId = () =>
     ? crypto.randomUUID()
     : `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 
+// Spawn-zone centres per map, as 0..1 fractions of the radar image — eyeballed from the
+// green spawn outlines the overview PNGs in public/radars/ draw themselves. Maps without
+// an entry (or boards with no map) fall back to top edge = CT, bottom edge = T.
+const SPAWNS = {
+  de_dust2: { ct: [0.61, 0.2], t: [0.38, 0.9] },
+  de_mirage: { ct: [0.88, 0.36], t: [0.31, 0.71] },
+  de_inferno: { ct: [0.89, 0.35], t: [0.1, 0.67] },
+  de_nuke: { ct: [0.82, 0.48], t: [0.2, 0.55] },
+  de_ancient: { ct: [0.5, 0.15], t: [0.48, 0.86] },
+  de_anubis: { ct: [0.42, 0.22], t: [0.47, 0.9] },
+  de_overpass: { ct: [0.48, 0.19], t: [0.66, 0.92] },
+  de_train: { ct: [0.89, 0.5], t: [0.1, 0.17] },
+  de_vertigo: { ct: [0.56, 0.24], t: [0.4, 0.74] },
+  de_cache: { ct: [0.9, 0.54], t: [0.08, 0.44] },
+}
+const DEFAULT_SPAWNS = { ct: [0.5, 0.12], t: [0.5, 0.88] }
+
+// Five positions fanned around a spawn centre (an X: leader + four corners), kept on-board.
+const clamp01 = (v) => Math.min(0.97, Math.max(0.03, v))
+const spawnSlots = ([cx, cy]) =>
+  [[0, 0], [-0.045, -0.035], [0.045, -0.035], [-0.045, 0.035], [0.045, 0.035]]
+    .map(([dx, dy]) => [clamp01(cx + dx), clamp01(cy + dy)])
+
 export default function Board({ tacticId, map }) {
   const { board, presence, connected, update } = useTacticBoard(tacticId)
   const fieldRef = useRef(null)
   const dragId = useRef(null)
   const dragMoved = useRef(false)
+  const drawId = useRef(null)
   const [selectedId, setSelectedId] = useState(null)
+  const [tool, setTool] = useState('move') // move | draw | erase
+  const [penColor, setPenColor] = useState('accent')
 
   const pieces = board?.pieces ?? []
+  const lines = board?.lines ?? []
   const selected = pieces.find((p) => p.id === selectedId)
 
   // Player pieces number themselves (CT 1–5, T 1–5); utility starts unlabeled.
   const addPiece = (kind) => {
     const isPlayer = kind === 'ct' || kind === 't'
     const label = isPlayer ? String(pieces.filter((p) => p.kind === kind).length + 1) : ''
-    update({ pieces: [...pieces, { id: newId(), kind, x: 0.5, y: 0.5, label }] }, true)
+    update({ ...board, pieces: [...pieces, { id: newId(), kind, x: 0.5, y: 0.5, label }] }, true)
   }
 
   const removePiece = (id) => {
     if (selectedId === id) setSelectedId(null)
-    update({ pieces: pieces.filter((p) => p.id !== id) }, true)
+    update({ ...board, pieces: pieces.filter((p) => p.id !== id) }, true)
   }
 
+  const removeLine = (id) => update({ ...board, lines: lines.filter((l) => l.id !== id) }, true)
+
   const setLabel = (id, label, force = false) =>
-    update({ pieces: pieces.map((p) => (p.id === id ? { ...p, label } : p)) }, force)
+    update({ ...board, pieces: pieces.map((p) => (p.id === id ? { ...p, label } : p)) }, force)
 
   const clearBoard = () => {
     setSelectedId(null)
-    update({ pieces: [] }, true)
+    update({ ...board, pieces: [], lines: [] }, true)
+  }
+
+  // Full 5v5 at spawn: existing players keep their id/label and snap to a spawn slot,
+  // missing ones are created (numbered on), extras beyond five stay where they are.
+  const placeAtSpawns = () => {
+    const spawns = SPAWNS[map] ?? DEFAULT_SPAWNS
+    const next = [...pieces]
+    for (const kind of ['ct', 't']) {
+      const slots = spawnSlots(spawns[kind])
+      const own = next.filter((p) => p.kind === kind)
+      own.slice(0, 5).forEach((p, i) => {
+        const at = next.indexOf(p)
+        next[at] = { ...p, x: slots[i][0], y: slots[i][1] }
+      })
+      for (let i = own.length; i < 5; i++) {
+        next.push({ id: newId(), kind, x: slots[i][0], y: slots[i][1], label: String(i + 1) })
+      }
+    }
+    update({ ...board, pieces: next }, true)
+  }
+
+  const fieldPos = (clientX, clientY) => {
+    const r = fieldRef.current.getBoundingClientRect()
+    return [
+      Math.min(1, Math.max(0, (clientX - r.left) / r.width)),
+      Math.min(1, Math.max(0, (clientY - r.top) / r.height)),
+    ]
   }
 
   const moveTo = (clientX, clientY) => {
-    const r = fieldRef.current.getBoundingClientRect()
-    const x = Math.min(1, Math.max(0, (clientX - r.left) / r.width))
-    const y = Math.min(1, Math.max(0, (clientY - r.top) / r.height))
-    update({ pieces: pieces.map((p) => (p.id === dragId.current ? { ...p, x, y } : p)) })
+    const [x, y] = fieldPos(clientX, clientY)
+    update({ ...board, pieces: pieces.map((p) => (p.id === dragId.current ? { ...p, x, y } : p)) })
+  }
+
+  // Freehand pen: a pointer-down on the field starts a line, moves append points
+  // (skipping sub-pixel jitter), pointer-up commits it — peers watch it grow live.
+  const startLine = (e) => {
+    if (tool !== 'draw' || e.button !== 0) return
+    e.preventDefault()
+    const id = newId()
+    drawId.current = id
+    update({ ...board, lines: [...lines, { id, color: penColor, points: [fieldPos(e.clientX, e.clientY)] }] })
+  }
+
+  const extendLine = (clientX, clientY) => {
+    const [x, y] = fieldPos(clientX, clientY)
+    update({
+      ...board,
+      lines: lines.map((l) => {
+        if (l.id !== drawId.current) return l
+        const [lx, ly] = l.points[l.points.length - 1]
+        if (Math.hypot(x - lx, y - ly) < 0.006) return l
+        return { ...l, points: [...l.points, [x, y]] }
+      }),
+    })
   }
 
   const onPointerMove = (e) => {
     if (dragId.current) {
       dragMoved.current = true
       moveTo(e.clientX, e.clientY)
+    } else if (drawId.current) {
+      extendLine(e.clientX, e.clientY)
     }
   }
 
   // A press that never moved is a select; a drag persists its final position.
   const endDrag = () => {
+    if (drawId.current) {
+      // A stray click without movement leaves a 1-point line — drop it.
+      const done = lines.find((l) => l.id === drawId.current)
+      drawId.current = null
+      if (done && done.points.length < 2) update({ ...board, lines: lines.filter((l) => l.id !== done.id) }, true)
+      else update(board, true)
+      return
+    }
     if (!dragId.current) return
     if (dragMoved.current) {
       update(board, true)
@@ -98,7 +189,49 @@ export default function Board({ tacticId, map }) {
             </button>
           ))}
         </span>
-        {pieces.length > 0 && (
+        <span className="board-sep" aria-hidden="true" />
+        <button
+          type="button"
+          className="add-piece board-spawns"
+          title="Place all ten players at their spawns"
+          onClick={placeAtSpawns}
+        >
+          5v5 spawns
+        </button>
+        <button
+          type="button"
+          className={`add-piece board-draw${tool === 'draw' ? ' on' : ''}`}
+          title="Draw freehand lines — drag on the board"
+          aria-pressed={tool === 'draw'}
+          onClick={() => setTool((t) => (t === 'draw' ? 'move' : 'draw'))}
+        >
+          ✏ draw
+        </button>
+        {tool === 'draw' && (
+          <span className="board-group board-inks" role="radiogroup" aria-label="Pen color">
+            {INKS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={`ink-swatch ink-${c}${penColor === c ? ' on' : ''}`}
+                role="radio"
+                aria-checked={penColor === c}
+                aria-label={`Pen color ${c}`}
+                onClick={() => setPenColor(c)}
+              />
+            ))}
+          </span>
+        )}
+        <button
+          type="button"
+          className={`add-piece board-erase${tool === 'erase' ? ' on' : ''}`}
+          title="Erase lines — click or sweep over them"
+          aria-pressed={tool === 'erase'}
+          onClick={() => setTool((t) => (t === 'erase' ? 'move' : 'erase'))}
+        >
+          ⌫ erase
+        </button>
+        {(pieces.length > 0 || lines.length > 0) && (
           <button type="button" className="link-btn board-clear" onClick={clearBoard}>clear board</button>
         )}
         <span className={`presence${connected ? ' live' : ''}`}>
@@ -108,13 +241,28 @@ export default function Board({ tacticId, map }) {
       </div>
 
       <div
-        className={map ? 'board-field has-radar' : 'board-field'}
+        className={`board-field${map ? ' has-radar' : ''}${tool !== 'move' ? ` ${tool === 'draw' ? 'drawing' : 'erasing'}` : ''}`}
         style={map ? { backgroundImage: `url(${radarUrl(map)})` } : undefined}
         ref={fieldRef}
+        onPointerDown={startLine}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerLeave={endDrag}
       >
+        <svg className="board-ink" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          {lines.map((l) => (
+            <polyline
+              key={l.id}
+              className={`ink-${l.color ?? 'accent'}`}
+              points={l.points.map(([x, y]) => `${x * 100},${y * 100}`).join(' ')}
+              onDoubleClick={() => removeLine(l.id)}
+              onPointerDown={() => tool === 'erase' && removeLine(l.id)}
+              onPointerOver={(e) => tool === 'erase' && e.buttons > 0 && removeLine(l.id)}
+            >
+              <title>{tool === 'erase' ? 'click to erase' : 'double-click to erase'}</title>
+            </polyline>
+          ))}
+        </svg>
         {pieces.map((p) => (
           <div
             key={p.id}
@@ -151,7 +299,7 @@ export default function Board({ tacticId, map }) {
           <button type="button" className="link-btn" onClick={() => setSelectedId(null)}>done</button>
         </div>
       ) : (
-        <p className="muted">Drag to move · click to name · double-click to remove · edits sync live to everyone on this tactic.</p>
+        <p className="muted">Drag to move · click to name · double-click to remove · pen draws in the picked color · eraser clicks or sweeps lines away · edits sync live to everyone on this tactic.</p>
       )}
     </section>
   )

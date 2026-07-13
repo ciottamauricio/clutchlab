@@ -17,10 +17,16 @@ service (see `docs/ARCHITECTURE.md` for why streaming ≠ batch).
 ## Ubiquitous language
 
 - **Tactic** — a row in `tactics`: a named board owned by a user.
-- **Board** — the tactic's state as JSON: `{ "pieces": [ … ] }`.
+- **Board** — the tactic's state as JSON: `{ "pieces": [ … ], "lines": [ … ] }`. The shape
+  is **owned by the frontend**: the realtime service persists and relays it as opaque JSON,
+  so new board content (like `lines` was) is a frontend-only change.
 - **Piece** — one item on the board: `{ id, kind, x, y, label }`. `kind` is a marker type
   (e.g. `ct`, `t`, `smoke`, `flash`, `he`, `molly`); `x`/`y` are normalized `0..1`
   positions; `label` is optional text.
+- **Line** — one freehand stroke: `{ id, color, points: [[x, y], …] }`, normalized `0..1`
+  pairs in draw order. `color` is a frontend theme-token name (`accent`/`ct`/`t`/`danger`),
+  not a hex. Absent on boards saved before the pen existed — readers must default `lines`
+  to `[]` and `color` to `accent`.
 - **Room** — the realtime service's in-memory set of clients connected to one tactic id.
 
 ## Entities
@@ -34,7 +40,7 @@ service (see `docs/ARCHITECTURE.md` for why streaming ≠ batch).
 | team_id | fk teams, nullable, nullOnDelete | api | the team the tactic is shared with; null = private to the owner. Deleting a team un-shares its tactics. |
 | name | string | api | |
 | map | string(32), nullable | api | which map the board draws on (e.g. `de_mirage`); null = plain field. An opaque label to the backend — the frontend owns the map list and radar images (`public/radars/`), so an unknown value just renders without a radar. |
-| board | json, nullable | api (create) + realtime (edits) | `{ "pieces": [...] }` |
+| board | json, nullable | api (create) + realtime (edits) | `{ "pieces": [...], "lines": [...] }` |
 | created_at / updated_at | timestamps | api + realtime | |
 
 ## Rules & invariants
