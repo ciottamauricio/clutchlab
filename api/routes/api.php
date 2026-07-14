@@ -10,6 +10,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\TacticController;
 use App\Http\Controllers\TeamController;
+use App\Http\Controllers\TrainingSessionController;
 use Illuminate\Support\Facades\Route;
 
 // Public — auth endpoints are rate-limited.
@@ -47,6 +48,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/teams/{team}/members/{user}', [TeamController::class, 'removeMember']);
     Route::post('/teams/{team}/players', [TeamController::class, 'addPlayer']);
     Route::delete('/teams/{team}/players/{steamId}', [TeamController::class, 'removePlayer']);
+
+    Route::get('/trainings', [TrainingSessionController::class, 'index']);
+    Route::post('/trainings', [TrainingSessionController::class, 'store']);
+    Route::get('/trainings/{training}', [TrainingSessionController::class, 'show']);
+    Route::patch('/trainings/{training}', [TrainingSessionController::class, 'update']);
+    Route::delete('/trainings/{training}', [TrainingSessionController::class, 'destroy']);
 
     Route::middleware('can:tactics.view')->group(function () {
         Route::get('/tactics', [TacticController::class, 'index']);

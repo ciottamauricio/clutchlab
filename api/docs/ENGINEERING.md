@@ -25,6 +25,12 @@ HTTP ─▶ Route ─▶ Form Request ─▶ Controller ─▶ Action ─▶ ┌
 | Model | Persistence + relations | Make external calls |
 | Resource | Shape the JSON response | Contain logic |
 
+**Domain subfolders** (adopted with the trainings domain): new or next-touched domains
+group their Actions and Requests per domain — `app/Actions/Trainings/`,
+`app/Http/Requests/Trainings/` — so the tree drifts toward the domain docs without a
+big-bang restructure. Layers stay the top level; the domain is the second level. Folders
+don't enforce boundaries — the domain docs' invariants do; this is navigation, not DDD.
+
 ## Worked example — the demo upload (build this shape every time)
 
 - Route: [`routes/api.php`](../routes/api.php) — `POST /matches` (throttled)

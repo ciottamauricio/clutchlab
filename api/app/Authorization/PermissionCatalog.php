@@ -41,6 +41,7 @@ class PermissionCatalog
             'team.manage_members' => [self::TEAM, 'Teams', 'Manage members', 'Add or remove members and change their team roles.'],
             'team.manage_roster' => [self::TEAM, 'Teams', 'Manage roster', "Edit the team's in-game roster (SteamIDs)."],
             'team.update' => [self::TEAM, 'Teams', 'Edit team', 'Rename or delete the team.'],
+            'training.manage' => [self::TEAM, 'Trainings', 'Manage trainings', 'Schedule, edit, and cancel team training sessions.'],
 
             // App-scope: granted to a global role, independent of any team.
             'awards.view' => [self::APP, 'Analysis', 'View awards', 'Open the cross-match awards page.'],
@@ -57,10 +58,11 @@ class PermissionCatalog
     public static function teamDefaults(): array
     {
         return [
-            self::OWNER => ['match.view', 'match.delete', 'match.reparse', 'team.upload_match', 'team.manage_members', 'team.manage_roster', 'team.update'],
-            self::IGL => ['match.view', 'match.delete', 'match.reparse', 'team.upload_match'],
+            self::OWNER => ['match.view', 'match.delete', 'match.reparse', 'team.upload_match', 'team.manage_members', 'team.manage_roster', 'team.update', 'training.manage'],
+            self::IGL => ['match.view', 'match.delete', 'match.reparse', 'team.upload_match', 'training.manage'],
             self::PLAYER => ['match.view'],
-            self::COACH => ['match.view'],
+            // Coach is view-only on matches, but running practice is the job.
+            self::COACH => ['match.view', 'training.manage'],
         ];
     }
 

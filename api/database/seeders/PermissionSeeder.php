@@ -13,7 +13,7 @@ class PermissionSeeder extends Seeder
 {
     public function run(): void
     {
-        foreach (PermissionCatalog::abilities() as $key => [$scope, $label, $description]) {
+        foreach (PermissionCatalog::abilities() as $key => [$scope, $area, $label, $description]) {
             $existed = DB::table('permissions')->where('key', $key)->exists();
 
             DB::table('permissions')->updateOrInsert(
