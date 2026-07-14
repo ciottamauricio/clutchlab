@@ -8,6 +8,12 @@ import (
 	"clutchlab/notifier/internal/config"
 	"clutchlab/notifier/internal/discord"
 	"clutchlab/notifier/internal/sub"
+	"clutchlab/notifier/internal/telemetry"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func main() {
@@ -16,6 +22,13 @@ func main() {
 
 	ctx := context.Background()
 	cfg := config.Load()
+
+	shutdown, err := telemetry.Init(ctx, "notifier", cfg.OtelEndpoint)
+	if err != nil {
+		log.Printf("tracing disabled: %v", err)
+	} else {
+		defer shutdown(ctx)
+	}
 
 	var out discord.Notifier = discord.Log{}
 	if cfg.WebhookURL != "" {
@@ -33,12 +46,26 @@ func main() {
 
 	log.Printf("subscribed to %q", cfg.Channel)
 	s.Listen(ctx, func(e sub.Event) {
+		// Joining the publisher's trace: the traceparent from the event payload makes
+		// this span a child of the worker's parse_job in Jaeger, across the channel.
+		ctx, span := otel.Tracer("notifier").Start(
+			telemetry.Extract(ctx, e.Traceparent), "notify",
+			trace.WithSpanKind(trace.SpanKindConsumer),
+			trace.WithAttributes(
+				attribute.Int64("match_id", e.MatchID),
+				attribute.String("event", e.Event),
+			),
+		)
+		defer span.End()
+
 		text, ok := message(e)
 		if !ok {
 			log.Printf("event %q ignored (no message for it)", e.Event)
 			return
 		}
 		if err := out.Notify(ctx, text); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			log.Printf("notify failed (dropped): %v", err)
 			return
 		}

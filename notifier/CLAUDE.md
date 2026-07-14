@@ -12,8 +12,10 @@ whole lesson (docs/ARCHITECTURE.md, "Event-driven notifications").
 
 - Layout is `cmd/notifier/main.go` + `internal/{config,sub,discord}`.
 - The channel is **Redis pub/sub** (`clutch_events`, `EVENTS_CHANNEL`) carrying JSON
-  events `{ event, v, match_id, … }` — the contract lives in `worker/internal/events`
-  and `notifier/internal/sub`; **change both sides in the same commit**.
+  events `{ event, v, match_id, …, traceparent }` — the contract lives in
+  `worker/internal/events` and `notifier/internal/sub`; **change both sides in the
+  same commit**. The optional `traceparent` joins this service's `notify` span to the
+  worker's trace in Jaeger (docs/ARCHITECTURE.md, Observability).
 - Delivery is **fire-and-forget**: events published while the notifier is down are gone.
   Accepted for notifications (a missed ping ≠ lost data); the earned upgrade is Redis
   Streams behind the same interfaces.

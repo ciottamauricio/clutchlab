@@ -105,10 +105,53 @@ services:
       - "9001:9001"                # web console
     networks: [clutchnet]
 
+  # --- Observability (docs/ARCHITECTURE.md, "Observability") ---
+  # Loki stores logs; Alloy tails every container's stdout via the Docker socket and
+  # ships them; Grafana is the query UI. Zero code changes in the services.
+
+  loki:
+    image: grafana/loki:3.4.2
+    volumes:
+      - lokidata:/loki
+    networks: [clutchnet]
+
+  alloy:
+    image: grafana/alloy:v1.7.5
+    command: ["run", "/etc/alloy/config.alloy"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./observability/alloy.config:/etc/alloy/config.alloy:ro
+    depends_on: [loki]
+    networks: [clutchnet]
+
+  # Trace backend: services export OpenTelemetry spans here (OTLP :4318); the UI on
+  # :16686 shows one upload as a waterfall across api → worker → notifier.
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    ports:
+      - "16686:16686"              # Jaeger UI (dev convenience)
+    networks: [clutchnet]
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    environment:
+      # Dev-only: no login wall, straight to the Explore view.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./observability/grafana:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3001:3000"                # Grafana UI (dev convenience, like Meili's 7700)
+    depends_on: [loki]
+    networks: [clutchnet]
+
 volumes:
   pgdata:
   miniodata:
   meilidata:
+  lokidata:
+  grafanadata:
 
 networks:
   clutchnet:

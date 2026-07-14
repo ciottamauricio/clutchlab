@@ -15,6 +15,7 @@ type Config struct {
 	MinioEndpoint, MinioKey, MinioSecret   string
 	Bucket                                 string
 	MeiliHost, MeiliKey                    string
+	OtelEndpoint                           string
 }
 
 func Load() Config {
@@ -33,6 +34,7 @@ func Load() Config {
 		Bucket:        env("AWS_BUCKET", "demos"),
 		MeiliHost:     env("MEILI_HOST", "http://meilisearch:7700"),
 		MeiliKey:      env("MEILI_MASTER_KEY", ""),
+		OtelEndpoint:  env("OTEL_ENDPOINT", "jaeger:4318"),
 	}
 }
 

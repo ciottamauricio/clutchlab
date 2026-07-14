@@ -28,6 +28,9 @@ type Event struct {
 	ScoreCT   int    `json:"score_ct"`
 	ScoreT    int    `json:"score_t"`
 	ErrorCode string `json:"error_code,omitempty"`
+	// W3C trace context — non-HTTP hops carry it in the payload instead of a header,
+	// so a subscriber's span joins the publisher's trace. Additive; optional.
+	Traceparent string `json:"traceparent,omitempty"`
 }
 
 // Publisher decouples the fact from the transport: swapping pub/sub for Streams or a

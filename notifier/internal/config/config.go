@@ -6,16 +6,18 @@ import "os"
 // An empty WebhookURL is valid: the notifier runs in log-only mode, so the
 // event flow is testable without a Discord server.
 type Config struct {
-	RedisAddr  string
-	Channel    string
-	WebhookURL string
+	RedisAddr    string
+	Channel      string
+	WebhookURL   string
+	OtelEndpoint string
 }
 
 func Load() Config {
 	return Config{
-		RedisAddr:  env("REDIS_HOST", "redis") + ":" + env("REDIS_PORT", "6379"),
-		Channel:    env("EVENTS_CHANNEL", "clutch_events"),
-		WebhookURL: os.Getenv("DISCORD_WEBHOOK_URL"),
+		RedisAddr:    env("REDIS_HOST", "redis") + ":" + env("REDIS_PORT", "6379"),
+		Channel:      env("EVENTS_CHANNEL", "clutch_events"),
+		WebhookURL:   os.Getenv("DISCORD_WEBHOOK_URL"),
+		OtelEndpoint: env("OTEL_ENDPOINT", "jaeger:4318"),
 	}
 }
 

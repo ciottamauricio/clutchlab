@@ -154,8 +154,11 @@ breaking ones; publisher `worker/internal/events`, subscriber `notifier/internal
 same commit when it changes):
 
 ```json
-{ "event": "match.parsed", "v": 1, "match_id": 42, "demo": "x.dem", "map": "de_mirage", "score_ct": 13, "score_t": 9 }
+{ "event": "match.parsed", "v": 1, "match_id": 42, "demo": "x.dem", "map": "de_mirage", "score_ct": 13, "score_t": 9, "traceparent": "00-…" }
 ```
+
+(`traceparent` is optional W3C trace context — see Observability below; it lets the
+subscriber's span join the publisher's trace across the channel.)
 
 The deliberate weaknesses, kept visible:
 
@@ -179,6 +182,27 @@ first. Then *deliberately* refactor to separate databases so you feel what break
 
 There's no free answer — that *is* the lesson. Feeling the pain of the shared-DB version
 first is more educational than starting "correct."
+
+## Observability (logs + traces)
+
+Service boundaries scatter one action's story across processes — a monolith answers
+"what happened to match 18" with a stack trace; this system needs tooling. Two layers,
+both self-hosted in compose, zero external cost:
+
+**Logs — Loki + Alloy + Grafana** (`observability/`). Alloy tails every container's
+stdout via the Docker socket and labels lines by compose service; Loki stores them
+(indexing only the labels — keep labels low-cardinality, per-match data belongs in the
+log body); Grafana queries them at `localhost:3001`. `match_id` is the de-facto
+correlation id: `{project="clutchlab-project"} |= "match 18"` reconstructs one match's
+story across api, worker, and notifier. No service knows the pipeline exists.
+
+**Traces — OpenTelemetry → Jaeger** (`localhost:16686`). The worker starts one trace
+per job (`parse_job`, child spans download → parse → save → index) and injects a W3C
+`traceparent` into the events it publishes; the notifier extracts it, so its `notify`
+span joins the same trace across the pub/sub hop. That payload-carried context is the
+non-HTTP version of the `traceparent` header — the queue could carry one the same way
+(Laravel → worker is the natural next hop to instrument). Tracing is observability, not
+behavior: exports are async and an unreachable Jaeger never affects a parse.
 
 ## The learning progression (the actual curriculum)
 

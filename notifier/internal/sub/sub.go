@@ -24,6 +24,8 @@ type Event struct {
 	ScoreCT   int    `json:"score_ct"`
 	ScoreT    int    `json:"score_t"`
 	ErrorCode string `json:"error_code"`
+	// W3C trace context from the publisher — lets our span join the worker's trace.
+	Traceparent string `json:"traceparent"`
 }
 
 type Subscriber struct {
