@@ -35,6 +35,8 @@ name**, never `localhost`.
   codes → localized text.
 - The parse queue is a **plain Redis list** with JSON `{ "match_id", "demo_key" }`, shared
   with Go — change both sides in the same commit.
-- Events are **Redis pub/sub** JSON on `clutch_events` (`{ "event", "v", "match_id", … }`),
-  worker → notifier. Additive changes only; publisher and subscribers in the same commit.
+- Events are **Redis pub/sub** JSON on `clutch_events` (`{ "event", "v", … }`), published
+  by the worker (parse outcomes) and the api (`EventBus`, e.g. `training.scheduled`),
+  consumed by the notifier. Additive changes only; publisher and subscribers in the same
+  commit, pinned by `contracts/` fixtures.
 - Config comes from Compose `env_file` (repo-root `.env`); do **not** create `api/.env`.

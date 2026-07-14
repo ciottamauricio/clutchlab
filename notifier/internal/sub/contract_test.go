@@ -26,3 +26,26 @@ func TestEventDecodesTheContractFixture(t *testing.T) {
 		t.Errorf("decoded %+v, want %+v", e, want)
 	}
 }
+
+// Consumer side of the training.scheduled contract (produced by the Laravel api —
+// its EventBusContractTest pins the bytes).
+func TestTrainingScheduledDecodesTheContractFixture(t *testing.T) {
+	raw, err := os.ReadFile("../../../contracts/training_scheduled.json")
+	if err != nil {
+		t.Fatalf("contract fixture: %v", err)
+	}
+
+	var e Event
+	if err := json.Unmarshal(bytes.TrimSpace(raw), &e); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	want := Event{
+		Event: "training.scheduled", V: 1, TrainingID: 7, Team: "LOLO Clan",
+		Title: "A-executes + retakes", ScheduledAt: "2026-07-17T21:00:00.000000Z",
+		Tactics: 2, Players: 5,
+	}
+	if e != want {
+		t.Errorf("decoded %+v, want %+v", e, want)
+	}
+}

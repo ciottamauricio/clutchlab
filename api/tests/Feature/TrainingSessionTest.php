@@ -55,6 +55,14 @@ class TrainingSessionTest extends TestCase
             ->assertJsonPath('data.tactics.0.id', $tactic->id)
             ->assertJsonCount(2, 'data.players')
             ->assertJsonPath('data.can.manage', true);
+
+        // Scheduling announces the fact on the event channel (contract: additive-only).
+        $this->assertCount(1, $this->eventBus->published);
+        [$event, $v, $payload] = $this->eventBus->published[0];
+        $this->assertSame('training.scheduled', $event);
+        $this->assertSame(1, $v);
+        $this->assertSame($this->team->name, $payload['team']);
+        $this->assertSame(2, $payload['players']);
     }
 
     public function test_a_player_cannot_schedule_for_the_team(): void

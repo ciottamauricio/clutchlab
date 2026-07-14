@@ -2,6 +2,7 @@
 
 namespace App\Actions\Trainings;
 
+use App\Events\Trainings\TrainingScheduled;
 use App\Models\Team;
 use App\Models\TrainingSession;
 use App\Models\User;
@@ -24,6 +25,10 @@ class CreateTrainingSessionAction
         $session->tactics()->sync($data['tactic_ids'] ?? []);
         $session->players()->sync($data['player_ids'] ?? []);
 
-        return $session->load(['team', 'creator', 'tactics', 'players']);
+        $session->load(['team', 'creator', 'tactics', 'players']);
+
+        TrainingScheduled::dispatch($session);
+
+        return $session;
     }
 }

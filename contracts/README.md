@@ -8,6 +8,7 @@ the **same file**, so renaming a field on one side turns that side's suite red �
 |---|---|---|
 | `parse_job.json` | api — `App\Queue\RedisParseQueue` | worker — `cmd/worker` `Job` |
 | `match_parsed.json` | worker — `internal/events.Event` | notifier — `internal/sub.Event` |
+| `training_scheduled.json` | api — `App\Queue\RedisEventBus` | notifier — `internal/sub.Event` |
 
 The producer test compares byte-for-byte (it defines the canonical serialization); the
 consumer test decodes the fixture and checks every field survives. Containers see this

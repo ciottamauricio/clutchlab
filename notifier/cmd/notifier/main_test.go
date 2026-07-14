@@ -35,6 +35,15 @@ func TestMessage(t *testing.T) {
 			ok:   true,
 		},
 		{
+			name: "training scheduled renders a viewer-local discord timestamp",
+			e: sub.Event{
+				Event: "training.scheduled", Title: "A-executes + retakes", Team: "LOLO Clan",
+				ScheduledAt: "2026-07-17T21:00:00.000000Z", Tactics: 2, Players: 5,
+			},
+			want: "📅 **A-executes + retakes** — LOLO Clan · <t:1784322000:F> · 2 tactics, 5 expected",
+			ok:   true,
+		},
+		{
 			name: "unknown events are skipped, not errors",
 			e:    sub.Event{Event: "team.member_joined", MatchID: 1},
 			ok:   false,

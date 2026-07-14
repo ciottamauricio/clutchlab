@@ -4,10 +4,12 @@ namespace App\Providers;
 
 use App\Authorization\PermissionCatalog;
 use App\Contracts\DemoStorage;
+use App\Contracts\EventBus;
 use App\Contracts\ParseQueue;
 use App\Contracts\PermissionService;
 use App\Contracts\SearchIndex;
 use App\Models\User;
+use App\Queue\RedisEventBus;
 use App\Queue\RedisParseQueue;
 use App\Search\MeilisearchIndex;
 use App\Services\DbPermissionService;
@@ -26,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(DemoStorage::class, fn () => new S3DemoStorage(Storage::disk('s3')));
         $this->app->bind(ParseQueue::class, RedisParseQueue::class);
+        $this->app->bind(EventBus::class, RedisEventBus::class);
         $this->app->bind(SearchIndex::class, fn () => new MeilisearchIndex(
             new MeilisearchClient(config('clutch.meili.host'), config('clutch.meili.key'))
         ));

@@ -1,9 +1,10 @@
 # Clutchlab notifier (Go)
 
 Event subscriber — **no inbound HTTP, not behind nginx, no database**. It SUBSCRIBEs to
-the Redis pub/sub events channel the worker publishes on and turns events into Discord
-webhook messages. The worker doesn't know this service exists — that decoupling is the
-whole lesson (docs/ARCHITECTURE.md, "Event-driven notifications").
+the Redis pub/sub events channel and turns events into Discord webhook messages. Two
+publishers speak on it today — the worker (parse outcomes) and the api (`EventBus`,
+e.g. `training.scheduled`) — and neither knows this service exists; that decoupling is
+the whole lesson (docs/ARCHITECTURE.md, "Event-driven notifications").
 
 - **How to build Go services here** (layout + conventions): [`../worker/docs/ENGINEERING.md`](../worker/docs/ENGINEERING.md)
 - App-wide build & run: repo-root [`../docs/ENGINEERING.md`](../docs/ENGINEERING.md)

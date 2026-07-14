@@ -16,7 +16,7 @@ import (
 )
 
 type Event struct {
-	Event     string `json:"event"` // "match.parsed" | "match.failed"
+	Event     string `json:"event"` // "match.parsed" | "match.failed" | "training.scheduled"
 	V         int    `json:"v"`
 	MatchID   int64  `json:"match_id"`
 	Demo      string `json:"demo"`
@@ -24,6 +24,13 @@ type Event struct {
 	ScoreCT   int    `json:"score_ct"`
 	ScoreT    int    `json:"score_t"`
 	ErrorCode string `json:"error_code"`
+	// training.scheduled fields (published by the api — contracts/training_scheduled.json).
+	TrainingID  int64  `json:"training_id"`
+	Team        string `json:"team"`
+	Title       string `json:"title"`
+	ScheduledAt string `json:"scheduled_at"` // RFC3339, UTC
+	Tactics     int    `json:"tactics"`
+	Players     int    `json:"players"`
 	// W3C trace context from the publisher — lets our span join the worker's trace.
 	Traceparent string `json:"traceparent"`
 }

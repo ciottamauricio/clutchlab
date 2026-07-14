@@ -8,8 +8,8 @@ architecture (docs/ROADMAP.md, "stays in Laravel").
 
 ## Status
 
-Planned → **Phase 1 implemented** (schema, model, policy, ability). API and UI follow.
-Phase 4 makes it the first Laravel-published event (`training.scheduled` → notifier).
+**Implemented** (schema → API → UI → event). Scheduling publishes `training.scheduled`
+on the events channel — the first Laravel-published cross-service event (see Events).
 
 ## Ubiquitous language
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"clutchlab/notifier/internal/config"
 	"clutchlab/notifier/internal/discord"
@@ -85,7 +86,20 @@ func message(e sub.Event) (string, bool) {
 		return fmt.Sprintf("✅ **%s** parsed — %s %d:%d", name, e.Map, e.ScoreCT, e.ScoreT), true
 	case "match.failed":
 		return fmt.Sprintf("❌ match #%d failed (%s)", e.MatchID, e.ErrorCode), true
+	case "training.scheduled":
+		return fmt.Sprintf("📅 **%s** — %s · %s · %d tactics, %d expected",
+			e.Title, e.Team, discordTime(e.ScheduledAt), e.Tactics, e.Players), true
 	default:
 		return "", false
 	}
+}
+
+// discordTime renders an RFC3339 instant as Discord timestamp markup, which each
+// viewer's client shows in their own timezone; falls back to the raw string.
+func discordTime(iso string) string {
+	t, err := time.Parse(time.RFC3339, iso)
+	if err != nil {
+		return iso
+	}
+	return fmt.Sprintf("<t:%d:F>", t.Unix())
 }
