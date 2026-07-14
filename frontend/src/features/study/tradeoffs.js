@@ -238,8 +238,31 @@ export const TOPICS = [
     codeLabel: 'the event contract — additive changes only, worker and notifier in the same commit',
   },
   {
-    id: 'orchestration',
+    id: 'testing',
     n: '13',
+    title: 'Testing the seams',
+    tag: 'contracts, fakes, CI',
+    summary: 'In a polyglot SOA the highest-leverage test is not a unit test — it is the wire contract, asserted from both sides.',
+    gained: [
+      'One fixture per cross-language message (contracts/): the producer asserts exact bytes, the consumer asserts it decodes — the "change both sides in the same commit" rule becomes machine-enforced. It caught a real bug on its first run: PHP escapes slashes in JSON, Go does not.',
+      'Feature tests encode the domain docs as assertions (the 403 matrix, upload gating, content-hash dedup) on in-memory SQLite, with every external system swapped for a fake over its interface — the interface rule paying out again.',
+      'CI runs per service with path filters (the monorepo topic\'s promised middle path), and contracts/** triggers every suite that speaks the fixture — a contract change cannot slip past one side.',
+    ],
+    paid: [
+      'The environment seam bites hardest in tests. Compose env_file lands in $_SERVER, which Laravel reads before $_ENV — and PHPUnit\'s <env> overrides never touch $_SERVER, so the suite silently ran migrate:fresh on the real Postgres. Twice. The fix is <server> overrides plus a tripwire that refuses any non-sqlite connection.',
+      'Same species, different layer: the npm lockfile written inside the musl (Alpine) dev container omits nothing, but npm ci on the glibc runner skips every native binding (npm/cli#4828) — rolldown, lightningcss, oxlint. The fix derives each musl package\'s gnu twin from the lock.',
+      'A test suite is more code that must track the domain docs — drift in either direction is a lie.',
+    ],
+    body: [
+      'The pyramid for this system, in order of leverage: contract tests at the seams (the thing this architecture uniquely needs), feature tests over HTTP encoding the rules the domain docs state as prose, table-driven tests of pure logic (the notifier\'s message(), one day the clutch detector), and eventually a single walking-skeleton E2E — one, not ten.',
+      'The recurring lesson is that tests inherit every environment seam the services have. Both incidents above were the same shape: config resolved in one environment, executed in another, with no error — only wrong behavior. The tripwire pattern (fail loudly when the resolved environment is not the expected one) is cheaper than any recovery.',
+    ],
+    code: '{"match_id":123,"demo_key":"demos/abc.dem"}',
+    codeLabel: 'contracts/parse_job.json — api asserts it produces these bytes; the worker asserts it decodes them',
+  },
+  {
+    id: 'orchestration',
+    n: '14',
     title: 'Orchestration: compose vs. cloud',
     tag: 'leaving the laptop',
     summary: 'docker-compose.yml does four jobs at once; in the cloud each job goes to a different owner.',

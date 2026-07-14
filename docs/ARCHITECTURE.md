@@ -207,6 +207,37 @@ non-HTTP version of the `traceparent` header — the queue could carry one the s
 (Laravel → worker is the natural next hop to instrument). Tracing is observability, not
 behavior: exports are async and an unreachable Jaeger never affects a parse.
 
+## Testing the boundaries
+
+The test strategy mirrors the architecture: the most valuable tests sit **on the seams**,
+not inside the services.
+
+| Layer | Where | What it proves |
+|---|---|---|
+| Contract tests | `contracts/*.json` + a test on each side | The wire format. The producer asserts **exact bytes** (it defines the canonical serialization); the consumer asserts the fixture decodes. Break either side and that side's suite goes red — the "change both sides in the same commit" rule, machine-enforced. |
+| Feature tests | `api/tests/Feature` | The domain docs as assertions: the 403-not-404 authorization matrix, upload gating, content-hash dedup, team reassignment. In-memory SQLite; every external system (`DemoStorage`, `ParseQueue`, `SearchIndex`) replaced by a fake bound over its interface in the base `TestCase`. |
+| Unit tables | Go `*_test.go` | Pure logic as a spec — the notifier's `message()` rendering, event marshaling (omitempty behavior is contract). |
+| CI | `.github/workflows/` | Per-service jobs with **path filters** (the monorepo's promised middle path: independent test runs, atomic commits kept). `contracts/**` is in every service's trigger paths, so a fixture change runs every suite that speaks it. |
+
+Consumers of *events* deliberately tolerate unknown fields (additive one-to-many contract);
+the *queue* consumer uses `DisallowUnknownFields` (point-to-point, same-commit rule — drift
+should scream).
+
+Two hard-won rules about tests and environments:
+
+- **Containers leak env into tests.** Compose `env_file` lands in `$_SERVER`; Laravel's
+  `env()` reads `$_SERVER` before `$_ENV`; PHPUnit's `<env>` (even `force="true"`) never
+  touches `$_SERVER`. Without `<server>` overrides in `phpunit.xml`, `RefreshDatabase`
+  migrate:freshes the **real** Postgres — it happened. `tests/TestCase` now hard-fails on
+  any non-sqlite connection; keep both defenses forever.
+- **Lockfiles remember their platform.** `package-lock.json` written in the musl (Alpine)
+  dev container makes `npm ci` on a glibc runner skip every native binding (npm/cli#4828);
+  the frontend workflow installs each musl package's gnu twin at the locked version.
+
+Both incidents were the same shape — config resolved in one environment, executed in
+another, failing silently. When an environment assumption matters, install a tripwire that
+fails loudly instead of trusting the plumbing.
+
 ## The learning progression (the actual curriculum)
 
 monolith-ish → split under justified pressure → feel the tradeoffs → decide what was worth it.
