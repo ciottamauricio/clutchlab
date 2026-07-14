@@ -7,6 +7,7 @@ use App\Actions\ReparseMatchAction;
 use App\Actions\UpdateMatchTeamAction;
 use App\Actions\UploadDemoAction;
 use App\Contracts\DemoStorage;
+use App\Http\Requests\ListMatchesRequest;
 use App\Http\Requests\UpdateMatchRequest;
 use App\Http\Requests\UploadDemoRequest;
 use App\Http\Resources\MatchResource;
@@ -17,10 +18,18 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MatchController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(ListMatchesRequest $request): JsonResponse
     {
         $matches = GameMatch::with(['team', 'owner'])
             ->visibleTo($request->user())
+            ->when($request->validated('player'), fn ($query, $player) => $query
+                ->whereHas('playerStats', fn ($stats) => $stats->whereRaw(
+                    // LOWER + LIKE instead of ILIKE so the filter also works on the
+                    // sqlite test database; %/_ are escaped (with an explicit ESCAPE —
+                    // sqlite has no default escape character) so they match literally.
+                    "LOWER(name) LIKE ? ESCAPE '\\'",
+                    ['%'.addcslashes(mb_strtolower($player), '%_\\').'%'],
+                )))
             ->latest()
             ->get();
 

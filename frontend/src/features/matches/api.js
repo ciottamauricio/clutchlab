@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, tokenStore } from '../../lib/api'
 
-const listMatches = () => api.get('/matches')
+const listMatches = (player) =>
+  api.get(player ? `/matches?player=${encodeURIComponent(player)}` : '/matches')
 const getMatch = (id) => api.get(`/matches/${id}`)
 const getKillPositions = (id) => api.get(`/matches/${id}/kill-positions`)
 const getClutches = (id) => api.get(`/matches/${id}/clutches`)
@@ -23,22 +24,29 @@ const uploadDemo = (file, teamId) => {
 const TERMINAL = new Set(['parsed', 'failed'])
 
 // Polls the match list so status changes (queued -> parsing -> parsed) show up
-// without a manual refresh.
-export function useMatches(pollMs = 3000) {
+// without a manual refresh. `player` filters server-side by player name; it is
+// debounced here so a keystroke doesn't fire a request.
+export function useMatches(pollMs = 3000, player = '') {
   const [matches, setMatches] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState(player.trim())
+
+  useEffect(() => {
+    const id = setTimeout(() => setQuery(player.trim()), 300)
+    return () => clearTimeout(id)
+  }, [player])
 
   const refresh = useCallback(async () => {
     try {
-      setMatches(await listMatches())
+      setMatches(await listMatches(query))
       setError(null)
     } catch (e) {
       setError(e.code ?? 'error.unknown')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [query])
 
   useEffect(() => {
     refresh()

@@ -569,6 +569,12 @@
 
 /* ---------- Match list (also reused by the teams list) ---------- */
 
+.match-filter {
+  width: 100%;
+  margin-bottom: 12px;
+  font-size: 13.5px;
+}
+
 .match-list {
   list-style: none;
   padding: 0;

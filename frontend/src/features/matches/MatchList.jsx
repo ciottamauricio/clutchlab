@@ -46,9 +46,13 @@ function MatchCard({ match }) {
   )
 }
 
-export default function MatchList({ matches, selectedId, onSelect, onDelete, deletingId }) {
+export default function MatchList({ matches, selectedId, onSelect, onDelete, deletingId, filtered }) {
   if (!matches.length) {
-    return <p className="muted">No demos yet — upload one above.</p>
+    return (
+      <p className="muted">
+        {filtered ? 'No matches with that player.' : 'No demos yet — upload one above.'}
+      </p>
+    )
   }
 
   return (

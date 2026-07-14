@@ -14,7 +14,8 @@ export default function DashboardPage() {
   const location = useLocation()
   const { user } = useAuth()
   const [selectedId, setSelectedId] = useState(location.state?.matchId ?? null)
-  const { matches, refresh } = useMatches()
+  const [playerFilter, setPlayerFilter] = useState('')
+  const { matches, refresh } = useMatches(3000, playerFilter)
   const { remove, deletingId, error: deleteError } = useDeleteMatch((id) => {
     refresh()
     setSelectedId((cur) => (cur === id ? null : cur))
@@ -38,12 +39,21 @@ export default function DashboardPage() {
       <div className="layout">
         <aside>
           <h2>Matches</h2>
+          <input
+            type="search"
+            className="match-filter"
+            placeholder="Filter by player…"
+            aria-label="Filter matches by player name"
+            value={playerFilter}
+            onChange={(e) => setPlayerFilter(e.target.value)}
+          />
           <MatchList
             matches={matches}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onDelete={handleDelete}
             deletingId={deletingId}
+            filtered={playerFilter.trim() !== ''}
           />
         </aside>
         <main>

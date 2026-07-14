@@ -136,7 +136,7 @@ upload rights (owner/igl) on the team, or being the uploader.
 
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
-| GET | `/matches` | list matches the caller can see, newest first | own uploads + their teams' matches; `{ data: [...] }` |
+| GET | `/matches` | list matches the caller can see, newest first | own uploads + their teams' matches; `{ data: [...] }`; optional `?player=` narrows to matches whose scoreboard contains that player name (case-insensitive substring; invalid value → `match.invalid_player_filter`) |
 | POST | `/matches` | upload a demo | multipart `demo`; optional `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
 | GET | `/matches/{match}` | match detail + players | visible only (403 otherwise); players by kills desc |
 | GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | visible only; see [heatmap.md](heatmap.md) |
