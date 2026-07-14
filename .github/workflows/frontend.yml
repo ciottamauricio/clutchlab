@@ -22,4 +22,11 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      # npm skips platform-specific optional deps resolved on another libc
+      # (npm/cli#4828) — the lockfile is written inside the musl (alpine) dev
+      # container, the runner is glibc. Install the missing native binding at the
+      # lockfile's exact version if npm ci left it out.
+      - run: |
+          node -e "require('@rolldown/binding-linux-x64-gnu')" 2>/dev/null || \
+            npm i --no-save @rolldown/binding-linux-x64-gnu@"$(node -p "require('./package-lock.json').packages['node_modules/@rolldown/binding-linux-x64-musl'].version")"
       - run: npm run build

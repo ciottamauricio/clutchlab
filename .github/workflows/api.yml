@@ -17,7 +17,8 @@ jobs:
         working-directory: api
     env:
       # Test-only key so the encrypter boots; not a secret (never touches real data).
-      APP_KEY: base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFh
+      # Must decode to exactly 32 bytes for aes-256-cbc.
+      APP_KEY: base64:dGVzdHRlc3R0ZXN0dGVzdHRlc3R0ZXN0dGVzdHRlc3Q=
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
