@@ -1863,24 +1863,85 @@ button.clutch-open:hover {
   aspect-ratio: 4 / 3;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background:
-    repeating-linear-gradient(0deg, transparent, transparent 39px, var(--border) 39px, var(--border) 40px),
-    repeating-linear-gradient(90deg, transparent, transparent 39px, var(--border) 39px, var(--border) 40px),
-    var(--surface);
+  background: var(--surface);
   touch-action: none;
   overflow: hidden;
 }
 
 /* Radar boards: the overview PNGs are square, light linework on transparency —
-   they need a dark backing in both themes (the inline style carries the image). */
+   they need a dark backing in both themes (the canvas carries the image). */
 .board-field.has-radar {
   aspect-ratio: 1 / 1;
   max-width: 720px;
   margin: 0 auto;
   background-color: #10151c;
+}
+
+/* The zoomable layer: radar/grid, ink, and pieces all live here so they pan and
+   scale as one. Origin 0 0 keeps the view's translate math in top-left px. */
+.board-canvas {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 39px, var(--border) 39px, var(--border) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, var(--border) 39px, var(--border) 40px);
+}
+
+/* The inline background-image (the radar PNG) outranks the grid gradients above. */
+.board-field.has-radar .board-canvas {
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
+}
+
+.board-field.pannable {
+  cursor: grab;
+}
+
+/* On-field zoom controls (wheel also zooms, about the cursor). */
+.board-zoom {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  opacity: 0.92;
+}
+
+.board-zoom button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font: 500 13px var(--mono);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.board-zoom button:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text-h);
+}
+
+.board-zoom button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.board-zoom .zoom-level {
+  min-width: 34px;
+  text-align: center;
+  font: 400 10px var(--mono);
+  color: var(--text-dim);
 }
 
 .tactic-map {
@@ -1904,6 +1965,10 @@ button.clutch-open:hover {
   width: 30px;
   height: 30px;
   margin: -15px 0 0 -15px;
+  /* Pieces keep their on-screen size while the canvas zooms (like the ink's
+     non-scaling stroke); the canvas publishes its scale as --bz. Centered via the
+     negative margins, so scaling about the default center origin stays anchored. */
+  transform: scale(calc(1 / var(--bz, 1)));
   border-radius: 50%;
   display: flex;
   align-items: center;

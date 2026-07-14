@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTacticBoard } from './api'
 import { radarUrl } from '../matches/radar'
 
@@ -45,6 +45,8 @@ const SPAWNS = {
 }
 const DEFAULT_SPAWNS = { ct: [0.5, 0.12], t: [0.5, 0.88] }
 
+const MAX_ZOOM = 4
+
 // Five positions fanned around a spawn centre (an X: leader + four corners), kept on-board.
 const clamp01 = (v) => Math.min(0.97, Math.max(0.03, v))
 const spawnSlots = ([cx, cy]) =>
@@ -54,12 +56,17 @@ const spawnSlots = ([cx, cy]) =>
 export default function Board({ tacticId, map }) {
   const { board, presence, connected, update } = useTacticBoard(tacticId)
   const fieldRef = useRef(null)
+  const canvasRef = useRef(null)
   const dragId = useRef(null)
   const dragMoved = useRef(false)
   const drawId = useRef(null)
+  const panFrom = useRef(null)
   const [selectedId, setSelectedId] = useState(null)
   const [tool, setTool] = useState('move') // move | draw | erase
   const [penColor, setPenColor] = useState('accent')
+  // The zoomed view, local to this viewer (never synced): the inner canvas is
+  // translated (x, y)px then scaled z, so board coordinates stay 0..1 untouched.
+  const [view, setView] = useState({ z: 1, x: 0, y: 0 })
 
   const pieces = board?.pieces ?? []
   const lines = board?.lines ?? []
@@ -106,13 +113,55 @@ export default function Board({ tacticId, map }) {
     update({ ...board, pieces: next }, true)
   }
 
+  // Board position from a pointer event, as 0..1 of the canvas. Measuring the canvas
+  // (not the field) makes this zoom-proof: its rect already carries the transform.
   const fieldPos = (clientX, clientY) => {
-    const r = fieldRef.current.getBoundingClientRect()
+    const r = canvasRef.current.getBoundingClientRect()
     return [
       Math.min(1, Math.max(0, (clientX - r.left) / r.width)),
       Math.min(1, Math.max(0, (clientY - r.top) / r.height)),
     ]
   }
+
+  // Keep the canvas covering the field: at scale z it overflows by size·(z−1),
+  // so the translation stays in [size·(1−z), 0].
+  const clampPan = (val, size, z) => Math.min(0, Math.max(size * (1 - z), val))
+
+  // Zoom about a field-relative point (px, py): the board spot under the pointer
+  // stays under the pointer.
+  const zoomAt = (factor, px, py) => {
+    const r = fieldRef.current.getBoundingClientRect()
+    setView((v) => {
+      const z = Math.min(MAX_ZOOM, Math.max(1, v.z * factor))
+      return {
+        z,
+        x: clampPan(px - ((px - v.x) * z) / v.z, r.width, z),
+        y: clampPan(py - ((py - v.y) * z) / v.z, r.height, z),
+      }
+    })
+  }
+
+  const zoomStep = (factor) => {
+    const r = fieldRef.current.getBoundingClientRect()
+    zoomAt(factor, r.width / 2, r.height / 2)
+  }
+
+  const resetView = () => setView({ z: 1, x: 0, y: 0 })
+
+  // Wheel zoom must preventDefault so the page doesn't scroll, and React registers
+  // its synthetic wheel handler as passive — hence a native non-passive listener.
+  useEffect(() => {
+    const el = fieldRef.current
+    if (!el) return
+    const onWheel = (e) => {
+      e.preventDefault()
+      const r = el.getBoundingClientRect()
+      zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const moveTo = (clientX, clientY) => {
     const [x, y] = fieldPos(clientX, clientY)
@@ -127,6 +176,17 @@ export default function Board({ tacticId, map }) {
     const id = newId()
     drawId.current = id
     update({ ...board, lines: [...lines, { id, color: penColor, points: [fieldPos(e.clientX, e.clientY)] }] })
+  }
+
+  // Pointer-down on the field: the pen starts a line; otherwise, when zoomed in with
+  // the move tool, dragging the background pans the view. A press on a piece never
+  // pans — the piece's own handler ran first (target before ancestors) and set dragId.
+  const onFieldDown = (e) => {
+    if (tool === 'draw') return startLine(e)
+    if (tool === 'move' && !dragId.current && view.z > 1 && e.button === 0) {
+      e.preventDefault()
+      panFrom.current = { px: e.clientX, py: e.clientY, x: view.x, y: view.y }
+    }
   }
 
   const extendLine = (clientX, clientY) => {
@@ -148,11 +208,20 @@ export default function Board({ tacticId, map }) {
       moveTo(e.clientX, e.clientY)
     } else if (drawId.current) {
       extendLine(e.clientX, e.clientY)
+    } else if (panFrom.current) {
+      const r = fieldRef.current.getBoundingClientRect()
+      const { px, py, x, y } = panFrom.current
+      setView((v) => ({
+        ...v,
+        x: clampPan(x + e.clientX - px, r.width, v.z),
+        y: clampPan(y + e.clientY - py, r.height, v.z),
+      }))
     }
   }
 
   // A press that never moved is a select; a drag persists its final position.
   const endDrag = () => {
+    panFrom.current = null
     if (drawId.current) {
       // A stray click without movement leaves a 1-point line — drop it.
       const done = lines.find((l) => l.id === drawId.current)
@@ -241,47 +310,64 @@ export default function Board({ tacticId, map }) {
       </div>
 
       <div
-        className={`board-field${map ? ' has-radar' : ''}${tool !== 'move' ? ` ${tool === 'draw' ? 'drawing' : 'erasing'}` : ''}`}
-        style={map ? { backgroundImage: `url(${radarUrl(map)})` } : undefined}
+        className={`board-field${map ? ' has-radar' : ''}${tool !== 'move' ? ` ${tool === 'draw' ? 'drawing' : 'erasing'}` : view.z > 1 ? ' pannable' : ''}`}
         ref={fieldRef}
-        onPointerDown={startLine}
+        onPointerDown={onFieldDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerLeave={endDrag}
       >
-        <svg className="board-ink" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          {lines.map((l) => (
-            <polyline
-              key={l.id}
-              className={`ink-${l.color ?? 'accent'}`}
-              points={l.points.map(([x, y]) => `${x * 100},${y * 100}`).join(' ')}
-              onDoubleClick={() => removeLine(l.id)}
-              onPointerDown={() => tool === 'erase' && removeLine(l.id)}
-              onPointerOver={(e) => tool === 'erase' && e.buttons > 0 && removeLine(l.id)}
+        <div
+          className="board-canvas"
+          ref={canvasRef}
+          style={{
+            transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`,
+            '--bz': view.z,
+            ...(map ? { backgroundImage: `url(${radarUrl(map)})` } : {}),
+          }}
+        >
+          <svg className="board-ink" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            {lines.map((l) => (
+              <polyline
+                key={l.id}
+                className={`ink-${l.color ?? 'accent'}`}
+                points={l.points.map(([x, y]) => `${x * 100},${y * 100}`).join(' ')}
+                onDoubleClick={() => removeLine(l.id)}
+                onPointerDown={() => tool === 'erase' && removeLine(l.id)}
+                onPointerOver={(e) => tool === 'erase' && e.buttons > 0 && removeLine(l.id)}
+              >
+                <title>{tool === 'erase' ? 'click to erase' : 'double-click to erase'}</title>
+              </polyline>
+            ))}
+          </svg>
+          {pieces.map((p) => (
+            <div
+              key={p.id}
+              className={`piece k-${p.kind}${p.id === selectedId ? ' selected' : ''}`}
+              style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%` }}
+              title="drag to move · click to name · double-click to remove"
+              onPointerDown={(e) => {
+                e.preventDefault()
+                dragId.current = p.id
+                dragMoved.current = false
+              }}
+              onDoubleClick={() => removePiece(p.id)}
             >
-              <title>{tool === 'erase' ? 'click to erase' : 'double-click to erase'}</title>
-            </polyline>
+              {(p.kind === 'ct' || p.kind === 't') && p.label ? p.label : SHORT[p.kind] ?? '?'}
+              {p.label && p.kind !== 'ct' && p.kind !== 't' && (
+                <span className="piece-tag">{p.label}</span>
+              )}
+            </div>
           ))}
-        </svg>
-        {pieces.map((p) => (
-          <div
-            key={p.id}
-            className={`piece k-${p.kind}${p.id === selectedId ? ' selected' : ''}`}
-            style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%` }}
-            title="drag to move · click to name · double-click to remove"
-            onPointerDown={(e) => {
-              e.preventDefault()
-              dragId.current = p.id
-              dragMoved.current = false
-            }}
-            onDoubleClick={() => removePiece(p.id)}
-          >
-            {(p.kind === 'ct' || p.kind === 't') && p.label ? p.label : SHORT[p.kind] ?? '?'}
-            {p.label && p.kind !== 'ct' && p.kind !== 't' && (
-              <span className="piece-tag">{p.label}</span>
-            )}
-          </div>
-        ))}
+        </div>
+        <div className="board-zoom" onPointerDown={(e) => e.stopPropagation()}>
+          <button type="button" aria-label="Zoom out" title="Zoom out" disabled={view.z <= 1} onClick={() => zoomStep(1 / 1.4)}>−</button>
+          <span className="zoom-level">{view.z.toFixed(1)}×</span>
+          <button type="button" aria-label="Zoom in" title="Zoom in" disabled={view.z >= MAX_ZOOM} onClick={() => zoomStep(1.4)}>+</button>
+          {view.z > 1 && (
+            <button type="button" aria-label="Reset zoom" title="Reset zoom" onClick={resetView}>⟲</button>
+          )}
+        </div>
       </div>
 
       {selected ? (
@@ -299,7 +385,7 @@ export default function Board({ tacticId, map }) {
           <button type="button" className="link-btn" onClick={() => setSelectedId(null)}>done</button>
         </div>
       ) : (
-        <p className="muted">Drag to move · click to name · double-click to remove · pen draws in the picked color · eraser clicks or sweeps lines away · edits sync live to everyone on this tactic.</p>
+        <p className="muted">Drag to move · click to name · double-click to remove · pen draws in the picked color · eraser clicks or sweeps lines away · scroll to zoom, drag the map to pan · edits sync live to everyone on this tactic.</p>
       )}
     </section>
   )
