@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { updateTraining, deleteTraining } from './api'
+import TrainingPrep, { RsvpButtons } from './TrainingPrep'
 import { mapLabel, formatMatchTime } from '../matches/format'
 
 const dayLabel = (iso) => {
@@ -56,10 +57,9 @@ export default function TrainingCard({ training, onChanged }) {
           </div>
         )}
 
-        {training.players?.length > 0 && (
-          <p className="tr-roster">{training.players.map((p) => p.name).join(' · ')}</p>
-        )}
+        <TrainingPrep training={training} onChanged={onChanged} />
         {training.notes && <p className="tr-notes-text">{training.notes}</p>}
+        {!canceled && <RsvpButtons training={training} onChanged={onChanged} />}
       </div>
 
       {training.can?.manage && (

@@ -10,6 +10,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\TacticController;
 use App\Http\Controllers\TeamController;
+use App\Http\Controllers\TrainingAssignmentController;
 use App\Http\Controllers\TrainingSessionController;
 use Illuminate\Support\Facades\Route;
 
@@ -54,6 +55,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/trainings/{training}', [TrainingSessionController::class, 'show']);
     Route::patch('/trainings/{training}', [TrainingSessionController::class, 'update']);
     Route::delete('/trainings/{training}', [TrainingSessionController::class, 'destroy']);
+    Route::patch('/trainings/{training}/rsvp', [TrainingSessionController::class, 'rsvp']);
+    Route::post('/trainings/{training}/assignments', [TrainingAssignmentController::class, 'store']);
+    Route::patch('/trainings/{training}/assignments/{assignment}', [TrainingAssignmentController::class, 'update'])->scopeBindings();
+    Route::delete('/trainings/{training}/assignments/{assignment}', [TrainingAssignmentController::class, 'destroy'])->scopeBindings();
 
     Route::middleware('can:tactics.view')->group(function () {
         Route::get('/tactics', [TacticController::class, 'index']);

@@ -30,6 +30,12 @@ class TrainingSessionPolicy
         return $this->permissions->canOnTeam($user, 'training.manage', $session->team);
     }
 
+    /** Answering the invite is the invited player's own act — being on the roster is the whole check. */
+    public function rsvp(User $user, TrainingSession $session): bool
+    {
+        return $session->players()->whereKey($user->id)->exists();
+    }
+
     public function delete(User $user, TrainingSession $session): bool
     {
         return $this->permissions->canOnTeam($user, 'training.manage', $session->team);

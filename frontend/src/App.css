@@ -3785,3 +3785,302 @@ a.brand:hover .brand-mark {
     gap: 8px;
   }
 }
+
+/* The next-practice hero. Committed dark in both themes (same precedent as the
+   radar board: light linework needs dark ground), with the map you'll drill
+   bleeding through from the right. Local ink colors, since app tokens invert. */
+.tr-next {
+  position: relative;
+  overflow: hidden;
+  background-color: #10151c;
+  border: 1px solid #232c38;
+  border-radius: 12px;
+  padding: 24px 26px;
+  margin-bottom: 20px;
+}
+
+.tr-next::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--tr-next-radar, none);
+  background-size: 130% auto;
+  background-position: 115% 38%;
+  background-repeat: no-repeat;
+  opacity: 0.35;
+  -webkit-mask-image: linear-gradient(100deg, transparent 34%, #000 78%);
+  mask-image: linear-gradient(100deg, transparent 34%, #000 78%);
+  pointer-events: none;
+}
+
+.tr-next-body {
+  position: relative;
+  max-width: 68%;
+}
+
+.tr-next-eyebrow {
+  font: 500 10.5px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+}
+
+.tr-next-when {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.tr-next-day {
+  font: 700 40px var(--display);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: #edf1f7;
+  line-height: 1;
+}
+
+.tr-next-time {
+  font: 700 40px var(--display);
+  color: var(--accent);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tr-next-title {
+  margin-top: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  color: #dce3ec;
+}
+
+.tr-next-meta {
+  margin-top: 2px;
+  font: 400 12px var(--mono);
+  color: #8b98a9;
+}
+
+.tr-next-tactics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.tr-next-tactic {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--ct);
+  color: var(--ct);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font: 500 12px var(--mono);
+}
+
+.tr-next-tactic:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tr-next-roster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.tr-next-player {
+  font-size: 11.5px;
+  color: #aeb9c8;
+  border: 1px solid #2a3442;
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.tr-next-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.tr-next-actions .link-btn {
+  color: #8b98a9;
+}
+
+/* History reads as history. */
+.tr-past .tr-card {
+  opacity: 0.62;
+}
+
+@media (max-width: 600px) {
+  .tr-next-body {
+    max-width: 100%;
+  }
+
+  .tr-next-day,
+  .tr-next-time {
+    font-size: 28px;
+  }
+}
+
+/* --- Training prep (homework) + RSVP --- */
+
+.prep {
+  margin-top: 12px;
+}
+
+.prep-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.prep-map {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 400 11px var(--mono);
+  color: var(--text-dim);
+}
+
+.prep-roster {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prep-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.prep-rsvp {
+  font: 600 12px var(--mono);
+  width: 14px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.prep-rsvp-in { color: var(--win); }
+.prep-rsvp-out { color: var(--danger); }
+
+.prep-name {
+  font-size: 12.5px;
+  color: var(--text);
+  min-width: 90px;
+}
+
+.prep-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.prep-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11.5px;
+}
+
+.prep-chip a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.prep-chip a:hover {
+  color: var(--accent);
+}
+
+.prep-chip.done {
+  border-color: var(--win);
+}
+
+.prep-chip.done a {
+  color: var(--win);
+}
+
+.prep-done,
+.prep-remove {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1;
+}
+
+.prep-chip.done .prep-done { color: var(--win); }
+.prep-done-mark { color: var(--win); font-size: 11px; }
+
+.prep-remove:hover { color: var(--danger); }
+
+.prep-add {
+  background: none;
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  padding: 2px 7px;
+  font: 500 10px var(--mono);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.prep-add:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.prep-mine {
+  margin-top: 14px;
+}
+
+.prep-mine .prep-chips {
+  margin-top: 6px;
+  display: flex;
+}
+
+/* Hero-local prep/rsvp legibility (committed-dark surface) */
+.tr-next .prep-chip { border-color: #2a3442; }
+.tr-next .prep-chip a { color: #cdd6e1; }
+.tr-next .prep-chip.done { border-color: var(--win); }
+.tr-next .prep-chip.done a { color: var(--win); }
+
+.rsvp {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.rsvp-btn {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+  border-radius: 6px;
+  padding: 5px 14px;
+  font: 500 12px var(--mono);
+}
+
+.rsvp-btn.rsvp-in.on {
+  border-color: var(--win);
+  color: var(--win);
+  background: rgba(86, 184, 123, 0.1);
+}
+
+.rsvp-btn.rsvp-out.on {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.tr-next-player.rsvp-in { border-color: var(--win); color: var(--win); }
+.tr-next-player.rsvp-out { border-color: var(--danger); color: #8b98a9; text-decoration: line-through; }

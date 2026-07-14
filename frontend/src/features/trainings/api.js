@@ -28,3 +28,12 @@ export function useTrainings() {
 export const createTraining = (data) => api.post('/trainings', data)
 export const updateTraining = (id, data) => api.patch(`/trainings/${id}`, data)
 export const deleteTraining = (id) => api.delete(`/trainings/${id}`)
+
+// Your own invite answer (roster members only).
+export const rsvpTraining = (id, going) => api.patch(`/trainings/${id}/rsvp`, { going })
+
+// Homework: the coach assigns/removes; the assignee marks done.
+export const createAssignment = (trainingId, data) => api.post(`/trainings/${trainingId}/assignments`, data)
+export const toggleAssignmentDone = (trainingId, id, done) =>
+  api.patch(`/trainings/${trainingId}/assignments/${id}`, { done })
+export const deleteAssignment = (trainingId, id) => api.delete(`/trainings/${trainingId}/assignments/${id}`)

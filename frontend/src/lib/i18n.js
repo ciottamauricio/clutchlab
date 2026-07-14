@@ -31,6 +31,10 @@ const MESSAGES = {
   'training.invalid_player': 'Everyone on the roster must be a team member',
   'training.invalid_tactic': 'Tactics must be visible to that team',
   'training.invalid_canceled': 'Invalid cancel flag',
+  'training.invalid_assignee': 'Homework can only be assigned to players on the roster',
+  'training.invalid_nade': 'Pick a map and a valid grenade type',
+  'training.invalid_done': 'Invalid studied flag',
+  'training.invalid_rsvp': 'Invalid RSVP answer',
 
   'auth.name_required': 'Please enter your name',
   'auth.email_required': 'Please enter your email',

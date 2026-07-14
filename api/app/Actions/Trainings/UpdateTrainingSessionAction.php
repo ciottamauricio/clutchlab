@@ -22,6 +22,6 @@ class UpdateTrainingSessionAction
             $session->players()->sync($data['player_ids'] ?? []);
         }
 
-        return $session->load(['team', 'creator', 'tactics', 'players']);
+        return $session->load(['team', 'creator', 'tactics', 'players', 'assignments']);
     }
 }

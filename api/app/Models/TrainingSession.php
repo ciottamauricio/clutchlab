@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 // A team's scheduled practice: a time, the tactics to drill, the expected roster.
 // team_id and created_by are set explicitly by the action, never mass-assigned.
@@ -38,9 +39,14 @@ class TrainingSession extends Model
         return $this->belongsToMany(Tactic::class, 'training_session_tactic');
     }
 
-    /** The expected roster — expected, not confirmed (RSVP is a later, additive step). */
+    /** The expected roster; each entry carries the player's rsvp (null / in / out). */
     public function players(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'training_session_user');
+        return $this->belongsToMany(User::class, 'training_session_user')->withPivot('rsvp');
+    }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(TrainingAssignment::class);
     }
 }

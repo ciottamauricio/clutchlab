@@ -148,4 +148,89 @@ class TrainingSessionTest extends TestCase
         $this->assertTrue($ids->contains($mine->id));
         $this->assertFalse($ids->contains($foreign->id));
     }
+
+    private function sessionWithRoster(): TrainingSession
+    {
+        $session = TrainingSession::factory()->create(['team_id' => $this->team->id]);
+        $session->players()->attach([$this->player->id, $this->coach->id]);
+
+        return $session;
+    }
+
+    public function test_an_invited_player_answers_their_own_rsvp(): void
+    {
+        $session = $this->sessionWithRoster();
+
+        Sanctum::actingAs($this->player);
+
+        $this->patchJson("/api/trainings/{$session->id}/rsvp", ['going' => true])
+            ->assertOk()
+            ->assertJsonPath('data.players', fn ($players) => collect($players)->firstWhere('id', $this->player->id)['rsvp'] === 'in');
+
+        $this->patchJson("/api/trainings/{$session->id}/rsvp", ['going' => false])->assertOk();
+        $this->assertSame('out', $session->players()->whereKey($this->player->id)->first()->pivot->rsvp);
+    }
+
+    public function test_a_member_off_the_roster_cannot_rsvp(): void
+    {
+        $session = TrainingSession::factory()->create(['team_id' => $this->team->id]);
+
+        Sanctum::actingAs($this->player); // team member, but not invited
+
+        $this->patchJson("/api/trainings/{$session->id}/rsvp", ['going' => true])->assertForbidden();
+    }
+
+    public function test_a_coach_assigns_homework_to_a_roster_player(): void
+    {
+        $session = $this->sessionWithRoster();
+
+        Sanctum::actingAs($this->coach);
+
+        $this->postJson("/api/trainings/{$session->id}/assignments", [
+            'user_id' => $this->player->id, 'map' => 'de_overpass', 'nade_type' => 'smoke',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.map', 'de_overpass')
+            ->assertJsonPath('data.done_at', null);
+
+        // Idempotent: same homework twice is a no-op, not an error or a duplicate.
+        $this->postJson("/api/trainings/{$session->id}/assignments", [
+            'user_id' => $this->player->id, 'map' => 'de_overpass', 'nade_type' => 'smoke',
+        ])->assertCreated();
+        $this->assertSame(1, $session->assignments()->count());
+    }
+
+    public function test_homework_needs_a_roster_assignee_and_a_known_nade_type(): void
+    {
+        $session = $this->sessionWithRoster();
+        $offRoster = User::factory()->create();
+        $this->team->members()->attach($offRoster, ['role' => 'player']);
+
+        Sanctum::actingAs($this->coach);
+
+        $this->postJson("/api/trainings/{$session->id}/assignments", [
+            'user_id' => $offRoster->id, 'map' => 'de_overpass', 'nade_type' => 'smoke',
+        ])->assertUnprocessable()->assertJsonPath('errors.user_id.0', 'training.invalid_assignee');
+
+        $this->postJson("/api/trainings/{$session->id}/assignments", [
+            'user_id' => $this->player->id, 'map' => 'de_overpass', 'nade_type' => 'decoy',
+        ])->assertUnprocessable()->assertJsonPath('errors.nade_type.0', 'training.invalid_nade');
+    }
+
+    public function test_only_the_assignee_marks_homework_done_not_even_the_coach(): void
+    {
+        $session = $this->sessionWithRoster();
+        $assignment = $session->assignments()->create([
+            'user_id' => $this->player->id, 'map' => 'de_overpass', 'nade_type' => 'flashbang',
+        ]);
+
+        Sanctum::actingAs($this->coach);
+        $this->patchJson("/api/trainings/{$session->id}/assignments/{$assignment->id}", ['done' => true])
+            ->assertForbidden();
+
+        Sanctum::actingAs($this->player);
+        $this->patchJson("/api/trainings/{$session->id}/assignments/{$assignment->id}", ['done' => true])
+            ->assertOk();
+        $this->assertNotNull($assignment->fresh()->done_at);
+    }
 }

@@ -15,8 +15,10 @@ on the events channel — the first Laravel-published cross-service event (see E
 
 - **Training session** — a row in `training_sessions`: one team, one scheduled time,
   a set of tactics to practice, a roster of expected players.
-- **Roster** — the users expected at the session (`training_session_user`). Expected,
-  not confirmed: RSVP is a deliberate later addition (additive pivot column).
+- **Roster** — the users expected at the session (`training_session_user`). Each entry
+  carries an **RSVP**: `null` (no answer yet) / `in` / `out`, answered by that player.
+- **Assignment** — one piece of pre-class homework (`training_assignments`): a player,
+  a map, a nade type; `done_at` when the player marks it studied.
 - **Session tactics** — the tactics to drill (`training_session_tactic`), each linking
   to the collaborative board.
 
@@ -39,6 +41,26 @@ on the events channel — the first Laravel-published cross-service event (see E
 Pivots: `training_session_tactic` (unique pair, cascade both ways) and
 `training_session_user` (unique pair, cascade both ways).
 
+### `TrainingAssignment` — table `training_assignments`
+
+Pre-class homework: "player X studies {map} {nade type} before this session."
+
+| Field | Type | Notes |
+|---|---|---|
+| training_session_id | fk, cascade | |
+| user_id | fk users, cascade | the student — must be on the session's roster |
+| map | string(32) | opaque label (same rule as `tactics.map`); the frontend owns the map list |
+| nade_type | string(16) | closed enum: `smoke` / `molotov` / `flashbang` / `he` |
+| done_at | timestamp, nullable | set by the **assignee only** — "studied it" |
+
+Unique `(training_session_id, user_id, map, nade_type)`; creating an existing
+assignment is idempotent (firstOrCreate), never an error.
+
+**The backend stores the meaning, never a URL.** The study link (csnades.gg today)
+is derived in the frontend from `map + nade_type` — the same boundary rule as codes
+vs. sentences: semantics in the API, rendering (including external-site URL schemes)
+in the client. Swapping study sites is a one-module frontend change.
+
 ## Business rules & invariants
 
 1. **A session always belongs to a team.** A solo practice needs no roster or schedule —
@@ -55,7 +77,13 @@ Pivots: `training_session_tactic` (unique pair, cascade both ways) and
    view-only on matches but whose job is running practice. Viewing is plain team
    membership (like tactics), not a grantable ability.
 6. Codes, not sentences: `training.invalid_team`, `training.invalid_time`,
-   `training.invalid_player`, `training.invalid_tactic`.
+   `training.invalid_player`, `training.invalid_tactic`, `training.invalid_assignee`,
+   `training.invalid_nade`. (RSVP by a non-roster caller is an authorization matter —
+   403 — not a validation code.)
+7. **Self-only actions**: RSVP (`in`/`out`) and marking an assignment done belong to the
+   player themselves — `training.manage` does not grant them. The coach assigns and
+   invites; only the student can say "I'll be there" or "studied it".
+8. Assignment assignees must be on the session's roster (homework is for attendees).
 
 ## API surface (Phase 2)
 
@@ -68,6 +96,10 @@ All under `auth:sanctum`; "visible" = member of the session's team; 403 otherwis
 | GET | `/trainings/{session}` | detail with tactics + roster |
 | PATCH | `/trainings/{session}` | edit fields / replace tactics / replace roster / set `canceled_at` |
 | DELETE | `/trainings/{session}` | remove entirely |
+| PATCH | `/trainings/{session}/rsvp` | body `{ "going": bool }` — caller answers their own invite (roster members only) |
+| POST | `/trainings/{session}/assignments` | `{ user_id, map, nade_type }` — `training.manage`; idempotent |
+| PATCH | `/trainings/{session}/assignments/{assignment}` | `{ "done": bool }` — the assignee only |
+| DELETE | `/trainings/{session}/assignments/{assignment}` | `training.manage` |
 
 ## Events (Phase 4)
 

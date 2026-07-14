@@ -25,7 +25,7 @@ class CreateTrainingSessionAction
         $session->tactics()->sync($data['tactic_ids'] ?? []);
         $session->players()->sync($data['player_ids'] ?? []);
 
-        $session->load(['team', 'creator', 'tactics', 'players']);
+        $session->load(['team', 'creator', 'tactics', 'players', 'assignments']);
 
         TrainingScheduled::dispatch($session);
 

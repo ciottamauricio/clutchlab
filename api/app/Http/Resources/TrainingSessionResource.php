@@ -32,9 +32,12 @@ class TrainingSessionResource extends JsonResource
             'players' => $this->whenLoaded('players', fn () => $this->players->map(fn ($p) => [
                 'id' => $p->id,
                 'name' => $p->name,
+                'rsvp' => $p->pivot->rsvp, // null = no answer yet, 'in' / 'out'
             ])->values()),
+            'assignments' => TrainingAssignmentResource::collection($this->whenLoaded('assignments')),
             'can' => [
                 'manage' => (bool) $request->user()?->can('update', $this->resource),
+                'rsvp' => (bool) $request->user()?->can('rsvp', $this->resource),
             ],
         ];
     }
