@@ -1,0 +1,21 @@
+name: worker
+
+on:
+  push:
+    paths: ["worker/**", "contracts/**", ".github/workflows/worker.yml"]
+  pull_request:
+    paths: ["worker/**", "contracts/**", ".github/workflows/worker.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: worker/go.mod
+      - run: go vet ./...
+      - run: go test ./...

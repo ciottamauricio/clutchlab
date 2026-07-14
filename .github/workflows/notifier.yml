@@ -1,0 +1,21 @@
+name: notifier
+
+on:
+  push:
+    paths: ["notifier/**", "contracts/**", ".github/workflows/notifier.yml"]
+  pull_request:
+    paths: ["notifier/**", "contracts/**", ".github/workflows/notifier.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: notifier
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: notifier/go.mod
+      - run: go vet ./...
+      - run: go test ./...

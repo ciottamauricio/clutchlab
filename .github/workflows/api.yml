@@ -1,0 +1,29 @@
+# Path-filtered per-service CI (study topic 11: independent build/test inside the
+# monorepo, atomic commits kept). contracts/** is deliberately in every service's
+# trigger: touching a wire fixture must run every suite that speaks it.
+name: api
+
+on:
+  push:
+    paths: ["api/**", "contracts/**", ".github/workflows/api.yml"]
+  pull_request:
+    paths: ["api/**", "contracts/**", ".github/workflows/api.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    env:
+      # Test-only key so the encrypter boots; not a secret (never touches real data).
+      APP_KEY: base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_sqlite, sqlite3
+          coverage: none
+      - run: composer install --prefer-dist --no-progress --no-interaction
+      - run: ./vendor/bin/phpunit

@@ -13,9 +13,10 @@ class RedisParseQueue implements ParseQueue
     {
         // Plain list + JSON, NOT Laravel's queue format — the Go worker can't read
         // serialized PHP jobs. This is the deliberate polyglot tax (docs/ARCHITECTURE.md).
+        // Unescaped slashes so the bytes match Go's serialization (contracts/parse_job.json).
         $this->redis->connection()->rpush(config('clutch.parse_queue'), json_encode([
             'match_id' => $matchId,
             'demo_key' => $demoKey,
-        ]));
+        ], JSON_UNESCAPED_SLASHES));
     }
 }
