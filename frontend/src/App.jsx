@@ -11,6 +11,7 @@ import AwardsPage from './pages/AwardsPage'
 import AdminPage from './pages/AdminPage'
 import ProfilePage from './pages/ProfilePage'
 import StudyPage from './pages/StudyPage'
+import TrainingsPage from './pages/TrainingsPage'
 import './App.css'
 
 function Protected({ children }) {
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="/" element={<ProfilePage />} />
             <Route path="/matches" element={<DashboardPage />} />
             <Route path="/teams" element={<TeamsPage />} />
+            <Route path="/trainings" element={<TrainingsPage />} />
             <Route path="/tactics" element={<RequireCan ability="tactics.view"><TacticsPage /></RequireCan>} />
             <Route path="/search" element={<RequireCan ability="search.use"><SearchPage /></RequireCan>} />
             <Route path="/awards" element={<RequireCan ability="awards.view"><AwardsPage /></RequireCan>} />

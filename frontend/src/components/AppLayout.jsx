@@ -21,6 +21,7 @@ export default function AppLayout() {
             <NavLink to="/" end>Profile</NavLink>
             <NavLink to="/matches">Matches</NavLink>
             <NavLink to="/teams">Teams</NavLink>
+            <NavLink to="/trainings">Trainings</NavLink>
             {canTactics && <NavLink to="/tactics">Tactics</NavLink>}
             {canSearch && <NavLink to="/search">Search</NavLink>}
             {canAwards && <NavLink to="/awards">Awards</NavLink>}

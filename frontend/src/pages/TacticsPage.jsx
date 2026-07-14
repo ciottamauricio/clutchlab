@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useTactics, deleteTactic } from '../features/tactics/api'
 import CreateTactic from '../features/tactics/CreateTactic'
 import Board from '../features/tactics/Board'
@@ -7,7 +8,8 @@ import { mapLabel } from '../features/matches/format'
 
 export default function TacticsPage() {
   const { tactics, refresh } = useTactics()
-  const [selectedId, setSelectedId] = useState(null)
+  // Deep link: a training session's tactic chip lands here with the board open.
+  const [selectedId, setSelectedId] = useState(useLocation().state?.tacticId ?? null)
   const selected = tactics.find((tactic) => tactic.id === selectedId)
 
   const onCreated = (tactic) => {

@@ -25,6 +25,7 @@ class TeamResource extends JsonResource
                 'manage_roster' => (bool) $request->user()?->can('manageRoster', $this->resource),
                 'update' => (bool) $request->user()?->can('update', $this->resource),
                 'upload_match' => (bool) $request->user()?->can('uploadMatch', $this->resource),
+                'manage_trainings' => (bool) $request->user()?->can('create', [\App\Models\TrainingSession::class, $this->resource]),
             ],
         ];
     }

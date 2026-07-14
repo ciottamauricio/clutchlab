@@ -23,6 +23,15 @@ const MESSAGES = {
   'match.invalid_player_filter': 'That player filter is invalid',
   'tactic.invalid_team': "You can only share with a team you belong to",
 
+  'training.invalid_team': "You can't schedule trainings for that team",
+  'training.invalid_title': 'Please give the session a title (max 120 chars)',
+  'training.invalid_time': 'Please pick a valid date and time',
+  'training.invalid_duration': 'Session length must be 1\u2013600 minutes',
+  'training.invalid_notes': 'Notes are too long (max 2000 chars)',
+  'training.invalid_player': 'Everyone on the roster must be a team member',
+  'training.invalid_tactic': 'Tactics must be visible to that team',
+  'training.invalid_canceled': 'Invalid cancel flag',
+
   'auth.name_required': 'Please enter your name',
   'auth.email_required': 'Please enter your email',
   'auth.email_invalid': 'That email looks invalid',

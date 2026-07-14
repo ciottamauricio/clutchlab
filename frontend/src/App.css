@@ -3580,3 +3580,208 @@ a.brand:hover .brand-mark {
   .study-title { font-size: 34px; }
   .study-ledger { grid-template-columns: 1fr; }
 }
+
+/* --- Trainings: the practice schedule --- */
+
+.tr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.tr-head h2 {
+  margin: 0;
+}
+
+.tr-open-form {
+  flex: 0 0 auto;
+}
+
+.tr-form {
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tr-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.tr-form label,
+.tr-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.tr-picker-label {
+  font: 500 11px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.tr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tr-chip {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+.tr-chip.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.tr-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tr-section {
+  font: 500 11px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  margin: 18px 0 10px;
+}
+
+.tr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tr-card {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.tr-when {
+  display: flex;
+  flex-direction: column;
+  min-width: 86px;
+}
+
+.tr-day {
+  font: 600 13px var(--mono);
+  color: var(--text-h);
+}
+
+.tr-time {
+  font: 400 12px var(--mono);
+  color: var(--text-dim);
+}
+
+.tr-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.tr-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tr-title {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.tr-team {
+  font: 400 11px var(--mono);
+  color: var(--text-dim);
+}
+
+.tr-canceled .tr-title {
+  text-decoration: line-through;
+  color: var(--text-dim);
+}
+
+.tr-canceled-tag {
+  font: 500 10px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+.tr-tactics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tr-tactic-link {
+  background: transparent;
+  border: 1px solid var(--ct);
+  color: var(--ct);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font: 500 12px var(--mono);
+}
+
+.tr-tactic-link:hover {
+  background: var(--hover);
+}
+
+.tr-roster {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.tr-notes-text {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.tr-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+@media (max-width: 600px) {
+  .tr-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tr-card {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
