@@ -24,9 +24,14 @@ jobs:
       - run: npm ci
       # npm skips platform-specific optional deps resolved on another libc
       # (npm/cli#4828) — the lockfile is written inside the musl (alpine) dev
-      # container, the runner is glibc. Install the missing native binding at the
-      # lockfile's exact version if npm ci left it out.
+      # container, the runner is glibc. For every musl native package in the lock
+      # (rolldown, lightningcss, …), install its gnu twin at the same version.
       - run: |
-          node -e "require('@rolldown/binding-linux-x64-gnu')" 2>/dev/null || \
-            npm i --no-save @rolldown/binding-linux-x64-gnu@"$(node -p "require('./package-lock.json').packages['node_modules/@rolldown/binding-linux-x64-musl'].version")"
+          node -e '
+            const pkgs = require("./package-lock.json").packages;
+            const twins = Object.keys(pkgs)
+              .filter((k) => k.includes("linux-x64-musl"))
+              .map((k) => k.replace("node_modules/", "").replace("musl", "gnu") + "@" + pkgs[k].version);
+            console.log(twins.join(" "));
+          ' | xargs -r npm i --no-save
       - run: npm run build
