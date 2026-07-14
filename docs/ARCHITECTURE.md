@@ -36,26 +36,29 @@ to ask of every candidate service:
                        rpush │        │ pdo         │           │
                         ┌────▼───┐  ┌─▼─────────────▼───────────▼──┐
                         │ redis  │  │           postgres           │
-                        └────▲───┘  └───────────────▲──────────────┘
-                       blpop │                      │
-                       ┌─────┴──────────────────────┴─┐
-                       │           worker             │  Go (demo parser)
-                       └──────┬────────────────┬──────┘
-                     get/put  │                │ index
-                   ┌──────────▼──┐        ┌────▼─────────┐
+                        └─▲──▲───┘  └───────────────▲──────────────┘
+               subscribe │  │ blpop · publish       │
+         ┌───────────────┘  │                       │
+    ┌────┴─────┐            │                       │
+    │ notifier │       ┌────┴───────────────────────┴─┐
+    └────┬─────┘       │           worker             │  Go (demo parser)
+         │ webhook     └──────┬────────────────┬──────┘
+         ▼           get/put  │                │ index
+      Discord      ┌──────────▼──┐        ┌────▼─────────┐
                    │    minio    │        │ meilisearch  │
                    └─────────────┘        └──────────────┘
 ```
 
-Two of these services have **no inbound HTTP through nginx by the queue path**: the `worker`
-is a pure background consumer (its only input is the Redis queue). The `realtime` service *is*
-behind nginx but on a separate `/realtime/*` websocket route — it earns its own boundary for a
-different reason than the worker does (see below). The queue is the only thing connecting the
-web world and the compute world — that's the physical shape of the async boundary.
+Three of these services have **no inbound HTTP through nginx**: the `worker` is a pure
+background consumer (its only input is the Redis queue), and the `notifier` consumes only
+the events channel (its only output is a Discord webhook). The `realtime` service *is*
+behind nginx but on a separate `/realtime/*` websocket route — it earns its own boundary
+for a different reason than the worker does (see below). Redis carries both crossings
+between the web world and the compute world: the **queue** (a command — api → worker) and
+the **events channel** (facts — worker → whoever subscribes).
 
-Not drawn above: the `notifier` (Go), a third no-inbound-HTTP service. It subscribes to the
-Redis pub/sub events channel the worker publishes on and posts to a Discord webhook — see
-"Event-driven notifications" below.
+Also not drawn: the observability containers (Alloy, Loki, Grafana, Jaeger) — they observe
+every service but sit outside the data path (see Observability below).
 
 ## Why each boundary earns its place
 

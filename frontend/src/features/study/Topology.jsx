@@ -1,7 +1,8 @@
 // The topology as a real diagram, organized around the study's thesis — the *seam*. The
 // synchronous web world (nginx, frontend, api, realtime) sits above; the async compute world
-// (worker) sits below; Redis is drawn on the boundary between them, the one queue crossing.
-// Nodes are colored by runtime so "two Go services, different reasons" reads at a glance.
+// (worker, notifier) sits below; Redis is drawn on the boundary between them, carrying both
+// crossings: the queue (commands) and the events channel (facts, pub/sub).
+// Nodes are colored by runtime so "three Go services, different reasons" reads at a glance.
 // Uses the app's tokens via CSS classes, so it inverts cleanly in light mode.
 export default function Topology() {
   return (
@@ -37,12 +38,15 @@ export default function Topology() {
             <path className="topo-edge-data" d="M610 184 C 610 320, 470 410, 420 452" />
           </g>
 
-          {/* ---- the seam: api -> redis -> worker ---- */}
+          {/* ---- the seam: api -> redis -> worker (queue), worker -> redis -> notifier (events) ---- */}
           <g className="topo-seam">
             <path className="topo-edge-queue" d="M320 184 C 220 220, 150 250, 150 300" />
             <path className="topo-edge-queue" d="M150 330 C 150 360, 280 375, 330 380" />
             <text className="topo-queuelabel" x="210" y="238">rpush ▸</text>
             <text className="topo-queuelabel" x="215" y="360">◂ BLPOP</text>
+            {/* events channel: published by the worker, fanned out to subscribers */}
+            <path className="topo-edge-queue" d="M240 318 C 350 328, 480 340, 560 372" />
+            <text className="topo-queuelabel" x="330" y="344">events · pub/sub ▸</text>
           </g>
 
           {/* worker -> minio / meilisearch */}
@@ -91,8 +95,8 @@ export default function Topology() {
 
           {/* redis — on the boundary */}
           <g className="topo-node topo-node-seamnode">
-            <rect x="90" y="300" width="120" height="30" rx="6" />
-            <text x="150" y="319">redis · queue</text>
+            <rect x="60" y="300" width="180" height="30" rx="6" />
+            <text x="150" y="319">redis · queue + events</text>
           </g>
 
           {/* worker (Go) */}
@@ -101,6 +105,17 @@ export default function Topology() {
             <text className="topo-name" x="410" y="379">worker</text>
             <text className="topo-role" x="410" y="393">Go · demo parser</text>
           </g>
+
+          {/* notifier (Go) — consumes events, speaks to the outside world */}
+          <g className="topo-node topo-node-go">
+            <rect x="560" y="360" width="150" height="40" rx="7" />
+            <text className="topo-name" x="635" y="379">notifier</text>
+            <text className="topo-role" x="635" y="393">Go · events → Discord</text>
+          </g>
+          <g className="topo-edges">
+            <path className="topo-edge-data" d="M710 380 L 744 380" />
+          </g>
+          <text className="topo-queuelabel" x="742" y="374" textAnchor="end">webhook ▸</text>
 
           {/* data stores */}
           <g className="topo-node topo-node-data">
@@ -123,7 +138,7 @@ export default function Topology() {
         <span className="topo-key topo-key-go">Go</span>
         <span className="topo-key topo-key-react">React</span>
         <span className="topo-key topo-key-infra">infra</span>
-        <span className="topo-legend-note">the dashed edge is the queue — the only path between the two worlds</span>
+        <span className="topo-legend-note">the dashed edges cross the seam — the queue (commands) and the events channel (facts)</span>
       </div>
     </figure>
   )

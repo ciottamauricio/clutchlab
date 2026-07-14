@@ -215,8 +215,31 @@ export const TOPICS = [
     ],
   },
   {
-    id: 'orchestration',
+    id: 'pub-sub',
     n: '12',
+    title: 'Commands vs. events — the notifier',
+    tag: 'pub/sub',
+    summary: 'The queue tells one worker what to do; the event channel tells whoever cares what happened.',
+    gained: [
+      'The worker publishes match.parsed / match.failed to a Redis pub/sub channel without knowing who listens — the notifier turns them into Discord messages today; any future subscriber joins without touching the worker.',
+      'A second messaging shape next to the queue: point-to-point commands (exactly one consumer must act) vs. broadcast facts (zero, one, or many may care).',
+      'The notifier is the only backend that renders human sentences — it is the "frontend" for Discord, the same role React plays for the browser, so codes-not-sentences survives.',
+    ],
+    paid: [
+      'Pub/sub is fire-and-forget: only subscribers connected at that instant receive the event. A notifier restart loses the gap — at-most-once delivery, felt rather than read about. Redis Streams (acks + consumer groups) is the earned upgrade behind the same interfaces.',
+      'The dual write: the worker writes Postgres, then publishes. A crash between the two loses the event (the status row stays correct — it is the source of truth). The industrial fix is a transactional outbox; accepting the gap is a documented decision.',
+      'One more cross-language contract, now one-to-many: unknown future subscribers mean additive changes only, with a version field for anything breaking.',
+    ],
+    body: [
+      'The parse queue and the event channel look similar — both are JSON on Redis — but they are opposite ideas. A command ("parse this") is addressed to a role and must be consumed exactly once; losing one loses work. An event ("this happened") is addressed to no one; missing one loses only a notification. Matching the guarantee to the stakes is the lesson: parsing earns idempotent writes and a waiting queue, notifications get best-effort by design — an event must never fail a parse.',
+      'The event also carries an optional W3C traceparent, so a subscriber\'s span joins the publisher\'s trace in Jaeger across the channel — the payload-borne version of the header HTTP services use.',
+    ],
+    code: '{ "event": "match.parsed", "v": 1, "match_id": 42, "map": "de_mirage", "score_ct": 13, "score_t": 9 }',
+    codeLabel: 'the event contract — additive changes only, worker and notifier in the same commit',
+  },
+  {
+    id: 'orchestration',
+    n: '13',
     title: 'Orchestration: compose vs. cloud',
     tag: 'leaving the laptop',
     summary: 'docker-compose.yml does four jobs at once; in the cloud each job goes to a different owner.',
