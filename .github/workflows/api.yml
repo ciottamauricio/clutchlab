@@ -20,7 +20,7 @@ jobs:
       # Must decode to exactly 32 bytes for aes-256-cbc.
       APP_KEY: base64:dGVzdHRlc3R0ZXN0dGVzdHRlc3R0ZXN0dGVzdHRlc3Q=
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
