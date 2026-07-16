@@ -112,6 +112,34 @@ the producer asserts it emits exactly those bytes, each consumer asserts it deco
 in whatever language it speaks. CI runs per service with path filters; touching
 `contracts/**` re-runs every suite that speaks the channel.
 
+## `infra/` — the same architecture, written for the cloud
+
+`docker-compose.yml` is the **local truth**; each directory under [`infra/`](infra/) is
+the identical service graph rewritten as a **cloud truth** in Terraform — the diff
+between the two files is the whole "compose vs. cloud" lesson (study topic 14):
+
+```
+infra/
+├── azure/            # Azure Container Apps translation
+│   ├── main.tf       #   the service graph: one resource per compose service —
+│   │                 #   registry, network, Postgres, Redis, storage, and a
+│   │                 #   container app per service (nginx stays the sole ingress)
+│   ├── variables.tf  #   the knobs: region, SKUs, image tag — and the secrets
+│   │                 #   (db password, APP_KEY, Meili key), injected as TF_VAR_*
+│   │                 #   at plan time, never written into the files
+│   └── outputs.tf    #   what you get back: the public URL, registry address,
+│                     #   connection endpoints
+└── aws/              # ECS Fargate translation — same three files, same roles;
+                      # plus what Azure hides: explicit VPC, subnets, NAT,
+                      # security groups, IAM task roles, Cloud Map DNS
+```
+
+Both are **validated skeletons** (`terraform validate` passes), not battle-tested
+deployments — study material first. The interesting differences (where Redis forces TLS,
+where MinIO→S3 is config-only vs. needs code, what `depends_on` not existing costs you)
+are tabled in [`infra/README.md`](infra/README.md), along with how to `terraform plan`
+one of them.
+
 ## Where to read more
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — why every boundary is where it is
