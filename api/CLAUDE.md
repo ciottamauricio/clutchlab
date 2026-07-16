@@ -23,7 +23,7 @@ changes.** The code follows the doc, not the other way around.
 | Search | Implemented (Step 4) | `docs/domains/search.md` |
 | Kill heatmap — kill positions on radar | Implemented | `docs/domains/heatmap.md` |
 | Awards — cross-match superlatives | Implemented | `docs/domains/awards.md` |
-| Notifications | Planned (Step 5) | `docs/domains/notifications.md` |
+| Notifications | Implemented (Step 5) — pub/sub; Go notifier + Laravel events-listener | `docs/domains/notifications.md` |
 | Trainings — scheduled practice (time + tactics + roster) | API implemented; UI + event next | `docs/domains/trainings.md` |
 
 ## API conventions (non-negotiable)

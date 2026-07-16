@@ -115,6 +115,11 @@ producer test on the PHP side, consumer test in the notifier). The Action itself
 side-effect-free; whether this indirection spreads to other domains is decided after
 living with it here.
 
+**Two independent subscribers react to that one fact:** the Go `notifier` posts to
+Discord, and the Laravel `events-listener` (Laravel's first turn as event **subscriber**)
+emails every rostered player — the roster is re-read by `training_id` since the payload
+carries only a count. See [notifications.md](notifications.md) for the subscriber side.
+
 ## Structure note
 
 This domain starts the **domain-subfolder convention**: `app/Actions/Trainings/`,

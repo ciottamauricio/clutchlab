@@ -27,6 +27,19 @@ services:
     depends_on: [postgres, redis, minio, meilisearch]
     networks: [clutchnet]
 
+  # Laravel as an event subscriber: blocks on clutch_events and turns facts into
+  # Laravel-side reactions (today: emailing a training's roster on training.scheduled).
+  # Same image as api; its own long-lived process. Mail uses MAIL_MAILER (log by default).
+  events-listener:
+    build: ./api
+    command: php artisan events:listen
+    volumes:
+      - ./api:/var/www/html
+      - ./contracts:/var/www/contracts:ro
+    env_file: .env
+    depends_on: [postgres, redis]
+    networks: [clutchnet]
+
   worker:
     build: ./worker
     volumes:
