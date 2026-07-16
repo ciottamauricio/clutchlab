@@ -1,7 +1,7 @@
 // The topology as a real diagram, organized around the study's thesis — the *seam*. The
 // synchronous web world (nginx, frontend, api, realtime) sits above; the async compute world
-// (worker, notifier) sits below; Redis is drawn on the boundary between them, carrying both
-// crossings: the queue (commands) and the events channel (facts, pub/sub).
+// (worker, notifier, events-listener) sits below; Redis is drawn on the boundary between
+// them, carrying both crossings: the queue (commands) and the events channel (facts, pub/sub).
 // Nodes are colored by runtime so "three Go services, different reasons" reads at a glance.
 // Uses the app's tokens via CSS classes, so it inverts cleanly in light mode.
 export default function Topology() {
@@ -44,8 +44,9 @@ export default function Topology() {
             <path className="topo-edge-queue" d="M150 330 C 150 360, 280 375, 330 380" />
             <text className="topo-queuelabel" x="210" y="238">rpush ▸</text>
             <text className="topo-queuelabel" x="215" y="360">◂ BLPOP</text>
-            {/* events channel: published by the worker, fanned out to subscribers */}
+            {/* events channel: published by worker + api, fanned out to BOTH subscribers */}
             <path className="topo-edge-queue" d="M240 318 C 350 328, 480 340, 560 372" />
+            <path className="topo-edge-queue" d="M120 330 C 116 342, 114 350, 112 360" />
             <text className="topo-queuelabel" x="330" y="344">events · pub/sub ▸</text>
           </g>
 
@@ -97,6 +98,13 @@ export default function Topology() {
           <g className="topo-node topo-node-seamnode">
             <rect x="60" y="300" width="180" height="30" rx="6" />
             <text x="150" y="319">redis · queue + events</text>
+          </g>
+
+          {/* events-listener (Laravel) — the second subscriber on the same channel */}
+          <g className="topo-node topo-node-php">
+            <rect x="36" y="360" width="160" height="40" rx="7" />
+            <text className="topo-name" x="116" y="379">events-listener</text>
+            <text className="topo-role" x="116" y="393">Laravel · events → mail</text>
           </g>
 
           {/* worker (Go) */}

@@ -283,4 +283,28 @@ export const TOPICS = [
     code: 'depends_on: [postgres, redis, minio]  # compose-only comfort — no cloud equivalent',
     codeLabel: 'the line that does not survive the move',
   },
+  {
+    id: 'subscriber',
+    n: '15',
+    title: 'One fact, two frameworks — Laravel as subscriber',
+    tag: 'events, mail',
+    summary: 'The same training.scheduled fact now lands in Go (Discord) and Laravel (email) — the fan-out promise of topic 12, cashed in.',
+    gained: [
+      'A second subscriber joined the channel without the publisher changing a line: the Go notifier posts to Discord, the Laravel events-listener emails the roster. PUBSUB NUMSUB clutch_events reads 2 — one fact, two frameworks, verified live.',
+      'The subscriber owns its own data. The event payload carries a player *count*, not addresses (a fact, not a data dump) — the email handler re-reads the roster by training_id at delivery time, so recipients are fresh even if the roster changed after publish.',
+      'A rule for where a reaction lives: put it where its dependencies already are. Discord needs one HTTPS POST — a tiny Go daemon. Email needs the users table, Mailables, and codes→prose — all Laravel. Same subscriber shape, language chosen by the reaction.',
+      'Reactions are a registry, not a switch: one EventHandler class per reaction, tagged in the provider — events:listen routes by each handler\'s handles(). Adding "email on match.failed" would touch zero existing files.',
+    ],
+    paid: [
+      'A long-lived PHP daemon runs against the framework\'s request→die grain — memory creep and stale connections are the daemon\'s problem, not the framework\'s habit. Go gets this shape for free; Laravel needs the same care queue:work does.',
+      'At-most-once, again: emails published while the listener is down are never sent. Tolerable for a practice invite; the day an email is *guaranteed*, that guarantee earns Redis Streams (acks + replay), not a bigger try/catch.',
+      'The trigger chain is invisible until you know where to look. Nothing in the code says "TrainingScheduled → PublishTrainingScheduled" — the wiring IS the type-hint on the listener\'s handle(), matched by auto-discovery. Convention saves a config file and costs a grep; php artisan event:list is how you see the truth.',
+    ],
+    body: [
+      'The full trigger is two hops. Hop one is in-process: CreateTrainingSessionAction saves the session and fires TrainingScheduled::dispatch($session) — a Laravel event that never leaves the process. Hop two is the boundary: an auto-discovered listener turns that private fact into the public one, publishing training.scheduled on clutch_events via the EventBus contract. Inside the process, convention and type-hints; across the boundary, an explicit versioned contract with a fixture. The formality jumps exactly at the seam.',
+      'Why route email through Redis and back into the same framework that raised the event? Because in-process listeners only fire when Laravel itself did the thing. Coming back through the channel means any service — the Go worker, anything future — can cause an email by publishing a fact it would publish anyway. The listener is a general reaction pipeline, not a training-email feature; mail rides MAIL_MAILER=log until real credentials exist, the same log-only trick the notifier uses without a webhook URL.',
+    ],
+    code: 'public function handle(TrainingScheduled $event): void',
+    codeLabel: 'the entire event→listener wiring — auto-discovery matches on this type-hint (see php artisan event:list)',
+  },
 ]
