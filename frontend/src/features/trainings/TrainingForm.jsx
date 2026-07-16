@@ -1,27 +1,39 @@
 import { useMemo, useState } from 'react'
 import { useTeams, useTeam } from '../teams/api'
 import { useTactics } from '../tactics/api'
-import { createTraining } from './api'
+import { createTraining, updateTraining } from './api'
+import HomeworkPicker from './HomeworkPicker'
 import { t } from '../../lib/i18n'
 import { mapLabel } from '../matches/format'
 
-// Schedule a session: pick a team you may schedule for, a time, the tactics to drill,
-// and the expected roster (the selected team's members). Server-checked; codes localized.
-export default function TrainingForm({ onCreated }) {
+// A datetime-local input wants "YYYY-MM-DDTHH:mm" in local time; toISOString gives UTC.
+// Slice the ISO string after shifting by the zone offset so the field shows local wall time.
+const toLocalInput = (iso) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+
+// Schedule or edit a session: pick a team you may schedule for, a time, the tactics to
+// drill, and the expected roster (the selected team's members). In edit mode the team is
+// fixed (a session never changes team). Server-checked; codes localized.
+export default function TrainingForm({ training, onSaved, onClose }) {
+  const editing = Boolean(training)
   const { teams } = useTeams()
   const { tactics } = useTactics()
   const manageable = teams.filter((tm) => tm.can?.manage_trainings)
 
-  const [teamId, setTeamId] = useState('')
-  const [title, setTitle] = useState('')
-  const [when, setWhen] = useState('')
-  const [duration, setDuration] = useState('')
-  const [notes, setNotes] = useState('')
-  const [tacticIds, setTacticIds] = useState([])
-  const [playerIds, setPlayerIds] = useState([])
+  const [teamId, setTeamId] = useState(editing ? String(training.team?.id ?? '') : '')
+  const [title, setTitle] = useState(training?.title ?? '')
+  const [when, setWhen] = useState(toLocalInput(training?.scheduled_at))
+  const [duration, setDuration] = useState(training?.duration_minutes ? String(training.duration_minutes) : '')
+  const [notes, setNotes] = useState(training?.notes ?? '')
+  const [tacticIds, setTacticIds] = useState((training?.tactics ?? []).map((tc) => tc.id))
+  const [playerIds, setPlayerIds] = useState((training?.players ?? []).map((p) => p.id))
+  const [assignments, setAssignments] = useState([]) // create-only: [{ user_id, map, nade_type }]
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(editing)
 
   const { team } = useTeam(teamId || null)
   const members = team?.members ?? []
@@ -35,25 +47,49 @@ export default function TrainingForm({ onCreated }) {
   const toggle = (setter) => (id) =>
     setter((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
 
-  if (manageable.length === 0) return null
+  // Dropping a player from the roster drops their homework too — you can't assign to
+  // someone who won't be there (the server enforces this; we keep the form honest).
+  const togglePlayer = (id) => {
+    setPlayerIds((cur) => {
+      const removing = cur.includes(id)
+      if (removing) setAssignments((as) => as.filter((a) => a.user_id !== id))
+      return removing ? cur.filter((x) => x !== id) : [...cur, id]
+    })
+  }
+
+  // A practice with nobody to run it or nothing to drill isn't a session — the server
+  // enforces this too, but we'd rather explain it here than bounce a 422.
+  const incomplete = playerIds.length === 0 || tacticIds.length === 0
+
+  if (!editing && manageable.length === 0) return null
+
+  const close = () => {
+    setOpen(false)
+    onClose?.()
+  }
 
   const submit = async (e) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
+    const payload = {
+      title,
+      notes: notes || null,
+      scheduled_at: new Date(when).toISOString(),
+      duration_minutes: duration ? Number(duration) : null,
+      tactic_ids: tacticIds,
+      player_ids: playerIds,
+    }
     try {
-      const training = await createTraining({
-        team_id: Number(teamId),
-        title,
-        notes: notes || null,
-        scheduled_at: new Date(when).toISOString(),
-        duration_minutes: duration ? Number(duration) : null,
-        tactic_ids: tacticIds,
-        player_ids: playerIds,
-      })
-      setTitle(''); setWhen(''); setDuration(''); setNotes(''); setTacticIds([]); setPlayerIds([])
-      setOpen(false)
-      onCreated?.(training)
+      const saved = editing
+        ? await updateTraining(training.id, payload)
+        : await createTraining({ team_id: Number(teamId), ...payload, assignments })
+      if (!editing) {
+        setTitle(''); setWhen(''); setDuration(''); setNotes(''); setTacticIds([]); setPlayerIds([]); setAssignments([])
+      }
+      setOpen(editing)
+      onSaved?.(saved)
+      onClose?.()
     } catch (err) {
       setError(err.code ?? 'error.unknown')
     } finally {
@@ -71,14 +107,22 @@ export default function TrainingForm({ onCreated }) {
 
   return (
     <form className="pf-card tr-form" onSubmit={submit}>
-      <h3>Schedule training</h3>
+      <h3>{editing ? 'Edit training' : 'Schedule training'}</h3>
 
       <div className="tr-form-row">
         <label>
           Team
-          <select value={teamId} onChange={(e) => { setTeamId(e.target.value); setPlayerIds([]); setTacticIds([]) }} required>
+          <select
+            value={teamId}
+            onChange={(e) => { setTeamId(e.target.value); setPlayerIds([]); setTacticIds([]) }}
+            disabled={editing}
+            required
+          >
             <option value="" disabled>Pick a team</option>
             {manageable.map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
+            {editing && !manageable.some((tm) => String(tm.id) === teamId) && (
+              <option value={teamId}>{training.team?.name}</option>
+            )}
           </select>
         </label>
         <label>
@@ -107,7 +151,7 @@ export default function TrainingForm({ onCreated }) {
                 key={m.id}
                 type="button"
                 className={`tr-chip${playerIds.includes(m.id) ? ' on' : ''}`}
-                onClick={() => toggle(setPlayerIds)(m.id)}
+                onClick={() => togglePlayer(m.id)}
               >
                 {m.name}
               </button>
@@ -128,6 +172,15 @@ export default function TrainingForm({ onCreated }) {
               </button>
             ))}
           </div>
+
+          {!editing && playerIds.length > 0 && (
+            <HomeworkPicker
+              roster={members.filter((m) => playerIds.includes(m.id))}
+              tactics={offerable.filter((tc) => tacticIds.includes(tc.id))}
+              assignments={assignments}
+              onChange={setAssignments}
+            />
+          )}
         </>
       )}
 
@@ -139,8 +192,11 @@ export default function TrainingForm({ onCreated }) {
       {error && <p className="error">{t(error)}</p>}
 
       <div className="tr-form-actions">
-        <button type="submit" disabled={saving || !teamId}>Schedule</button>
-        <button type="button" className="link-btn" onClick={() => setOpen(false)}>cancel</button>
+        <button type="submit" disabled={saving || !teamId || incomplete}>{editing ? 'Save changes' : 'Schedule'}</button>
+        <button type="button" className="link-btn" onClick={close}>cancel</button>
+        {teamId && incomplete && (
+          <span className="tr-form-hint">Pick at least one player and one tactic.</span>
+        )}
       </div>
     </form>
   )

@@ -65,6 +65,49 @@ class TrainingSessionTest extends TestCase
         $this->assertSame(2, $payload['players']);
     }
 
+    public function test_a_coach_attaches_homework_while_scheduling(): void
+    {
+        $tactic = Tactic::factory()->create(['user_id' => $this->player->id]);
+
+        Sanctum::actingAs($this->coach);
+
+        $this->postJson('/api/trainings', [
+            'team_id' => $this->team->id,
+            'title' => 'A-executes + retakes',
+            'scheduled_at' => now()->addDay()->toISOString(),
+            'tactic_ids' => [$tactic->id],
+            'player_ids' => [$this->player->id, $this->coach->id],
+            'assignments' => [
+                ['user_id' => $this->player->id, 'map' => 'de_overpass', 'nade_type' => 'smoke'],
+                ['user_id' => $this->player->id, 'map' => 'de_overpass', 'nade_type' => 'flashbang'],
+            ],
+        ])
+            ->assertCreated()
+            ->assertJsonCount(2, 'data.assignments')
+            ->assertJsonPath('data.assignments.0.map', 'de_overpass');
+    }
+
+    public function test_homework_on_create_must_target_a_rostered_player(): void
+    {
+        $tactic = Tactic::factory()->create(['user_id' => $this->player->id]);
+
+        Sanctum::actingAs($this->coach);
+
+        // The coach is a team member but was left off this session's roster.
+        $this->postJson('/api/trainings', [
+            'team_id' => $this->team->id,
+            'title' => 'x',
+            'scheduled_at' => now()->addDay()->toISOString(),
+            'tactic_ids' => [$tactic->id],
+            'player_ids' => [$this->player->id],
+            'assignments' => [
+                ['user_id' => $this->coach->id, 'map' => 'de_overpass', 'nade_type' => 'smoke'],
+            ],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['assignments.0.user_id' => 'training.invalid_assignee']);
+    }
+
     public function test_a_player_cannot_schedule_for_the_team(): void
     {
         Sanctum::actingAs($this->player);
@@ -108,6 +151,41 @@ class TrainingSessionTest extends TestCase
         ])
             ->assertUnprocessable()
             ->assertJsonPath('errors.tactic_ids.0', 'training.invalid_tactic');
+    }
+
+    public function test_a_session_needs_at_least_one_tactic_and_one_player(): void
+    {
+        $tactic = Tactic::factory()->create(['user_id' => $this->player->id]);
+
+        Sanctum::actingAs($this->coach);
+
+        // No roster.
+        $this->postJson('/api/trainings', [
+            'team_id' => $this->team->id,
+            'title' => 'empty',
+            'scheduled_at' => now()->addDay()->toISOString(),
+            'tactic_ids' => [$tactic->id],
+            'player_ids' => [],
+        ])->assertUnprocessable()->assertJsonPath('errors.player_ids.0', 'training.invalid_player');
+
+        // No tactics.
+        $this->postJson('/api/trainings', [
+            'team_id' => $this->team->id,
+            'title' => 'empty',
+            'scheduled_at' => now()->addDay()->toISOString(),
+            'tactic_ids' => [],
+            'player_ids' => [$this->player->id],
+        ])->assertUnprocessable()->assertJsonPath('errors.tactic_ids.0', 'training.invalid_tactic');
+    }
+
+    public function test_editing_cannot_empty_the_roster_or_tactics(): void
+    {
+        $session = $this->sessionWithRoster();
+
+        Sanctum::actingAs($this->coach);
+
+        $this->patchJson("/api/trainings/{$session->id}", ['player_ids' => []])
+            ->assertUnprocessable()->assertJsonPath('errors.player_ids.0', 'training.invalid_player');
     }
 
     public function test_members_view_and_strangers_get_403(): void
@@ -177,6 +255,22 @@ class TrainingSessionTest extends TestCase
 
         Sanctum::actingAs($this->player); // team member, but not invited
 
+        $this->patchJson("/api/trainings/{$session->id}/rsvp", ['going' => true])->assertForbidden();
+    }
+
+    public function test_even_a_master_admin_off_the_roster_cannot_rsvp(): void
+    {
+        $session = $this->sessionWithRoster();
+        $admin = User::factory()->create(['role' => 'admin']); // Gate::before bypasses everything else
+
+        Sanctum::actingAs($admin);
+
+        // The admin is not on this roster — there's no invite to answer. `can.rsvp` is false…
+        $this->getJson("/api/trainings/{$session->id}")
+            ->assertOk()
+            ->assertJsonPath('data.can.rsvp', false);
+
+        // …and the endpoint itself refuses, despite the admin's blanket policy bypass.
         $this->patchJson("/api/trainings/{$session->id}/rsvp", ['going' => true])->assertForbidden();
     }
 

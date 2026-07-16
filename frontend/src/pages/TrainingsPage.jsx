@@ -13,6 +13,7 @@ export default function TrainingsPage() {
   const now = Date.now()
   const upcoming = trainings.filter((s) => new Date(s.scheduled_at).getTime() >= now)
   const past = trainings.filter((s) => new Date(s.scheduled_at).getTime() < now).reverse()
+  const live = upcoming.filter((s) => !s.canceled_at)
 
   // The hero is the soonest session that's actually happening; a canceled one
   // stays in the ordinary list, struck through — that's information too.
@@ -21,10 +22,20 @@ export default function TrainingsPage() {
 
   return (
     <section className="trainings">
-      <div className="tr-head">
-        <h2>Trainings</h2>
-        <TrainingForm onCreated={refresh} />
-      </div>
+      <header className="tr-masthead">
+        <div className="tr-masthead-line">
+          <span className="tr-eyebrow">Practice log</span>
+          <TrainingForm onSaved={refresh} />
+        </div>
+        <h2 className="tr-masthead-title">Trainings</h2>
+        <p className="tr-masthead-count">
+          {live.length > 0
+            ? <><strong>{live.length}</strong> upcoming</>
+            : 'Nothing on the calendar'}
+          <span aria-hidden="true"> · </span>
+          <strong>{past.length}</strong> logged
+        </p>
+      </header>
 
       {error && <p className="error">{t(error)}</p>}
       {loading && <p className="muted">Loading…</p>}

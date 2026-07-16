@@ -3583,21 +3583,51 @@ a.brand:hover .brand-mark {
 
 /* --- Trainings: the practice schedule --- */
 
-.tr-head {
+.tr-masthead {
+  margin-bottom: 22px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tr-masthead-line {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
 }
 
-.tr-head h2 {
-  margin: 0;
+.tr-eyebrow {
+  font: 500 11px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
+}
+
+.tr-masthead-title {
+  margin: 2px 0 0;
+  font: 600 46px/0.95 var(--display);
+  letter-spacing: 0.01em;
+  color: var(--text-h);
+}
+
+.tr-masthead-count {
+  margin: 6px 0 0;
+  font: 400 13px var(--mono);
+  color: var(--text-dim);
+}
+
+.tr-masthead-count strong {
+  font-weight: 600;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
 }
 
 .tr-open-form {
   flex: 0 0 auto;
+}
+
+@media (max-width: 600px) {
+  .tr-masthead-title { font-size: 38px; }
 }
 
 .tr-form {
@@ -3656,6 +3686,90 @@ a.brand:hover .brand-mark {
   gap: 12px;
 }
 
+.tr-form-hint {
+  font: 400 12px var(--sans);
+  color: var(--text-dim);
+}
+
+/* Homework-on-create: one row per rostered player, nade chips keyed to a shared map. */
+.hw {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hw-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hw-map {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 400 12px var(--sans);
+  color: var(--text-dim);
+}
+
+.hw-map select {
+  padding: 2px 6px;
+}
+
+.hw-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hw-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hw-name {
+  flex: 0 0 120px;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hw-chips {
+  display: flex;
+  gap: 4px;
+}
+
+.hw-chip {
+  font: 500 10px var(--mono);
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+
+.hw-chip:hover,
+.hw-chip:focus-visible {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.hw-chip.on {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
 .tr-section {
   font: 500 11px var(--mono);
   text-transform: uppercase;
@@ -3681,6 +3795,14 @@ a.brand:hover .brand-mark {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 16px;
+}
+
+/* In edit mode the row hands its slot to the form, which brings its own card chrome. */
+.tr-card-editing {
+  display: block;
+  padding: 0;
+  background: none;
+  border: none;
 }
 
 .tr-when {
@@ -3771,8 +3893,59 @@ a.brand:hover .brand-mark {
 .tr-actions {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  align-items: flex-end;
+  gap: 6px;
+  align-items: stretch;
+}
+
+/* Three controls, three natures. Operator-style mono to match the feature's eyebrows;
+   the form encodes what each does, so the eye reads intent before it reads the word. */
+.tr-act {
+  font: 500 11px var(--mono);
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  text-align: center;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+
+/* edit — the reason you're here: the one bordered, clickable-looking control. */
+.tr-act-edit {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.tr-act-edit:hover,
+.tr-act-edit:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+/* cancel/restore — reversible bookkeeping, so it stays quiet and never alarms. */
+.tr-act-cancel:hover,
+.tr-act-cancel:focus-visible {
+  color: var(--text-h);
+  background: var(--hover);
+}
+
+/* delete — final. Set apart by a hairline, and its danger register only shows on
+   approach, so a list of cards never turns into a wall of red. */
+.tr-act-delete {
+  margin-top: 2px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 5px 5px;
+  padding-top: 6px;
+}
+
+.tr-act-delete:hover,
+.tr-act-delete:focus-visible {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: var(--danger);
 }
 
 @media (max-width: 600px) {
@@ -3797,6 +3970,14 @@ a.brand:hover .brand-mark {
   border-radius: 12px;
   padding: 24px 26px;
   margin-bottom: 20px;
+}
+
+/* Editing the hero: drop the committed-dark shell and radar so the form reads plainly. */
+.tr-next-editing {
+  overflow: visible;
+  padding: 0;
+  background: none;
+  border: none;
 }
 
 .tr-next::before {
@@ -3897,12 +4078,40 @@ a.brand:hover .brand-mark {
 
 .tr-next-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 14px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
 }
 
-.tr-next-actions .link-btn {
+/* On the committed-dark hero the same three intents read against a darker surface,
+   and the row is horizontal — so delete's divider sits to its left, not above. */
+.tr-next-actions .tr-act {
   color: #8b98a9;
+}
+
+.tr-next-actions .tr-act-edit {
+  color: #cdd6e1;
+  border-color: #2f3a48;
+}
+
+.tr-next-actions .tr-act-edit:hover,
+.tr-next-actions .tr-act-edit:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.tr-next-actions .tr-act-cancel:hover,
+.tr-next-actions .tr-act-cancel:focus-visible {
+  color: #ecf1f7;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tr-next-actions .tr-act-delete {
+  margin: 0 0 0 4px;
+  border-top: none;
+  border-left: 1px solid #232c38;
+  border-radius: 5px;
+  padding: 4px 10px 4px 14px;
 }
 
 /* History reads as history. */

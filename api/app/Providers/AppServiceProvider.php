@@ -43,8 +43,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // The master admin passes every policy check. Returning null (not false) lets
-        // non-admins fall through to the ordinary policy.
-        Gate::before(fn (User $user) => $user->isAdmin() ? true : null);
+        // non-admins fall through to the ordinary policy. `rsvp` is exempt: answering an
+        // invite is a self-only act — there's no invite to answer if you're not on the
+        // roster, so admin power doesn't apply. It falls through to the policy for everyone.
+        Gate::before(fn (User $user, string $ability) => $user->isAdmin() && $ability !== 'rsvp' ? true : null);
 
         // Named ability for admin-only routes (`->middleware('can:admin')`). Non-admins fall
         // here from Gate::before and are denied; admins never reach it (short-circuited above).

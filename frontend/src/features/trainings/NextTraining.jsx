@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { updateTraining, deleteTraining } from './api'
+import TrainingForm from './TrainingForm'
 import { MyPrep, RsvpButtons } from './TrainingPrep'
 import { mapLabel, formatMatchTime } from '../matches/format'
 import { radarUrl, hasRadar } from '../matches/radar'
@@ -20,6 +22,20 @@ const countdown = (iso) => {
 // tactics board, so radars read in both themes). Everything after it stays quiet.
 export default function NextTraining({ training, onChanged }) {
   const navigate = useNavigate()
+  const [editing, setEditing] = useState(false)
+
+  if (editing) {
+    return (
+      <section className="tr-next tr-next-editing">
+        <TrainingForm
+          training={training}
+          onSaved={onChanged}
+          onClose={() => setEditing(false)}
+        />
+      </section>
+    )
+  }
+
   const when = new Date(training.scheduled_at)
   const day = when.toLocaleDateString(undefined, { weekday: 'long' })
   const date = when.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })
@@ -74,10 +90,13 @@ export default function NextTraining({ training, onChanged }) {
 
         {training.can?.manage && (
           <div className="tr-next-actions">
-            <button type="button" className="link-btn" onClick={async () => { await updateTraining(training.id, { canceled: true }); onChanged?.() }}>
+            <button type="button" className="tr-act tr-act-edit" onClick={() => setEditing(true)}>
+              edit
+            </button>
+            <button type="button" className="tr-act tr-act-cancel" onClick={async () => { await updateTraining(training.id, { canceled: true }); onChanged?.() }}>
               cancel
             </button>
-            <button type="button" className="link-btn" onClick={async () => { await deleteTraining(training.id); onChanged?.() }}>
+            <button type="button" className="tr-act tr-act-delete" onClick={async () => { await deleteTraining(training.id); onChanged?.() }}>
               delete
             </button>
           </div>

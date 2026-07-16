@@ -81,9 +81,14 @@ in the client. Swapping study sites is a one-module frontend change.
    `training.invalid_nade`. (RSVP by a non-roster caller is an authorization matter —
    403 — not a validation code.)
 7. **Self-only actions**: RSVP (`in`/`out`) and marking an assignment done belong to the
-   player themselves — `training.manage` does not grant them. The coach assigns and
-   invites; only the student can say "I'll be there" or "studied it".
+   player themselves — `training.manage` does not grant them, and the **master admin is
+   exempt from the `Gate::before` bypass for `rsvp`** (there is no invite to answer if you
+   aren't on the roster). The coach assigns and invites; only the student can say "I'll be
+   there" or "studied it".
 8. Assignment assignees must be on the session's roster (homework is for attendees).
+9. **A session is never empty.** Scheduling — and editing — requires at least one tactic
+   to drill and at least one player on the roster; an empty practice is a mistake, not a
+   state. Violations return `training.invalid_tactic` / `training.invalid_player`.
 
 ## API surface (Phase 2)
 

@@ -4,7 +4,9 @@ namespace App\Http\Requests\Trainings;
 
 use App\Contracts\PermissionService;
 use App\Models\Team;
+use App\Models\TrainingAssignment;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreTrainingSessionRequest extends FormRequest
 {
@@ -28,10 +30,16 @@ class StoreTrainingSessionRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:2000'],
             'scheduled_at' => ['required', 'date'],
             'duration_minutes' => ['nullable', 'integer', 'between:1,600'],
-            'tactic_ids' => ['nullable', 'array'],
+            'tactic_ids' => ['required', 'array', 'min:1'],
             'tactic_ids.*' => ['integer'],
-            'player_ids' => ['nullable', 'array'],
+            'player_ids' => ['required', 'array', 'min:1'],
             'player_ids.*' => ['integer'],
+            // Optional homework picked during scheduling. Roster-membership is checked in
+            // withValidator against the submitted player_ids (the roster doesn't exist yet).
+            'assignments' => ['sometimes', 'array'],
+            'assignments.*.user_id' => ['required', 'integer'],
+            'assignments.*.map' => ['required', 'string', 'max:32'],
+            'assignments.*.nade_type' => ['required', Rule::in(TrainingAssignment::NADE_TYPES)],
         ];
     }
 
@@ -42,7 +50,15 @@ class StoreTrainingSessionRequest extends FormRequest
             if (! $team) {
                 return; // team_id rule already failed
             }
-            TrainingReferences::check($v, $team, $this->input('tactic_ids', []) ?? [], $this->input('player_ids', []) ?? []);
+            $playerIds = $this->input('player_ids', []) ?? [];
+            TrainingReferences::check($v, $team, $this->input('tactic_ids', []) ?? [], $playerIds);
+
+            // Homework is for attendees: every assignee must be in the submitted roster.
+            foreach ($this->input('assignments', []) ?? [] as $i => $a) {
+                if (! in_array($a['user_id'] ?? null, $playerIds)) {
+                    $v->errors()->add("assignments.$i.user_id", 'training.invalid_assignee');
+                }
+            }
         });
     }
 
@@ -60,10 +76,21 @@ class StoreTrainingSessionRequest extends FormRequest
             'scheduled_at.date' => 'training.invalid_time',
             'duration_minutes.integer' => 'training.invalid_duration',
             'duration_minutes.between' => 'training.invalid_duration',
+            'tactic_ids.required' => 'training.invalid_tactic',
             'tactic_ids.array' => 'training.invalid_tactic',
+            'tactic_ids.min' => 'training.invalid_tactic',
             'tactic_ids.*.integer' => 'training.invalid_tactic',
+            'player_ids.required' => 'training.invalid_player',
             'player_ids.array' => 'training.invalid_player',
+            'player_ids.min' => 'training.invalid_player',
             'player_ids.*.integer' => 'training.invalid_player',
+            'assignments.*.user_id.required' => 'training.invalid_assignee',
+            'assignments.*.user_id.integer' => 'training.invalid_assignee',
+            'assignments.*.map.required' => 'training.invalid_nade',
+            'assignments.*.map.string' => 'training.invalid_nade',
+            'assignments.*.map.max' => 'training.invalid_nade',
+            'assignments.*.nade_type.required' => 'training.invalid_nade',
+            'assignments.*.nade_type.in' => 'training.invalid_nade',
         ];
     }
 }

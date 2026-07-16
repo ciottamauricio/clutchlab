@@ -22,9 +22,9 @@ class UpdateTrainingSessionRequest extends FormRequest
             'scheduled_at' => ['sometimes', 'date'],
             'duration_minutes' => ['sometimes', 'nullable', 'integer', 'between:1,600'],
             'canceled' => ['sometimes', 'boolean'],
-            'tactic_ids' => ['sometimes', 'array'],
+            'tactic_ids' => ['sometimes', 'array', 'min:1'],
             'tactic_ids.*' => ['integer'],
-            'player_ids' => ['sometimes', 'array'],
+            'player_ids' => ['sometimes', 'array', 'min:1'],
             'player_ids.*' => ['integer'],
         ];
     }
@@ -53,8 +53,10 @@ class UpdateTrainingSessionRequest extends FormRequest
             'duration_minutes.between' => 'training.invalid_duration',
             'canceled.boolean' => 'training.invalid_canceled',
             'tactic_ids.array' => 'training.invalid_tactic',
+            'tactic_ids.min' => 'training.invalid_tactic',
             'tactic_ids.*.integer' => 'training.invalid_tactic',
             'player_ids.array' => 'training.invalid_player',
+            'player_ids.min' => 'training.invalid_player',
             'player_ids.*.integer' => 'training.invalid_player',
         ];
     }

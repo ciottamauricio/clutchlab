@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { updateTraining, deleteTraining } from './api'
+import TrainingForm from './TrainingForm'
 import TrainingPrep, { RsvpButtons } from './TrainingPrep'
 import { mapLabel, formatMatchTime } from '../matches/format'
 
@@ -12,7 +14,20 @@ const dayLabel = (iso) => {
 // record (a struck-through session tells a story); delete removes it.
 export default function TrainingCard({ training, onChanged }) {
   const navigate = useNavigate()
+  const [editing, setEditing] = useState(false)
   const canceled = Boolean(training.canceled_at)
+
+  if (editing) {
+    return (
+      <li className="tr-card tr-card-editing">
+        <TrainingForm
+          training={training}
+          onSaved={onChanged}
+          onClose={() => setEditing(false)}
+        />
+      </li>
+    )
+  }
 
   const toggleCancel = async () => {
     await updateTraining(training.id, { canceled: !canceled })
@@ -64,10 +79,11 @@ export default function TrainingCard({ training, onChanged }) {
 
       {training.can?.manage && (
         <div className="tr-actions">
-          <button type="button" className="link-btn" onClick={toggleCancel}>
+          <button type="button" className="tr-act tr-act-edit" onClick={() => setEditing(true)}>edit</button>
+          <button type="button" className="tr-act tr-act-cancel" onClick={toggleCancel}>
             {canceled ? 'restore' : 'cancel'}
           </button>
-          <button type="button" className="link-btn" onClick={remove}>delete</button>
+          <button type="button" className="tr-act tr-act-delete" onClick={remove}>delete</button>
         </div>
       )}
     </li>
