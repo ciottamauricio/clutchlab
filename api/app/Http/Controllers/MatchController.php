@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\DeleteMatchAction;
+use App\Actions\Matches\ComputeViewerResultsAction;
 use App\Actions\ReparseMatchAction;
 use App\Actions\UpdateMatchTeamAction;
 use App\Actions\UploadDemoAction;
@@ -12,13 +13,14 @@ use App\Http\Requests\UpdateMatchRequest;
 use App\Http\Requests\UploadDemoRequest;
 use App\Http\Resources\MatchResource;
 use App\Models\GameMatch;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MatchController extends Controller
 {
-    public function index(ListMatchesRequest $request): JsonResponse
+    public function index(ListMatchesRequest $request, ComputeViewerResultsAction $viewerResults): JsonResponse
     {
         $matches = GameMatch::with(['team', 'owner'])
             ->visibleTo($request->user())
@@ -30,8 +32,31 @@ class MatchController extends Controller
                     "LOWER(name) LIKE ? ESCAPE '\\'",
                     ['%'.addcslashes(mb_strtolower($player), '%_\\').'%'],
                 )))
+            // A month filter means "played in that calendar month" — matches without a
+            // played_at (unrecognized filename) only show in the unfiltered view.
+            ->when($request->validated('month'), function ($query, $month) {
+                $start = CarbonImmutable::createFromFormat('!Y-m', $month, 'UTC');
+                $query->where('played_at', '>=', $start)
+                    ->where('played_at', '<', $start->addMonth());
+            })
+            ->when($request->validated('day'), function ($query, $day) {
+                $start = CarbonImmutable::createFromFormat('!Y-m-d', $day, 'UTC');
+                $query->where('played_at', '>=', $start)
+                    ->where('played_at', '<', $start->addDay());
+            })
+            // Most recently *played* first. played_at can be null (unrecognized filename
+            // or not yet parsed); those sort to the bottom, then by upload time. The
+            // `played_at is null` expression makes NULL-placement portable — Postgres sorts
+            // NULLs last on DESC, sqlite (test DB) sorts them first, so we order it ourselves.
+            ->orderByRaw('played_at is null')
+            ->orderByDesc('played_at')
             ->latest()
-            ->get();
+            ->paginate(10)
+            ->withQueryString();
+
+        // Mark each match with the viewer's result (win/loss/draw) where the game was
+        // theirs — their own seat, or a 4+ stack from one of their teams.
+        $viewerResults->execute(collect($matches->items()), $request->user());
 
         return MatchResource::collection($matches)->response();
     }

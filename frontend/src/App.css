@@ -575,6 +575,107 @@
   font-size: 13.5px;
 }
 
+/* Archive instruments: month stepper above the list, chronology pager below. All in
+   the app's mono operator register; no new colors — tokens only. */
+.arch-months {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.arch-step {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font: 600 13px/1 var(--mono);
+  cursor: pointer;
+}
+
+.arch-step:hover,
+.arch-step:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.arch-month {
+  min-width: 78px;
+  text-align: center;
+  font: 600 12px var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+.arch-day {
+  min-width: 104px;
+}
+
+.arch-all {
+  padding: 2px 4px;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-dim);
+  font: 500 11px var(--mono);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.arch-all:hover,
+.arch-all:focus-visible {
+  color: var(--accent);
+}
+
+.arch-total {
+  margin-left: auto;
+  font: 400 11px var(--mono);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.arch-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.arch-pager button {
+  padding: 2px 6px;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-dim);
+  font: 500 11px var(--mono);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.arch-pager button:hover:not(:disabled),
+.arch-pager button:focus-visible {
+  color: var(--accent);
+}
+
+.arch-pager button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.arch-page {
+  font: 400 11px var(--mono);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.match-empty {
+  font-size: 13px;
+}
+
 .match-list {
   list-style: none;
   padding: 0;
@@ -634,14 +735,63 @@
   border-color: var(--danger);
 }
 
+/* The viewer's result on a card: the left stripe carries the color, the W/L/D letter
+   carries the word (never color alone). On a selected card the result stripe outranks
+   the neutral selection stripe — selection still reads via background + border. */
+.match-list .match-open.res-win,
+.match-list li.active .match-open.res-win {
+  box-shadow: inset 3px 0 0 var(--win);
+}
+
+.match-list .match-open.res-loss,
+.match-list li.active .match-open.res-loss {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.match-list .match-open.res-draw,
+.match-list li.active .match-open.res-draw {
+  box-shadow: inset 3px 0 0 var(--t);
+}
+
 .mc-line {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  /* Never overlap, never truncate: when the name and the date can't share the row,
+     the date drops to its own line (kept right-aligned by its auto margin). */
+  flex-wrap: wrap;
+  gap: 2px 8px;
   width: 100%;
   min-width: 0;
 }
+
+/* The map/date header line reads left-to-right as one phrase: result, map, then the
+   date trailing it — and both rows stay left when it wraps. */
+.mc-line.mc-head {
+  justify-content: flex-start;
+}
+
+.mc-map-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mc-result {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font: 700 10px var(--mono);
+}
+
+.mc-res-win { color: var(--win); background: var(--win-bg); }
+.mc-res-loss { color: var(--danger); background: var(--danger-bg); }
+.mc-res-draw { color: var(--t); background: var(--t-bg); }
 
 .mc-map {
   font: 600 16px var(--display);
@@ -1128,6 +1278,8 @@ button.clutch-open:hover {
   font: 400 12px var(--mono);
   color: var(--text-dim);
 }
+
+/* The map being plotted — same display voice as the match card's map name. */
 
 .radar-legend {
   display: flex;

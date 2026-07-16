@@ -86,4 +86,88 @@ class MatchAuthorizationTest extends TestCase
         $this->assertTrue($ids->contains($teams->id));
         $this->assertFalse($ids->contains($foreign->id));
     }
+
+    public function test_the_list_is_ordered_by_most_recently_played(): void
+    {
+        $me = User::factory()->create();
+
+        $old = GameMatch::factory()->create(['user_id' => $me->id, 'played_at' => '2026-06-01 20:00:00']);
+        $recent = GameMatch::factory()->create(['user_id' => $me->id, 'played_at' => '2026-07-10 20:00:00']);
+        $undated = GameMatch::factory()->create(['user_id' => $me->id, 'played_at' => null]);
+
+        Sanctum::actingAs($me);
+
+        $ids = collect($this->getJson('/api/matches')->assertOk()->json('data'))->pluck('id');
+
+        // Most recently played on top; the undated match sinks to the bottom.
+        $this->assertSame([$recent->id, $old->id, $undated->id], $ids->all());
+    }
+
+    public function test_the_list_filters_by_the_month_a_match_was_played(): void
+    {
+        $me = User::factory()->create();
+
+        $june = GameMatch::factory()->create(['user_id' => $me->id, 'played_at' => '2026-06-15 21:00:00']);
+        $july = GameMatch::factory()->create(['user_id' => $me->id, 'played_at' => '2026-07-02 21:00:00']);
+        $undated = GameMatch::factory()->create(['user_id' => $me->id, 'played_at' => null]);
+
+        Sanctum::actingAs($me);
+
+        $ids = collect($this->getJson('/api/matches?month=2026-06')->assertOk()->json('data'))->pluck('id');
+
+        // Only June's match — July and the undated one stay out of a month view.
+        $this->assertSame([$june->id], $ids->all());
+        $this->assertFalse($ids->contains($july->id));
+        $this->assertFalse($ids->contains($undated->id));
+
+        $this->getJson('/api/matches?month=july')
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.month.0', 'match.invalid_month');
+    }
+
+    public function test_the_list_filters_by_the_day_a_match_was_played(): void
+    {
+        $me = User::factory()->create();
+
+        $thatEvening = GameMatch::factory()->create(['user_id' => $me->id, 'played_at' => '2026-07-09 23:49:00']);
+        $earlyThatDay = GameMatch::factory()->create(['user_id' => $me->id, 'played_at' => '2026-07-09 00:15:00']);
+        $dayBefore = GameMatch::factory()->create(['user_id' => $me->id, 'played_at' => '2026-07-08 22:00:00']);
+
+        Sanctum::actingAs($me);
+
+        $ids = collect($this->getJson('/api/matches?day=2026-07-09')->assertOk()->json('data'))->pluck('id');
+
+        // The whole day, midnight to midnight — and nothing from adjacent days.
+        $this->assertSame([$thatEvening->id, $earlyThatDay->id], $ids->all());
+        $this->assertFalse($ids->contains($dayBefore->id));
+
+        $this->getJson('/api/matches?day=yesterday')
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.day.0', 'match.invalid_day');
+    }
+
+    public function test_the_list_paginates_ten_per_page(): void
+    {
+        $me = User::factory()->create();
+
+        foreach (range(1, 12) as $day) {
+            GameMatch::factory()->create([
+                'user_id' => $me->id,
+                'played_at' => sprintf('2026-07-%02d 21:00:00', $day),
+            ]);
+        }
+
+        Sanctum::actingAs($me);
+
+        $first = $this->getJson('/api/matches')->assertOk();
+        $first->assertJsonCount(10, 'data')
+            ->assertJsonPath('meta.total', 12)
+            ->assertJsonPath('meta.per_page', 10)
+            ->assertJsonPath('meta.last_page', 2);
+
+        // Page 2 carries the oldest two (the list is played-desc).
+        $second = $this->getJson('/api/matches?page=2')->assertOk();
+        $second->assertJsonCount(2, 'data')
+            ->assertJsonPath('meta.current_page', 2);
+    }
 }

@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, tokenStore } from '../../lib/api'
 
-const listMatches = (player) =>
-  api.get(player ? `/matches?player=${encodeURIComponent(player)}` : '/matches')
+const listMatches = (player, month, day, page) => {
+  const params = new URLSearchParams()
+  if (player) params.set('player', player)
+  if (month) params.set('month', month)
+  if (day) params.set('day', day)
+  if (page > 1) params.set('page', page)
+  const qs = params.toString()
+  return api.getPage(`/matches${qs ? `?${qs}` : ''}`)
+}
 const getMatch = (id) => api.get(`/matches/${id}`)
 const getKillPositions = (id) => api.get(`/matches/${id}/kill-positions`)
 const getClutches = (id) => api.get(`/matches/${id}/clutches`)
@@ -25,9 +32,12 @@ const TERMINAL = new Set(['parsed', 'failed'])
 
 // Polls the match list so status changes (queued -> parsing -> parsed) show up
 // without a manual refresh. `player` filters server-side by player name; it is
-// debounced here so a keystroke doesn't fire a request.
-export function useMatches(pollMs = 3000, player = '') {
+// debounced here so a keystroke doesn't fire a request. `month` (YYYY-MM) and `day`
+// (YYYY-MM-DD) map straight to the API's filters ('' = inactive); `meta` is Laravel's
+// pagination block ({ current_page, last_page, total, … }).
+export function useMatches(pollMs = 3000, player = '', month = '', day = '', page = 1) {
   const [matches, setMatches] = useState([])
+  const [meta, setMeta] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState(player.trim())
@@ -39,14 +49,16 @@ export function useMatches(pollMs = 3000, player = '') {
 
   const refresh = useCallback(async () => {
     try {
-      setMatches(await listMatches(query))
+      const res = await listMatches(query, month, day, page)
+      setMatches(res?.data ?? [])
+      setMeta(res?.meta ?? null)
       setError(null)
     } catch (e) {
       setError(e.code ?? 'error.unknown')
     } finally {
       setLoading(false)
     }
-  }, [query])
+  }, [query, month, day, page])
 
   useEffect(() => {
     refresh()
@@ -54,7 +66,7 @@ export function useMatches(pollMs = 3000, player = '') {
     return () => clearInterval(id)
   }, [refresh, pollMs])
 
-  return { matches, error, loading, refresh }
+  return { matches, meta, error, loading, refresh }
 }
 
 // Polls a single match until it reaches a terminal state, then stops. This is the

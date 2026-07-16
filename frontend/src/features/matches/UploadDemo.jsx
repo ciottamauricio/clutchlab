@@ -8,11 +8,14 @@ const CAN_UPLOAD = new Set(['owner', 'igl'])
 
 export default function UploadDemo({ onUploaded }) {
   const [file, setFile] = useState(null)
-  const [teamId, setTeamId] = useState('')
+  // null = untouched. Teams arrive async, so the "first team" default is derived at
+  // render rather than set as state; an explicit choice (including Private) sticks.
+  const [teamId, setTeamId] = useState(null)
   const inputRef = useRef(null)
   const { teams } = useTeams()
 
   const uploadable = teams.filter((team) => CAN_UPLOAD.has(team.my_role))
+  const effectiveTeamId = teamId ?? (uploadable[0] ? String(uploadable[0].id) : '')
 
   const { upload, uploading, error } = useUploadDemo((match) => {
     setFile(null)
@@ -22,7 +25,7 @@ export default function UploadDemo({ onUploaded }) {
 
   const submit = (e) => {
     e.preventDefault()
-    if (file) upload(file, teamId || null)
+    if (file) upload(file, effectiveTeamId || null)
   }
 
   return (
@@ -34,11 +37,11 @@ export default function UploadDemo({ onUploaded }) {
         onChange={(e) => setFile(e.target.files?.[0] ?? null)}
       />
       {uploadable.length > 0 && (
-        <select value={teamId} onChange={(e) => setTeamId(e.target.value)} aria-label="Team">
-          <option value="">Private — just me</option>
+        <select value={effectiveTeamId} onChange={(e) => setTeamId(e.target.value)} aria-label="Team">
           {uploadable.map((team) => (
             <option key={team.id} value={team.id}>{team.name}</option>
           ))}
+          <option value="">Private — just me</option>
         </select>
       )}
       <button type="submit" disabled={!file || uploading}>

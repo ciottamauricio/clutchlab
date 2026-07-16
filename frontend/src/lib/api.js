@@ -26,7 +26,7 @@ function firstCode(body) {
   return body?.message ?? body?.error ?? 'error.unknown'
 }
 
-async function request(path, { auth = true, headers = {}, ...options } = {}) {
+async function request(path, { auth = true, headers = {}, unwrap = true, ...options } = {}) {
   const finalHeaders = { Accept: 'application/json', ...headers }
   const token = tokenStore.get()
   if (auth && token) finalHeaders.Authorization = `Bearer ${token}`
@@ -46,11 +46,14 @@ async function request(path, { auth = true, headers = {}, ...options } = {}) {
     throw new ApiError(firstCode(body), res.status)
   }
 
-  return body?.data
+  return unwrap ? body?.data : body
 }
 
 export const api = {
   get: (path) => request(path),
+  // Paginated lists: returns the whole Laravel envelope ({ data, links, meta })
+  // instead of unwrapping `data`, so callers can read page counts from `meta`.
+  getPage: (path) => request(path, { unwrap: false }),
   post: (path, data, opts) =>
     request(path, {
       method: 'POST',

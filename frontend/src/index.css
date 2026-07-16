@@ -23,6 +23,7 @@
   --danger: #e0635b;
   --danger-bg: rgba(224, 99, 91, 0.12);
   --win: #56b87b;
+  --win-bg: rgba(86, 184, 123, 0.13);
 
   /* Primary button: "flashbang white" in dark; inverts to dark ink in light. */
   --btn-bg: #e6ecf3;
@@ -70,6 +71,7 @@
   --danger: #cf3b45;
   --danger-bg: rgba(207, 59, 69, 0.1);
   --win: #2f9e5f;
+  --win-bg: rgba(47, 158, 95, 0.1);
 
   --btn-bg: #10151b;
   --btn-text: #f3f5f8;

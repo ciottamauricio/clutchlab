@@ -112,6 +112,12 @@ Transition rules:
     the match's first gun kill (a tick test — round numbers are unreliable because the restart
     around the knife round can merge it with real round 1). Legitimate mid-game knife kills are
     kept. Opening-kill flags are recomputed on the surviving kills.
+11. **The list marks the viewer's result.** `viewer_result` is `'win' | 'loss' | 'draw'`
+    when the game was the viewer's: their own `steam_id` played in it (their seat decides
+    the side), or **at least 4 members of one of their teams** were on the same side (a
+    stack that queued together — per team, never pooled across teams). `null` otherwise,
+    and always `null` off the list endpoint. Computed by
+    `app/Actions/Matches/ComputeViewerResultsAction.php`; presentation-only, never stored.
 
 ## Validation (boundary) — `app/Http/Requests/UploadDemoRequest.php`
 
@@ -136,7 +142,7 @@ upload rights (owner/igl) on the team, or being the uploader.
 
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
-| GET | `/matches` | list matches the caller can see, newest first | own uploads + their teams' matches; `{ data: [...] }`; optional `?player=` narrows to matches whose scoreboard contains that player name (case-insensitive substring; invalid value → `match.invalid_player_filter`) |
+| GET | `/matches` | list matches the caller can see, most recently **played** first (null `played_at` last, then by upload time) | own uploads + their teams' matches; **paginated 10/page** (`{ data, links, meta }`, `?page=`); optional `?player=` narrows to matches whose scoreboard contains that player name (case-insensitive substring; invalid value → `match.invalid_player_filter`); optional `?month=YYYY-MM` / `?day=YYYY-MM-DD` narrow to matches **played** in that calendar month / day (they intersect; undated matches only appear unfiltered; invalid values → `match.invalid_month` / `match.invalid_day`) |
 | POST | `/matches` | upload a demo | multipart `demo`; optional `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
 | GET | `/matches/{match}` | match detail + players | visible only (403 otherwise); players by kills desc |
 | GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | visible only; see [heatmap.md](heatmap.md) |

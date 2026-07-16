@@ -45,6 +45,51 @@ export function mapLabel(name) {
   return bare.charAt(0).toUpperCase() + bare.slice(1)
 }
 
+// Month helpers for the archive's month filter. A month is a plain `YYYY-MM` string —
+// the same value the API's `?month=` filter takes.
+
+export const currentMonth = () => {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+// "2026-07" → "JUL 2026", in the viewer's locale.
+export const monthLabel = (ym) => {
+  const [y, m] = ym.split('-').map(Number)
+  return new Date(y, m - 1, 1)
+    .toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+    .toUpperCase()
+}
+
+// Step a `YYYY-MM` by ±n months; the Date constructor handles year rollover.
+export const stepMonth = (ym, delta) => {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+// Day helpers — a day is a plain `YYYY-MM-DD`, matching the API's `?day=` filter.
+
+export const todayYmd = () => {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+// "2026-07-12" → "SAT, 12 JUL", in the viewer's locale.
+export const dayLabel = (ymd) => {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Date(y, m - 1, d)
+    .toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short' })
+    .toUpperCase()
+}
+
+// Step a `YYYY-MM-DD` by ±n days; the Date constructor handles month/year rollover.
+export const stepDay = (ymd, delta) => {
+  const [y, m, d] = ymd.split('-').map(Number)
+  const dt = new Date(y, m - 1, d + delta)
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+}
+
 // The two teams as { name, score, side }, higher score first (winner on the left).
 // Names fall back to side labels for pug demos that carry no clan name.
 export function matchTeams(match) {

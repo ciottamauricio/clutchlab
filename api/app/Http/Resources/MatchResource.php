@@ -33,6 +33,10 @@ class MatchResource extends JsonResource
             // name lacks it. Cast to datetime, so it serializes with a `Z` and the frontend
             // renders it in the viewer's local timezone (2237 UTC → 19:37 in Brazil, UTC-3).
             'played_at' => $this->played_at,
+            // 'win' | 'loss' | 'draw' when this game was the viewer's (they played, or a
+            // 4+ stack from one of their teams did); null otherwise. List-only annotation
+            // computed by ComputeViewerResultsAction — absent (null) on other endpoints.
+            'viewer_result' => $this->viewer_result ?? null,
             // What the viewer may do with this match, resolved through the policy (so it honors
             // team-role grants and the admin bypass). The client hides buttons it can't use;
             // the server still enforces on the actual request.

@@ -21,6 +21,9 @@ const MESSAGES = {
   'match.upload_forbidden': "You don't have permission to upload matches",
   'match.duplicate': "You've already uploaded this demo",
   'match.invalid_player_filter': 'That player filter is invalid',
+  'match.invalid_month': 'That month filter is invalid',
+  'match.invalid_day': 'That day filter is invalid',
+  'match.invalid_page': 'That page does not exist',
   'tactic.invalid_team': "You can only share with a team you belong to",
 
   'training.invalid_team': "You can't schedule trainings for that team",

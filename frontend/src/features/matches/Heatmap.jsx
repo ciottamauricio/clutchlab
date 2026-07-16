@@ -4,6 +4,7 @@ import { hasRadar, radarUrl, toRadar } from './radar'
 import WeaponSelect from '../search/WeaponSelect'
 import BodyHitgroups from '../../components/BodyHitgroups'
 import WatchInGame from './WatchInGame'
+import { mapLabel } from './format'
 import { t } from '../../lib/i18n'
 
 const SIDES = ['', 'CT', 'T']
@@ -143,7 +144,7 @@ export default function Heatmap({ matchId, players, teams }) {
       {!loading && hasRadar(map) && (
         <>
           <div className="radar-head">
-            <p className="muted">{shown.length} kill{shown.length === 1 ? '' : 's'} shown</p>
+            <p className="muted"><span className="radar-map">{mapLabel(map)}</span> · {shown.length} kill{shown.length === 1 ? '' : 's'} shown</p>
             <div className="radar-legend">
               <span className="lg"><span className="dot dot-CT" /> CT</span>
               <span className="lg"><span className="dot dot-T" /> T</span>

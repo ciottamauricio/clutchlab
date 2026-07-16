@@ -1,6 +1,11 @@
 import StatusBadge from './StatusBadge'
 import { formatMatchDate, formatDuration, matchTeams, matchDate } from './format'
 
+// The viewer's result, when the game was theirs (see matches.md rule 11). The letter
+// carries the meaning, the color carries the mood — never color alone.
+const RESULT_MARK = { win: 'W', loss: 'L', draw: 'D' }
+const RESULT_WORD = { win: 'Won', loss: 'Lost', draw: 'Draw' }
+
 function MatchCard({ match }) {
   const date = formatMatchDate(matchDate(match))
   const duration = formatDuration(match.duration_seconds)
@@ -27,10 +32,22 @@ function MatchCard({ match }) {
   }
 
   const [a, b] = matchTeams(match)
+  const result = match.viewer_result
   return (
     <>
-      <span className="mc-line">
-        <span className="mc-map">{match.map_name || 'unknown map'}</span>
+      <span className="mc-line mc-head">
+        <span className="mc-map-wrap">
+          {result && (
+            <span
+              className={`mc-result mc-res-${result}`}
+              title={RESULT_WORD[result]}
+              aria-label={RESULT_WORD[result]}
+            >
+              {RESULT_MARK[result]}
+            </span>
+          )}
+          <span className="mc-map">{match.map_name || 'unknown map'}</span>
+        </span>
         <span className="mc-date">
           {date}
           {duration && <span className="mc-duration"> · {duration}</span>}
@@ -46,20 +63,20 @@ function MatchCard({ match }) {
   )
 }
 
-export default function MatchList({ matches, selectedId, onSelect, onDelete, deletingId, filtered }) {
+export default function MatchList({ matches, selectedId, onSelect, onDelete, deletingId, empty }) {
   if (!matches.length) {
-    return (
-      <p className="muted">
-        {filtered ? 'No matches with that player.' : 'No demos yet — upload one above.'}
-      </p>
-    )
+    return <div className="muted match-empty">{empty ?? 'No demos yet — upload one above.'}</div>
   }
 
   return (
     <ul className="match-list">
       {matches.map((match) => (
         <li key={match.id} className={match.id === selectedId ? 'active' : ''}>
-          <button type="button" className="match-open" onClick={() => onSelect(match.id)}>
+          <button
+            type="button"
+            className={`match-open${match.viewer_result ? ` res-${match.viewer_result}` : ''}`}
+            onClick={() => onSelect(match.id)}
+          >
             <MatchCard match={match} />
           </button>
           {match.can?.delete && (
