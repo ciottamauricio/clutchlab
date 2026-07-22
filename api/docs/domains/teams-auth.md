@@ -141,12 +141,18 @@ to the DB on first run and never clobbers later admin edits. Current abilities:
 | `team.manage_members` | team | Add/remove members, change team roles |
 | `team.manage_roster` | team | Edit the in-game roster (SteamIDs) |
 | `team.update` | team | Rename / delete the team |
+| `training.manage` | team | Schedule / edit / cancel trainings |
+| `tactics.create` | team | Create a tactic shared with the team |
+| `tactics.edit` | team | Edit the team's shared tactic boards |
+| `tactics.delete` | team | Delete the team's shared tactics |
 | `awards.view` | app | Open the awards page |
 | `search.use` | app | Use kill search |
-| `tactics.view` | app | Open the tactics board |
+| `tactics.view` | app | Open the tactics page (per-tactic access still applies) |
 
-**Default grants** (seeded; editable): owner → all team abilities; igl → view/delete/reparse/
-upload; player & coach → view. member → all three app pages; admin → (needs none, bypasses).
+**Default grants** (seeded; editable): owner → all team abilities; igl → matches + trainings +
+tactics create/edit/delete; coach → match.view + trainings + tactics create/edit/delete;
+player → match.view + tactics create/edit. member → all three app pages; admin → (needs none,
+bypasses).
 
 Two rules stay outside the grant tables, on purpose:
 - **The match uploader** always keeps `view`/`delete`/`reparse` over their own upload, even with
@@ -273,8 +279,9 @@ grant tables — nothing is hard-coded.
 
 - **Permissions are per-role, not per-user** — an admin edits what a *role* can do; there's no
   grant to an individual user, and no custom roles beyond the fixed four team / two global ones.
-- App-scope abilities cover whole pages (awards/search/tactics); finer within-page gating (e.g.
-  tactics view vs. edit) isn't split out yet — the tactics write endpoints ride `tactics.view`.
+- App-scope abilities cover whole pages (awards/search); tactics splits page-open
+  (`tactics.view`, app-scope) from the writes (`tactics.create/edit/delete`, team-scope
+  resolved against the tactic's team — a private draft is the creator's alone).
 - No invitation/acceptance flow — an owner adds existing users directly by email.
 - A match belongs to at most one team; there's no re-assigning a match's team after upload yet.
 - Removing the last `owner` of a team isn't prevented.

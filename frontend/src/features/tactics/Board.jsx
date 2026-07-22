@@ -53,8 +53,8 @@ const spawnSlots = ([cx, cy]) =>
   [[0, 0], [-0.045, -0.035], [0.045, -0.035], [-0.045, 0.035], [0.045, 0.035]]
     .map(([dx, dy]) => [clamp01(cx + dx), clamp01(cy + dy)])
 
-export default function Board({ tacticId, map }) {
-  const { board, presence, connected, update } = useTacticBoard(tacticId)
+export default function Board({ tacticId, map, canEdit = true }) {
+  const { board, presence, connected, update } = useTacticBoard(tacticId, canEdit)
   const fieldRef = useRef(null)
   const canvasRef = useRef(null)
   const dragId = useRef(null)
@@ -242,6 +242,10 @@ export default function Board({ tacticId, map }) {
 
   return (
     <section className="board-wrap">
+      {!canEdit && (
+        <p className="board-readonly">View only — you can watch edits live, but this tactic isn&apos;t yours to change.</p>
+      )}
+      {canEdit && (
       <div className="board-toolbar">
         <span className="board-group">
           {PLAYERS.map((k) => (
@@ -303,11 +307,13 @@ export default function Board({ tacticId, map }) {
         {(pieces.length > 0 || lines.length > 0) && (
           <button type="button" className="link-btn board-clear" onClick={clearBoard}>clear board</button>
         )}
-        <span className={`presence${connected ? ' live' : ''}`}>
-          <span className="presence-dot" aria-hidden="true" />
-          {connected ? `${presence} online` : 'connecting…'}
-        </span>
       </div>
+      )}
+
+      <span className={`presence${connected ? ' live' : ''}${canEdit ? '' : ' presence-solo'}`}>
+        <span className="presence-dot" aria-hidden="true" />
+        {connected ? `${presence} online` : 'connecting…'}
+      </span>
 
       <div
         className={`board-field${map ? ' has-radar' : ''}${tool !== 'move' ? ` ${tool === 'draw' ? 'drawing' : 'erasing'}` : view.z > 1 ? ' pannable' : ''}`}

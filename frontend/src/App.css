@@ -1982,9 +1982,26 @@ button.clutch-open:hover {
   color: var(--text-dim);
 }
 
-.board-toolbar .presence {
+.board-wrap > .presence {
+  display: block;
   margin-top: 4px;
-  text-align: center;
+  text-align: right;
+}
+
+/* Read-only: no toolbar, so the presence line stands alone above the board. */
+.presence-solo {
+  margin-top: 0;
+  margin-bottom: 6px;
+}
+
+.board-readonly {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font: 400 12px var(--sans);
+  color: var(--text-dim);
 }
 
 @media (max-width: 720px) {

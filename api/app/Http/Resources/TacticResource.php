@@ -18,7 +18,9 @@ class TacticResource extends JsonResource
             'team' => $this->whenLoaded('team', fn () => ['id' => $this->team->id, 'name' => $this->team->name]),
             'owner' => $this->whenLoaded('owner', fn () => $this->owner ? ['id' => $this->owner->id, 'name' => $this->owner->name] : null),
             'can' => [
+                'edit' => (bool) $request->user()?->can('update', $this->resource),
                 'delete' => (bool) $request->user()?->can('delete', $this->resource),
+                'share' => (bool) $request->user()?->can('share', $this->resource),
             ],
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

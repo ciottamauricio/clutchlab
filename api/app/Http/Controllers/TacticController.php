@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateTacticRequest;
 use App\Http\Requests\UpdateTacticTeamRequest;
 use App\Http\Resources\TacticResource;
 use App\Models\Tactic;
+use App\Models\Team;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -24,9 +25,15 @@ class TacticController extends Controller
 
     public function store(StoreTacticRequest $request, CreateTacticAction $action): JsonResponse
     {
-        $tactic = $action->execute($request->user(), $request->validated('name'), $request->validated('map'));
+        // Creating into a team needs tactics.create on it; a private draft ($team null)
+        // is always allowed. The request already verified membership of a non-null team.
+        $teamId = $request->validated('team_id') ?: null;
+        $team = $teamId ? Team::find($teamId) : null;
+        $this->authorize('create', [Tactic::class, $team]);
 
-        return (new TacticResource($tactic))->response()->setStatusCode(201);
+        $tactic = $action->execute($request->user(), $request->validated('name'), $request->validated('map'), $teamId);
+
+        return (new TacticResource($tactic->load(['team', 'owner'])))->response()->setStatusCode(201);
     }
 
     public function show(Tactic $tactic): TacticResource
@@ -49,7 +56,7 @@ class TacticController extends Controller
     // (authorized like delete); the request checks membership of the target team.
     public function updateTeam(UpdateTacticTeamRequest $request, Tactic $tactic, UpdateTacticTeamAction $action): TacticResource
     {
-        $this->authorize('delete', $tactic);
+        $this->authorize('share', $tactic);
 
         $action->execute($tactic, $request->validated('team_id') ?: null);
 

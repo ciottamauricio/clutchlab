@@ -45,12 +45,19 @@ service (see `docs/ARCHITECTURE.md` for why streaming ≠ batch).
 
 ## Rules & invariants
 
-1. Creating a tactic sets `user_id` = the caller and an empty board `{ "pieces": [] }`.
-2. **Ownership & sharing** (`TacticPolicy`): the owner may do everything. A tactic shared
-   with a team may be **viewed and edited** (CRUD or websocket) by every member of that
-   team — a shared strat is a collaboration surface. **Delete and re-share stay with the
-   owner.** Violations return **403**. Access is membership-based, not a grantable ability
-   (the finer tactics gating noted in [teams-auth.md](teams-auth.md) known limitations).
+1. Creating a tactic sets `user_id` = the caller and an empty board `{ "pieces": [] }`. An
+   optional `team_id` shares it on creation (validated to a team the caller belongs to,
+   `tactic.invalid_team`); absent/null makes a **private draft**.
+2. **Ownership & sharing** (`TacticPolicy`) splits by where the tactic lives:
+   - A **private tactic** (`team_id` null) is the creator's alone — only they view, edit,
+     or delete it. No team ability applies (there's no team to resolve one against).
+   - A **team tactic** is gated by **team-scope abilities resolved against its team**:
+     `tactics.create` (make one shared with the team), `tactics.edit` (edit any of the
+     team's shared boards — CRUD or websocket), `tactics.delete` (remove one). Defaults:
+     owner/igl/coach get all three; **player gets create + edit but not delete**.
+   - The **creator always keeps control of their own** tactic — they can edit and delete
+     it regardless of their team role — and **re-sharing stays the creator's call** (the
+     `share` ability). Violations return **403**.
 3. The board is **last-write-wins**: the realtime service persists whatever board a client
    sends and relays it to the others. There is no per-piece conflict resolution.
 4. All endpoints and the websocket require authentication (Sanctum token).
@@ -60,11 +67,11 @@ service (see `docs/ARCHITECTURE.md` for why streaming ≠ batch).
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/tactics` | list visible tactics: own + the caller's teams' (`Tactic::visibleTo`) |
-| POST | `/api/tactics` | create (name + optional map → empty board) |
+| POST | `/api/tactics` | create (name + optional map → empty board); optional `team_id` shares on creation and needs `tactics.create` on that team |
 | GET | `/api/tactics/{tactic}` | fetch one (owner or team member) |
-| PUT | `/api/tactics/{tactic}` | update name, map and/or board (owner or team member) |
-| PATCH | `/api/tactics/{tactic}` | move between private and a team — body `team_id` (int = share, null = private); owner only; target must be a team the owner belongs to (`tactic.invalid_team`); `UpdateTacticTeamAction` |
-| DELETE | `/api/tactics/{tactic}` | delete (owner only) |
+| PUT | `/api/tactics/{tactic}` | update name, map and/or board (owner, or `tactics.edit` on the tactic's team) |
+| PATCH | `/api/tactics/{tactic}` | move between private and a team — body `team_id` (int = share, null = private); creator only (`share`); target must be a team the creator belongs to (`tactic.invalid_team`); `UpdateTacticTeamAction` |
+| DELETE | `/api/tactics/{tactic}` | delete (owner, or `tactics.delete` on the tactic's team) |
 
 `TacticResource` ships `team` (when loaded), `owner`, and `can.delete` so the UI knows
 whether to offer the share/delete controls; the server still enforces every request.

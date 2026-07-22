@@ -11,7 +11,9 @@ export default function TacticShare({ tactic, onChanged }) {
   const { setTeam, saving, error } = useUpdateTacticTeam(onChanged)
   const [editing, setEditing] = useState(false)
 
-  const canManage = tactic.can?.delete
+  // Re-sharing is the creator's call (server: the `share` ability), independent of who
+  // may edit the board.
+  const canManage = tactic.can?.share
   const current = tactic.team?.name
 
   const change = async (e) => {

@@ -54,7 +54,7 @@ export default function TacticsPage() {
           {selected ? (
             <>
               <TacticShare tactic={selected} onChanged={refresh} />
-              <Board key={selected.id} tacticId={selected.id} map={selected.map} />
+              <Board key={selected.id} tacticId={selected.id} map={selected.map} canEdit={selected.can?.edit ?? true} />
             </>
           ) : (
             <p className="muted">Select a tactic to open the board.</p>

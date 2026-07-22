@@ -42,11 +42,14 @@ class PermissionCatalog
             'team.manage_roster' => [self::TEAM, 'Teams', 'Manage roster', "Edit the team's in-game roster (SteamIDs)."],
             'team.update' => [self::TEAM, 'Teams', 'Edit team', 'Rename or delete the team.'],
             'training.manage' => [self::TEAM, 'Trainings', 'Manage trainings', 'Schedule, edit, and cancel team training sessions.'],
+            'tactics.create' => [self::TEAM, 'Tactics', 'Create tactics', 'Draw a new tactic and share it with the team.'],
+            'tactics.edit' => [self::TEAM, 'Tactics', 'Edit tactics', "Edit the board of any of the team's shared tactics."],
+            'tactics.delete' => [self::TEAM, 'Tactics', 'Delete tactics', "Delete the team's shared tactics."],
 
             // App-scope: granted to a global role, independent of any team.
             'awards.view' => [self::APP, 'Analysis', 'View awards', 'Open the cross-match awards page.'],
             'search.use' => [self::APP, 'Analysis', 'Use search', 'Open and query the kill search.'],
-            'tactics.view' => [self::APP, 'Analysis', 'View tactics', 'Open the tactics board.'],
+            'tactics.view' => [self::APP, 'Analysis', 'Open the tactics board', 'Open the tactics page (per-tactic access still applies).'],
         ];
     }
 
@@ -58,11 +61,12 @@ class PermissionCatalog
     public static function teamDefaults(): array
     {
         return [
-            self::OWNER => ['match.view', 'match.delete', 'match.reparse', 'team.upload_match', 'team.manage_members', 'team.manage_roster', 'team.update', 'training.manage'],
-            self::IGL => ['match.view', 'match.delete', 'match.reparse', 'team.upload_match', 'training.manage'],
-            self::PLAYER => ['match.view'],
-            // Coach is view-only on matches, but running practice is the job.
-            self::COACH => ['match.view', 'training.manage'],
+            self::OWNER => ['match.view', 'match.delete', 'match.reparse', 'team.upload_match', 'team.manage_members', 'team.manage_roster', 'team.update', 'training.manage', 'tactics.create', 'tactics.edit', 'tactics.delete'],
+            self::IGL => ['match.view', 'match.delete', 'match.reparse', 'team.upload_match', 'training.manage', 'tactics.create', 'tactics.edit', 'tactics.delete'],
+            // Players draft and refine strats together, but don't delete the team's board.
+            self::PLAYER => ['match.view', 'tactics.create', 'tactics.edit'],
+            // Coach is view-only on matches, but running practice — including the strats — is the job.
+            self::COACH => ['match.view', 'training.manage', 'tactics.create', 'tactics.edit', 'tactics.delete'],
         ];
     }
 

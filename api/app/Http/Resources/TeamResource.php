@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Tactic;
 use App\Models\TrainingSession;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -27,6 +28,7 @@ class TeamResource extends JsonResource
                 'update' => (bool) $request->user()?->can('update', $this->resource),
                 'upload_match' => (bool) $request->user()?->can('uploadMatch', $this->resource),
                 'manage_trainings' => (bool) $request->user()?->can('create', [TrainingSession::class, $this->resource]),
+                'create_tactics' => (bool) $request->user()?->can('create', [Tactic::class, $this->resource]),
             ],
         ];
     }

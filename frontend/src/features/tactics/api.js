@@ -24,7 +24,8 @@ export function useTactics() {
   return { tactics, error, loading, refresh }
 }
 
-export const createTactic = (name, map = null) => api.post('/tactics', { name, map })
+export const createTactic = (name, map = null, teamId = null) =>
+  api.post('/tactics', { name, map, team_id: teamId })
 export const deleteTactic = (id) => api.delete(`/tactics/${id}`)
 
 const updateTacticTeam = (id, teamId) => api.patch(`/tactics/${id}`, { team_id: teamId })
@@ -55,7 +56,7 @@ export function useUpdateTacticTeam(onUpdated) {
 // Opens the websocket to the realtime service for one tactic. Returns the live
 // board, presence count, and an update() that applies locally and broadcasts.
 // The message shape matches the realtime service (api/docs/domains/tactics.md).
-export function useTacticBoard(tacticId) {
+export function useTacticBoard(tacticId, canEdit = true) {
   const [board, setBoard] = useState({ pieces: [] })
   const [presence, setPresence] = useState(0)
   const [connected, setConnected] = useState(false)
@@ -85,8 +86,11 @@ export function useTacticBoard(tacticId) {
   }, [tacticId])
 
   // Applies a new board locally and broadcasts it. Throttled to ~20/s during a
-  // drag; pass force=true (add/remove/drag-end) to send immediately.
+  // drag; pass force=true (add/remove/drag-end) to send immediately. Without edit
+  // rights it never broadcasts — the realtime service would reject the save anyway,
+  // so a read-only viewer simply can't push changes (the UI also hides the tools).
   const update = useCallback((next, force = false) => {
+    if (!canEdit) return
     setBoard(next)
     const ws = wsRef.current
     if (!ws || ws.readyState !== WebSocket.OPEN) return
@@ -95,7 +99,7 @@ export function useTacticBoard(tacticId) {
       lastSent.current = now
       ws.send(JSON.stringify({ type: 'update', board: next }))
     }
-  }, [])
+  }, [canEdit])
 
   return { board, presence, connected, update }
 }
