@@ -1,0 +1,23 @@
+name: realtime
+
+# realtime carries no contracts/ fixture — it passes the board through as opaque
+# json.RawMessage — so its path filter is its own dir plus this workflow only.
+on:
+  push:
+    paths: ["realtime/**", ".github/workflows/realtime.yml"]
+  pull_request:
+    paths: ["realtime/**", ".github/workflows/realtime.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: realtime
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: realtime/go.mod
+      - run: go vet ./...
+      - run: go test ./...
