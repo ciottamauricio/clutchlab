@@ -241,12 +241,16 @@ export default function Board({ tacticId, map, canEdit = true }) {
   }
 
   return (
-    <section className="board-wrap">
-      <div className="board-rail">
+    <section className={`board-wrap${canEdit ? '' : ' board-viewonly'}`}>
       {!canEdit && (
-        <p className="board-readonly">View only — you can watch edits live, but this tactic isn&apos;t yours to change.</p>
+        <p className="board-readonly">
+          <span className={`presence-dot${connected ? ' live' : ''}`} aria-hidden="true" />
+          <span>View only — you can watch edits live, but this tactic isn&apos;t yours to change.</span>
+          <span className="board-readonly-count">{connected ? `${presence} online` : 'connecting…'}</span>
+        </p>
       )}
       {canEdit && (
+      <div className="board-rail">
       <div className="board-toolbar">
         <span className="board-group">
           {PLAYERS.map((k) => (
@@ -309,13 +313,12 @@ export default function Board({ tacticId, map, canEdit = true }) {
           <button type="button" className="link-btn board-clear" onClick={clearBoard}>clear board</button>
         )}
       </div>
-      )}
-
         <span className={`presence${connected ? ' live' : ''}`}>
           <span className="presence-dot" aria-hidden="true" />
           {connected ? `${presence} online` : 'connecting…'}
         </span>
       </div>
+      )}
 
       <div
         className={`board-field${map ? ' has-radar' : ''}${tool !== 'move' ? ` ${tool === 'draw' ? 'drawing' : 'erasing'}` : view.z > 1 ? ' pannable' : ''}`}
@@ -351,15 +354,15 @@ export default function Board({ tacticId, map, canEdit = true }) {
           {pieces.map((p) => (
             <div
               key={p.id}
-              className={`piece k-${p.kind}${p.id === selectedId ? ' selected' : ''}`}
+              className={`piece k-${p.kind}${p.id === selectedId ? ' selected' : ''}${canEdit ? '' : ' piece-static'}`}
               style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%` }}
-              title="drag to move · click to name · double-click to remove"
-              onPointerDown={(e) => {
+              title={canEdit ? 'drag to move · click to name · double-click to remove' : undefined}
+              onPointerDown={canEdit ? (e) => {
                 e.preventDefault()
                 dragId.current = p.id
                 dragMoved.current = false
-              }}
-              onDoubleClick={() => removePiece(p.id)}
+              } : undefined}
+              onDoubleClick={canEdit ? () => removePiece(p.id) : undefined}
             >
               {(p.kind === 'ct' || p.kind === 't') && p.label ? p.label : SHORT[p.kind] ?? '?'}
               {p.label && p.kind !== 'ct' && p.kind !== 't' && (
@@ -378,7 +381,7 @@ export default function Board({ tacticId, map, canEdit = true }) {
         </div>
       </div>
 
-      {selected ? (
+      {selected && canEdit ? (
         <div className="board-inspector">
           <span className={`piece piece-chip k-${selected.kind}`}>{SHORT[selected.kind]}</span>
           <input
@@ -392,8 +395,10 @@ export default function Board({ tacticId, map, canEdit = true }) {
           <button type="button" className="link-btn" onClick={() => removePiece(selected.id)}>remove</button>
           <button type="button" className="link-btn" onClick={() => setSelectedId(null)}>done</button>
         </div>
-      ) : (
+      ) : canEdit ? (
         <p className="muted">Drag to move · click to name · double-click to remove · pen draws in the picked color · eraser clicks or sweeps lines away · scroll to zoom, drag the map to pan · edits sync live to everyone on this tactic.</p>
+      ) : (
+        <p className="muted board-viewonly-hint">Scroll to zoom · drag the map to pan · edits appear live as the team makes them.</p>
       )}
     </section>
   )

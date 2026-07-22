@@ -1806,8 +1806,39 @@ button.clutch-open:hover {
   margin: 0;
 }
 
-/* The left rail: toolbar (or the read-only notice) plus the presence line, stacked. It
-   is the grid's first column (max-content), so the board keeps the whole 1fr track. */
+/* View-only: no rail, so the board takes the whole width and the notice is a full-width
+   line above it. The caption below sits in the single column too. */
+.board-viewonly {
+  grid-template-columns: 1fr;
+}
+
+.board-viewonly > .board-inspector,
+.board-viewonly > .muted {
+  grid-column: 1;
+}
+
+.board-readonly {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font: 400 12px var(--sans);
+  color: var(--text-dim);
+}
+
+.board-readonly-count {
+  margin-left: auto;
+  font: 400 11px var(--mono);
+  color: var(--text-dim);
+}
+
+/* The left rail: toolbar plus the presence line, stacked. It is the grid's first column
+   (max-content), so the board keeps the whole 1fr track. */
 .board-rail {
   display: flex;
   flex-direction: column;
@@ -1998,25 +2029,6 @@ button.clutch-open:hover {
   text-align: center;
 }
 
-.board-readonly {
-  margin: 0 0 8px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  font: 400 12px var(--sans);
-  color: var(--text-dim);
-}
-
-@media (max-width: 720px) {
-  .board-toolbar .presence {
-    margin-left: auto;
-    margin-top: 0;
-  }
-}
-
-/* When the clear button is present it takes the free space; presence sits beside it. */
-
 .presence-dot {
   display: inline-block;
   width: 7px;
@@ -2026,7 +2038,13 @@ button.clutch-open:hover {
   margin-right: 6px;
 }
 
-.presence.live .presence-dot {
+/* View-only pieces are display, not handles. */
+.piece-static {
+  cursor: default;
+}
+
+.presence.live .presence-dot,
+.presence-dot.live {
   background: var(--win);
 }
 
