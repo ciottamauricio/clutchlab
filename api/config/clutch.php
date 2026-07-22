@@ -17,4 +17,11 @@ return [
         'host' => env('MEILI_HOST', 'http://meilisearch:7700'),
         'key' => env('MEILI_MASTER_KEY', ''),
     ],
+
+    // Claude, behind the AnalystLlm contract. No key → the analyst endpoint degrades
+    // with analyst.unavailable instead of erroring at boot.
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY', ''),
+        'model' => env('ANTHROPIC_MODEL', 'claude-opus-4-8'),
+    ],
 ];

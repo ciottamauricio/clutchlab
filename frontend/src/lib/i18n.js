@@ -75,6 +75,11 @@ const MESSAGES = {
 
   'search.unavailable': 'Search is temporarily unavailable',
 
+  'analyst.unavailable': 'The analyst is temporarily unavailable',
+  'analyst.question_required': 'Type a question first',
+  'analyst.question_too_short': 'Ask a fuller question (at least 5 characters)',
+  'analyst.question_too_long': 'Keep the question under 500 characters',
+
   'error.unknown': 'Something went wrong',
 }
 

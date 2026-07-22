@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminPermissionController;
 use App\Http\Controllers\AdminUserController;
+use App\Http\Controllers\AnalystController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AwardsController;
 use App\Http\Controllers\MatchController;
@@ -78,6 +79,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/search/kills', [SearchController::class, 'kills']);
         Route::get('/search/rounds', [SearchController::class, 'rounds']);
         Route::get('/search/clutch-sizes', [SearchController::class, 'clutchSizes']);
+        // Same corpus as search, so the same ability gates it. Each call is a paid
+        // LLM request — throttled well below the generic limits.
+        Route::post('/analyst/ask', [AnalystController::class, 'ask'])->middleware('throttle:10,1');
     });
 
     // Master-admin only: manage every user's global role and linked SteamID.

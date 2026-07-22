@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use Anthropic\Client as AnthropicClient;
 use App\Authorization\PermissionCatalog;
+use App\Contracts\AnalystLlm;
 use App\Contracts\DemoStorage;
 use App\Contracts\EventBus;
 use App\Contracts\EventSubscriber;
@@ -11,6 +13,7 @@ use App\Contracts\PermissionService;
 use App\Contracts\SearchIndex;
 use App\Events\Subscribers\EmailTrainingRoster;
 use App\Events\Subscribers\EventHandler;
+use App\Llm\AnthropicAnalyst;
 use App\Models\User;
 use App\Queue\RedisEventBus;
 use App\Queue\RedisEventSubscriber;
@@ -40,6 +43,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->tag([EmailTrainingRoster::class], EventHandler::class);
         $this->app->bind(SearchIndex::class, fn () => new MeilisearchIndex(
             new MeilisearchClient(config('clutch.meili.host'), config('clutch.meili.key'))
+        ));
+        $this->app->bind(AnalystLlm::class, fn () => new AnthropicAnalyst(
+            new AnthropicClient(apiKey: config('clutch.anthropic.key')),
+            config('clutch.anthropic.model'),
         ));
 
         // Singleton so the per-request grant cache is shared across every check in a request.

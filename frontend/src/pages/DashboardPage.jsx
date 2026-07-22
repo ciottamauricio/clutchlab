@@ -6,7 +6,8 @@ import MatchDashboard from '../features/matches/MatchDashboard'
 import { DateStrip, Pager } from '../features/matches/ArchiveNav'
 import { currentMonth, monthLabel, stepMonth, dayLabel, stepDay } from '../features/matches/format'
 import { useMatches, useDeleteMatch } from '../features/matches/api'
-import { useAuth } from '../features/auth/AuthContext'
+import AskAnalyst from '../features/analyst/AskAnalyst'
+import { useAuth, useCan } from '../features/auth/AuthContext'
 import { t } from '../lib/i18n'
 
 // Thin route: composes the matches feature, holds only UI state (which match is
@@ -16,6 +17,7 @@ import { t } from '../lib/i18n'
 export default function DashboardPage() {
   const location = useLocation()
   const { user } = useAuth()
+  const canAsk = useCan('search.use')
   const [selectedId, setSelectedId] = useState(location.state?.matchId ?? null)
   const [playerFilter, setPlayerFilter] = useState('')
   const [month, setMonth] = useState(currentMonth())
@@ -92,6 +94,7 @@ export default function DashboardPage() {
   return (
     <>
       {user?.can_upload && <UploadDemo onUploaded={handleUploaded} />}
+      {canAsk && <AskAnalyst onOpenMatch={setSelectedId} />}
       {deleteError && <p className="error">{t(deleteError)}</p>}
       <div className="layout">
         <aside>
