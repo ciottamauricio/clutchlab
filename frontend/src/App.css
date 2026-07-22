@@ -1806,6 +1806,15 @@ button.clutch-open:hover {
   margin: 0;
 }
 
+/* The left rail: toolbar (or the read-only notice) plus the presence line, stacked. It
+   is the grid's first column (max-content), so the board keeps the whole 1fr track. */
+.board-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
 .board-toolbar {
   display: flex;
   flex-direction: column;
@@ -1823,6 +1832,7 @@ button.clutch-open:hover {
     grid-column: 1;
   }
 
+  .board-rail,
   .board-toolbar {
     flex-direction: row;
     align-items: center;
@@ -1982,16 +1992,10 @@ button.clutch-open:hover {
   color: var(--text-dim);
 }
 
-.board-wrap > .presence {
+.board-rail > .presence {
   display: block;
   margin-top: 4px;
-  text-align: right;
-}
-
-/* Read-only: no toolbar, so the presence line stands alone above the board. */
-.presence-solo {
-  margin-top: 0;
-  margin-bottom: 6px;
+  text-align: center;
 }
 
 .board-readonly {

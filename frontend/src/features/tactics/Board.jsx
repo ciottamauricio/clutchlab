@@ -242,6 +242,7 @@ export default function Board({ tacticId, map, canEdit = true }) {
 
   return (
     <section className="board-wrap">
+      <div className="board-rail">
       {!canEdit && (
         <p className="board-readonly">View only — you can watch edits live, but this tactic isn&apos;t yours to change.</p>
       )}
@@ -310,10 +311,11 @@ export default function Board({ tacticId, map, canEdit = true }) {
       </div>
       )}
 
-      <span className={`presence${connected ? ' live' : ''}${canEdit ? '' : ' presence-solo'}`}>
-        <span className="presence-dot" aria-hidden="true" />
-        {connected ? `${presence} online` : 'connecting…'}
-      </span>
+        <span className={`presence${connected ? ' live' : ''}`}>
+          <span className="presence-dot" aria-hidden="true" />
+          {connected ? `${presence} online` : 'connecting…'}
+        </span>
+      </div>
 
       <div
         className={`board-field${map ? ' has-radar' : ''}${tool !== 'move' ? ` ${tool === 'draw' ? 'drawing' : 'erasing'}` : view.z > 1 ? ' pannable' : ''}`}
