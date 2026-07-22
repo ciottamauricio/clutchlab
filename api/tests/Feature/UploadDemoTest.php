@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -28,7 +29,7 @@ class UploadDemoTest extends TestCase
     private function uploader(): User
     {
         $user = User::factory()->create();
-        \App\Models\Team::factory()->create()->members()->attach($user, ['role' => 'igl']);
+        Team::factory()->create()->members()->attach($user, ['role' => 'igl']);
 
         return $user;
     }

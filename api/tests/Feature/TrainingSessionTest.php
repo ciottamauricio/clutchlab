@@ -6,8 +6,8 @@ use App\Models\Tactic;
 use App\Models\Team;
 use App\Models\TrainingSession;
 use App\Models\User;
-use Laravel\Sanctum\Sanctum;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 // The trainings domain doc as assertions: coach schedules (the matrix's point), player

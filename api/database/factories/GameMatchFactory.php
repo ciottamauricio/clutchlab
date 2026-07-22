@@ -2,10 +2,11 @@
 
 namespace Database\Factories;
 
+use App\Models\GameMatch;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-/** @extends Factory<\App\Models\GameMatch> */
+/** @extends Factory<GameMatch> */
 class GameMatchFactory extends Factory
 {
     public function definition(): array

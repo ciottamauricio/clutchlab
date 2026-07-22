@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\GameMatch;
 use App\Models\Team;
 use App\Models\User;
-use Laravel\Sanctum\Sanctum;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 // Domain rule 11: the list marks the viewer's result. Their own seat decides the side;

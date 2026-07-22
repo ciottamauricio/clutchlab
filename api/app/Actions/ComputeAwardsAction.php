@@ -16,7 +16,9 @@ class ComputeAwardsAction
 {
     // Pistols + knife — the "eco" weapons (mirrors the frontend weapon registry's Pistols group).
     private const ECO_WEAPONS = ['glock18', 'usps', 'p2000', 'p250', 'fiveseven', 'tec9', 'cz75auto', 'dualberettas', 'deserteagle', 'r8revolver', 'knife'];
+
     private const MIN_KILLS_RATIO = 20;   // floor for ratio awards, so a 1/1 player can't top them
+
     private const TOP = 5;
 
     // The award keys whose leaderboard rows can be drilled into a kill list (see kills()).
@@ -67,6 +69,7 @@ class ComputeAwardsAction
         $oneTrick = $byWeapon->map(function (Collection $rows) {
             $total = $rows->sum('c');
             $top = $rows->sortByDesc('c')->first();
+
             return ['total' => $total, 'weapon' => $top->weapon, 'share' => $total ? $top->c / $total : 0];
         });
 
@@ -171,7 +174,7 @@ class ComputeAwardsAction
             ->whereIn('match_player_stats.match_id', $matchIds)
             ->whereIn('match_player_stats.steam_id', $ids)
             ->groupBy('match_player_stats.steam_id')
-            ->selectRaw("match_player_stats.steam_id, (array_agg(match_player_stats.name ORDER BY matches.created_at DESC))[1] AS name")
+            ->selectRaw('match_player_stats.steam_id, (array_agg(match_player_stats.name ORDER BY matches.created_at DESC))[1] AS name')
             ->pluck('name', 'steam_id');
     }
 

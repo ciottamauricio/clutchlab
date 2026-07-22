@@ -34,4 +34,5 @@ jobs:
               .map((k) => k.replace("node_modules/", "").replace("musl", "gnu") + "@" + pkgs[k].version);
             console.log(twins.join(" "));
           ' | xargs -r npm i --no-save
+      - run: npm run lint
       - run: npm run build

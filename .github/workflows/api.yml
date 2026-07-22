@@ -27,4 +27,5 @@ jobs:
           extensions: pdo_sqlite, sqlite3
           coverage: none
       - run: composer install --prefer-dist --no-progress --no-interaction
+      - run: ./vendor/bin/pint --test    # style gate: fails on anything `pint` would reformat
       - run: ./vendor/bin/phpunit

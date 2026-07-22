@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use App\Contracts\PermissionService;
-use App\Models\GameMatch;
 use App\Models\Team;
 use Illuminate\Foundation\Http\FormRequest;
 

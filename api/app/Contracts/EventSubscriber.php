@@ -13,7 +13,7 @@ interface EventSubscriber
      * message. $event is the type key (e.g. "training.scheduled"); $payload is the full
      * decoded JSON (event + v + fields). Malformed messages are skipped, not thrown.
      *
-     * @param callable(string, array): void $handle
+     * @param  callable(string, array): void  $handle
      */
     public function listen(callable $handle): void;
 }

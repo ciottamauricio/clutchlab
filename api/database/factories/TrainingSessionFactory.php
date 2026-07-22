@@ -3,9 +3,10 @@
 namespace Database\Factories;
 
 use App\Models\Team;
+use App\Models\TrainingSession;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-/** @extends Factory<\App\Models\TrainingSession> */
+/** @extends Factory<TrainingSession> */
 class TrainingSessionFactory extends Factory
 {
     public function definition(): array

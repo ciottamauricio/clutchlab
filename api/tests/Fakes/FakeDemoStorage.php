@@ -30,6 +30,6 @@ class FakeDemoStorage implements DemoStorage
 
     public function download(string $key, string $name): StreamedResponse
     {
-        return new StreamedResponse(fn () => print(''), 200);
+        return new StreamedResponse(fn () => print (''), 200);
     }
 }
