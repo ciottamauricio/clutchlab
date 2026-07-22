@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\GameMatch;
+use App\Models\Tactic;
 use App\Models\Team;
+use App\Models\TrainingSession;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -67,6 +69,40 @@ class AnalystTest extends TestCase
         $this->assertSame(25, $mineRow['scoreboard'][0]['k']);
 
         $this->assertSame('How do we do on Mirage?', $this->analystLlm->question);
+    }
+
+    public function test_own_teams_trainings_are_evidence_with_intent_details(): void
+    {
+        $me = $this->asMember();
+        $team = Team::factory()->create(['name' => 'LOLO Clan']);
+        $team->members()->attach($me, ['role' => 'player']);
+
+        $tactic = Tactic::factory()->create(['user_id' => $me->id, 'name' => 'B split', 'map' => 'de_mirage']);
+        $training = TrainingSession::factory()->create([
+            'team_id' => $team->id,
+            'title' => 'A-executes + retakes',
+            'scheduled_at' => '2026-07-20 19:00:00',
+        ]);
+        $training->tactics()->attach($tactic);
+        $training->players()->attach($me, ['rsvp' => 'in']);
+        $training->assignments()->create(['user_id' => $me->id, 'map' => 'de_mirage', 'nade_type' => 'smoke']);
+
+        // Another team's practice must never reach the model.
+        TrainingSession::factory()->create(['title' => 'their secret strats']);
+
+        $this->postJson('/api/analyst/ask', ['question' => 'What did we practice lately?'])->assertOk();
+
+        $trainings = $this->analystLlm->evidence['recent_trainings'];
+        $this->assertCount(1, $trainings);
+        $this->assertSame('A-executes + retakes', $trainings[0]['title']);
+        $this->assertSame('LOLO Clan', $trainings[0]['team']);
+        $this->assertFalse($trainings[0]['canceled']);
+        $this->assertSame(['B split (de_mirage)'], $trainings[0]['tactics']);
+        $this->assertSame([['name' => $me->name, 'rsvp' => 'in']], $trainings[0]['roster']);
+        $this->assertSame(
+            [['player' => $me->name, 'map' => 'de_mirage', 'nade' => 'smoke', 'done' => false]],
+            $trainings[0]['homework'],
+        );
     }
 
     public function test_unparsed_matches_are_not_evidence(): void

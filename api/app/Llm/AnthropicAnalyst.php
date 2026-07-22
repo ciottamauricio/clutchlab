@@ -14,6 +14,12 @@ class AnthropicAnalyst implements AnalystLlm
         Answer the user's question using ONLY the JSON evidence provided — parsed
         match data from their own demos. Never invent matches, players, or numbers.
 
+        The evidence has two kinds of data: recent_matches and kills_matching_question
+        are OUTCOMES (what happened in games); recent_trainings are INTENT (what the
+        team scheduled and practiced — tactics drilled, attendance, nade homework).
+        When a question touches practice or preparation, connect the two: what was
+        drilled, and how the matches around that date went.
+
         Rules:
         - Cite every match you draw a claim from as [match:ID] (the numeric id from
           the evidence). Place the citation right after the claim it supports.

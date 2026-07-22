@@ -5,19 +5,26 @@ namespace App\Actions\Analysis;
 use App\Contracts\AnalystLlm;
 use App\Contracts\SearchIndex;
 use App\Models\GameMatch;
+use App\Models\TrainingSession;
 use App\Models\User;
 
-// The RAG loop: retrieve (recent matches + scoreboards from Postgres, question-relevant
-// kills from the Meilisearch read model) → augment (compact JSON evidence) → generate
-// (AnalystLlm). Both retrievers are scoped to the caller's visible matches, so the
-// model can only see — and therefore only cite — what the user could open themselves.
+// The RAG loop: retrieve (recent matches + scoreboards and recent trainings from
+// Postgres, question-relevant kills from the Meilisearch read model) → augment
+// (compact JSON evidence) → generate (AnalystLlm). Every retriever is scoped to what
+// the caller could open themselves — visible matches, own teams' trainings — so the
+// model can only see, and therefore only cite, their own data. Matches are outcomes;
+// trainings are intent — together they let the analyst connect "what we practiced"
+// to "what happened".
 class AskAnalystAction
 {
     // Bounds keep the prompt small and the cost predictable: the newest N matches with
-    // full scoreboards, plus M keyword-matched kill rows for round-level detail.
+    // full scoreboards, M keyword-matched kill rows for round-level detail, and the
+    // T most recent practice sessions.
     private const MATCH_LIMIT = 15;
 
     private const KILL_LIMIT = 40;
+
+    private const TRAINING_LIMIT = 10;
 
     public function __construct(
         private SearchIndex $search,
@@ -47,6 +54,7 @@ class AskAnalystAction
                 ])->all(),
             ])->all(),
             'kills_matching_question' => $this->relevantKills($user, $question, $matches->pluck('id')->all()),
+            'recent_trainings' => $this->recentTrainings($user),
         ];
 
         return $this->llm->answer($question, $evidence);
@@ -73,5 +81,36 @@ class AskAnalystAction
             'clutch' => $hit['clutch'] ?? null,
             'opening' => $hit['opening'] ?? null,
         ], $result['hits']);
+    }
+
+    // What the caller's teams practiced (intent, vs the matches' outcomes): the most
+    // recent sessions — past and upcoming — with the tactics drilled, who confirmed,
+    // and the homework laid out. Small and few, so no keyword retrieval is needed:
+    // the newest window IS the relevant set for practice questions.
+    private function recentTrainings(User $user): array
+    {
+        return TrainingSession::whereIn('team_id', $user->teams()->pluck('teams.id'))
+            ->with(['team:id,name', 'tactics:id,name,map', 'players:id,name', 'assignments.assignee:id,name'])
+            ->orderByDesc('scheduled_at')
+            ->limit(self::TRAINING_LIMIT)
+            ->get()
+            ->map(fn (TrainingSession $s) => [
+                'team' => $s->team?->name,
+                'title' => $s->title,
+                'notes' => $s->notes,
+                'scheduled_at' => $s->scheduled_at?->toDateTimeString(),
+                'canceled' => $s->canceled_at !== null,
+                'tactics' => $s->tactics->map(fn ($t) => trim($t->name.' ('.($t->map ?? '?').')'))->all(),
+                'roster' => $s->players->map(fn ($p) => [
+                    'name' => $p->name,
+                    'rsvp' => $p->pivot->rsvp,
+                ])->all(),
+                'homework' => $s->assignments->map(fn ($a) => [
+                    'player' => $a->assignee?->name,
+                    'map' => $a->map,
+                    'nade' => $a->nade_type,
+                    'done' => $a->done_at !== null,
+                ])->all(),
+            ])->all();
     }
 }

@@ -20,9 +20,16 @@ and the transactional tables — and only the generation half is new.
 question ──▶ RETRIEVE  Postgres: newest 15 parsed visible matches + scoreboards
          │             Meilisearch `kills`: 40 hits matching the question's words,
          │             scoped to those same matches (degrades to [] if down)
+         │             Postgres: the caller's teams' 10 most recent trainings —
+         │             tactics drilled, roster + RSVPs, nade homework
          ├──▶ AUGMENT  compact JSON evidence + the question in one user message
          └──▶ GENERATE one Claude call (AnalystLlm), grounded by the system prompt
 ```
+
+Matches and kills are **outcomes**; trainings are **intent**. The system prompt names
+the split, so the analyst can connect "what we practiced" to "what happened" —
+a question no single page in the app can answer. Trainings need no keyword
+retrieval: the corpus is small and recency IS relevance for practice questions.
 
 ## Rules
 
@@ -30,16 +37,18 @@ question ──▶ RETRIEVE  Postgres: newest 15 parsed visible matches + scoreb
    `answer(question, evidence)`); `App\Llm\AnthropicAnalyst` is bound in
    `AppServiceProvider`. Tests swap in `SpyAnalystLlm` — no real API call ever happens
    in tests, and assertions target the *retrieved evidence*, never generated prose.
-2. **Retrieval is visibility-scoped.** Both retrievers run inside
-   `GameMatch::visibleTo($user)` — the model can only see (and therefore only cite)
-   matches the caller could open themselves. There is no path from another user's data
-   into the prompt.
+2. **Retrieval is visibility-scoped.** Match retrievers run inside
+   `GameMatch::visibleTo($user)`; trainings are limited to the caller's own teams
+   (same scope as the trainings page). The model can only see — and therefore only
+   cite — what the caller could open themselves. There is no path from another
+   user's data into the prompt.
 3. **Grounding is server-side.** The system prompt (in `AnthropicAnalyst`, not user
    input) requires: answer only from the evidence, cite matches as `[match:ID]`, admit
    gaps instead of inventing. The frontend turns citations into chips that open the
    match — every claim is checkable against the real dashboard.
-4. **Bounded evidence.** 15 matches / 40 kill rows per request — the prompt size and
-   the per-call cost are capped by construction, not by hoping questions stay small.
+4. **Bounded evidence.** 15 matches / 40 kill rows / 10 trainings per request — the
+   prompt size and the per-call cost are capped by construction, not by hoping
+   questions stay small.
 5. **Degrade, never 500.** No `ANTHROPIC_API_KEY`, provider outage, or Meilisearch down
    → `503 analyst.unavailable` (search-down only drops the kills evidence; the answer
    still comes from scoreboards). Codes, not sentences, as everywhere.

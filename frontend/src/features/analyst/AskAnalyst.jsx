@@ -26,7 +26,7 @@ function renderAnswer(text, onOpenMatch) {
 const SUGGESTIONS = [
   'How do we usually perform on Mirage?',
   'Who gets the most opening kills?',
-  'Which map should we practice next?',
+  'Did our last training pay off in the matches after it?',
 ]
 
 export default function AskAnalyst({ onOpenMatch }) {
