@@ -246,7 +246,7 @@ export const TOPICS = [
     gained: [
       'One fixture per cross-language message (contracts/): the producer asserts exact bytes, the consumer asserts it decodes — the "change both sides in the same commit" rule becomes machine-enforced. It caught a real bug on its first run: PHP escapes slashes in JSON, Go does not.',
       'Feature tests encode the domain docs as assertions (the 403 matrix, upload gating, content-hash dedup) on in-memory SQLite, with every external system swapped for a fake over its interface — the interface rule paying out again.',
-      'CI runs per service with path filters (the monorepo topic\'s promised middle path), and contracts/** triggers every suite that speaks the fixture — a contract change cannot slip past one side.',
+      'These tests need somewhere to run on every push — that pipeline is its own topic (16): six path-filtered workflows where contracts/** re-verifies every side of a fixture at once.',
     ],
     paid: [
       'The environment seam bites hardest in tests. Compose env_file lands in $_SERVER, which Laravel reads before $_ENV — and PHPUnit\'s <env> overrides never touch $_SERVER, so the suite silently ran migrate:fresh on the real Postgres. Twice. The fix is <server> overrides plus a tripwire that refuses any non-sqlite connection.',
@@ -306,5 +306,28 @@ export const TOPICS = [
     ],
     code: 'public function handle(TrainingScheduled $event): void',
     codeLabel: 'the entire event→listener wiring — auto-discovery matches on this type-hint (see php artisan event:list)',
+  },
+  {
+    id: 'pipeline',
+    n: '16',
+    title: 'The pipeline as a sixth service',
+    tag: 'CI, path filters',
+    summary: 'In a monorepo of six runtimes, CI is not one green check — it is six independent pipelines that only wake for what changed.',
+    gained: [
+      'One workflow per buildable thing — api (Pint + phpunit), frontend (oxlint + build), worker / notifier / realtime (vet + test), and infra (terraform fmt + validate). Each triggers only on its own directory, so a frontend commit never spends CI minutes on the Go services.',
+      'contracts/** is the deliberate exception: it sits in the trigger paths of every service that decodes a fixture, so one wire-contract change fans out to re-verify all of them — the "same commit, both sides" rule enforced by the trigger graph itself. Services that carry no fixture (realtime passes the board as opaque bytes; infra is Terraform) are correctly left out.',
+      'The linters were already in the repo and run by hand a hundred times — wiring Pint and oxlint as gates just made the standard non-optional. infra validates with terraform init -backend=false: a broken skeleton is caught with no cloud account and no state, because study material that lies is worse than none.',
+    ],
+    paid: [
+      'Turning the Pint gate on is a one-way door: the whole codebase must first pass it, so switching it on came with a reformat commit (import order, FQCN-into-use, phpdoc alignment) touching a dozen files at once. The gate is only honest if nothing is grandfathered past it.',
+      'Path filters cut both ways. A shared change (the root .env, docker-compose.yml, a README) matches no service filter and triggers nothing — correct for docs, a trap the day a compose change actually needs a service rebuilt. The filter graph is a model of the dependency graph, and models drift.',
+      'This is still CI, not CD. Nothing yet builds and ships the images the Terraform skeletons expect in a registry — that rung (GHCR, and the multi-stage nginx image that finally bakes the frontend dist/) is written down as the next step, not done. Naming the gap is part of the honesty.',
+    ],
+    body: [
+      'The instinct from a single-service repo is one pipeline that builds everything. In a polyglot monorepo that is the wrong shape twice over: it wastes minutes rebuilding untouched services, and it couples their fates — a flaky Go test blocks a CSS fix. The middle path (topic 11) is one pipeline per service, gated by path filters, so build isolation and atomic cross-service commits coexist. CI stops being a wall at the end and becomes part of the architecture: the same seams the services have, drawn again in the trigger graph.',
+      'The test pyramid (topic 13) is what runs; this topic is where and when it runs. They meet at contracts/**: the highest-leverage test is the wire fixture, and the highest-leverage trigger is the one that reruns every side of that fixture on any change to it. The pipeline encodes the same rule the fixtures do — which is why adding realtime meant adding a workflow, not just a test file: an untested service with no pipeline is a hole the green check can\'t see.',
+    ],
+    code: 'paths: ["worker/**", "contracts/**", ".github/workflows/worker.yml"]',
+    codeLabel: 'a service wakes for its own code, the shared contracts, or its own pipeline definition — nothing else',
   },
 ]

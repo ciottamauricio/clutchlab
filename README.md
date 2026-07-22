@@ -9,7 +9,7 @@ The features are the excuse. This is a **learning project about the boundaries b
 services**: a polyglot, service-oriented app where every seam — the cross-language queue,
 the pub/sub event channel, the search read model, the wire contracts — exists to be
 studied. The app documents itself: the **Study page** (in the app's nav) walks through
-all fifteen architecture tradeoffs with what each decision gained and what it cost, and
+all sixteen architecture tradeoffs with what each decision gained and what it cost, and
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) is the written version.
 
 ## Services
