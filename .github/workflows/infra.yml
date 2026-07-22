@@ -1,0 +1,28 @@
+name: infra
+
+# The Terraform skeletons are study material (study topic 14), so CI keeps them honest:
+# formatted and internally valid. No cloud account and no backend — `validate` needs
+# neither. Each cloud dir is its own matrix leg.
+on:
+  push:
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+  pull_request:
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: [azure, aws]
+    defaults:
+      run:
+        working-directory: infra/${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v3
+      # fmt is repo-wide (recursive from infra/), so run it once from either leg.
+      - run: terraform fmt -check -recursive ..
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate

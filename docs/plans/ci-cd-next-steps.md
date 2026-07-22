@@ -4,6 +4,10 @@ Written 2026-07-16, after the test workflows landed. Current state and the ranke
 of what to add, with enough detail to execute each item cold. Execute roughly in order —
 1–3 are one sitting; 4 is the first real CD rung; 5–7 are their own sessions.
 
+**Progress:** items 1–3 done (2026-07-21). realtime.yml + hub tests, Pint gate in api.yml
+(codebase reformatted to pass) + lint in frontend.yml, infra.yml (terraform fmt/validate).
+Next up: item 4 (GHCR images) — needs the multi-stage nginx build decision.
+
 ## What CI does today (inventory)
 
 | Workflow | Runs | Gap inside it |
