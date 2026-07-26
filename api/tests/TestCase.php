@@ -7,9 +7,11 @@ use App\Contracts\DemoStorage;
 use App\Contracts\EventBus;
 use App\Contracts\ParseQueue;
 use App\Contracts\SearchIndex;
+use App\Contracts\SemanticRetriever;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Tests\Fakes\FakeDemoStorage;
 use Tests\Fakes\FakeSearchIndex;
+use Tests\Fakes\FakeSemanticRetriever;
 use Tests\Fakes\SpyAnalystLlm;
 use Tests\Fakes\SpyEventBus;
 use Tests\Fakes\SpyParseQueue;
@@ -26,6 +28,8 @@ abstract class TestCase extends BaseTestCase
 
     protected SpyAnalystLlm $analystLlm;
 
+    protected FakeSemanticRetriever $semanticRetriever;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -40,11 +44,13 @@ abstract class TestCase extends BaseTestCase
         $this->parseQueue = new SpyParseQueue;
         $this->eventBus = new SpyEventBus;
         $this->analystLlm = new SpyAnalystLlm;
+        $this->semanticRetriever = new FakeSemanticRetriever;
 
         $this->app->instance(DemoStorage::class, $this->demoStorage);
         $this->app->instance(ParseQueue::class, $this->parseQueue);
         $this->app->instance(EventBus::class, $this->eventBus);
         $this->app->instance(SearchIndex::class, new FakeSearchIndex);
         $this->app->instance(AnalystLlm::class, $this->analystLlm);
+        $this->app->instance(SemanticRetriever::class, $this->semanticRetriever);
     }
 }

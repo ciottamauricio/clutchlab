@@ -25,7 +25,7 @@ changes.** The code follows the doc, not the other way around.
 | Awards — cross-match superlatives | Implemented | `docs/domains/awards.md` |
 | Notifications | Implemented (Step 5) — pub/sub; Go notifier + Laravel events-listener | `docs/domains/notifications.md` |
 | Trainings — scheduled practice (time + tactics + roster) | API implemented; UI + event next | `docs/domains/trainings.md` |
-| Analyst — RAG Q&A over the caller's matches | Implemented | `docs/domains/analyst.md` |
+| Analyst — RAG Q&A over the caller's matches (keyword + semantic retrieval) | Implemented | `docs/domains/analyst.md` |
 
 ## API conventions (non-negotiable)
 

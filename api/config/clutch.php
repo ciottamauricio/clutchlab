@@ -24,4 +24,28 @@ return [
         'key' => env('ANTHROPIC_API_KEY', ''),
         'model' => env('ANTHROPIC_MODEL', 'claude-opus-4-8'),
     ],
+
+    // Which generator answers analyst questions. 'claude' is wired; 'ollama'/'llphant'
+    // are seams left open (bind them in AppServiceProvider) — the contract stays the same.
+    'analyst_provider' => env('ANALYST_PROVIDER', 'claude'),
+
+    // Semantic search embedder. Only 'hash' is wired (keyless local stand-in). To use a
+    // real embedder: write the class (implements EmbeddingClient), bind its case in
+    // AppServiceProvider, set EMBED_PROVIDER + EMBED_DIMENSIONS to the model's width,
+    // then migrate the vector column and re-run `php artisan analyst:embed`. The column
+    // width and the embedder MUST agree — that's what EMBED_DIMENSIONS pins.
+    'embed' => [
+        'provider' => env('EMBED_PROVIDER', 'hash'),
+        'dimensions' => (int) env('EMBED_DIMENSIONS', 256),
+
+        // Filled in only when you write the matching embedder class.
+        'voyage' => [
+            'key' => env('VOYAGE_API_KEY', ''),
+            'model' => env('VOYAGE_MODEL', 'voyage-3'),       // 1024 dims
+        ],
+        'ollama' => [
+            'host' => env('OLLAMA_HOST', 'http://ollama:11434'),
+            'model' => env('OLLAMA_EMBED_MODEL', 'nomic-embed-text'), // 768 dims
+        ],
+    ],
 ];

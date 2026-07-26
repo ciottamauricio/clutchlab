@@ -18,8 +18,10 @@ and the transactional tables — and only the generation half is new.
 
 ```
 question ──▶ RETRIEVE  Postgres: newest 15 parsed visible matches + scoreboards
-         │             Meilisearch `kills`: 40 hits matching the question's words,
+         │             Meilisearch `kills`: 40 hits matching the question's WORDS,
          │             scoped to those same matches (degrades to [] if down)
+         │             pgvector `match_embeddings`: 5 nearest match cards by MEANING,
+         │             over the whole visible set (degrades to [] if down)
          │             Postgres: the caller's teams' 10 most recent trainings —
          │             tactics drilled, roster + RSVPs, nade homework
          ├──▶ AUGMENT  compact JSON evidence + the question in one user message
@@ -30,6 +32,54 @@ Matches and kills are **outcomes**; trainings are **intent**. The system prompt 
 the split, so the analyst can connect "what we practiced" to "what happened" —
 a question no single page in the app can answer. Trainings need no keyword
 retrieval: the corpus is small and recency IS relevance for practice questions.
+
+### Two retrievers, two jobs (keyword vs. semantic)
+
+The analyst runs **two** retrievers on every question, because they fail differently:
+
+- **Keyword** (`SearchIndex` / Meilisearch) matches the question's *words* against kill
+  rows — precise for "awp opening kills on mirage", blind to paraphrase ("long-range
+  duels" shares no words with any kill row, so it finds nothing).
+- **Semantic** (`SemanticRetriever` / pgvector) embeds the question and finds match
+  *cards* closest in *meaning* — "our comeback games", "close matches on Nuke". It
+  searches the **whole visible set**, so it can surface a relevant match older than the
+  15-match recency window. It's fuzzy: it always returns its nearest N with a
+  `similarity` score, and the prompt tells the model to weight by that score.
+
+Keyword is exact-but-literal; semantic is fuzzy-but-meaning-aware. Together they cover
+each other's blind spots — the core lesson of this domain.
+
+### The semantic read model (pgvector)
+
+A third read model, same CQRS shape as search: Postgres matches are the source of
+truth; `match_embeddings` is a **projection** — one embedded prose "card" per parsed
+match (`BuildMatchCardAction`), rebuildable any time with `php artisan analyst:embed`.
+
+- **Embedding is a seam.** `EmbeddingClient` turns text → a fixed-width vector, and
+  reports that width via `dimensions()`. The default `HashEmbeddings` is a keyless local
+  embedder (the "hashing trick") — it runs the whole architecture with no external
+  account, but captures word overlap, not meaning ("duel" and "fight" land in different
+  buckets).
+
+  **Swapping in a real embedder** (Voyage, OpenAI, an Ollama model) is four steps, no
+  changes to the retriever or action:
+  1. Write the class implementing `EmbeddingClient`; its `dimensions()` returns the
+     model's width (voyage-3 = 1024, nomic-embed-text = 768).
+  2. Bind its case in the `EmbeddingClient` match in `AppServiceProvider`, and set
+     `EMBED_PROVIDER` to select it.
+  3. Set `EMBED_DIMENSIONS` to the model's width and `php artisan migrate` — the resize
+     migration reshapes the `vector(N)` column (a no-op while the width is unchanged).
+  4. `php artisan analyst:embed` — rebuild the index; the old vectors mean nothing to the
+     new model, and the projection is disposable by design.
+
+  `EMBED_DIMENSIONS` is the single value the column width and the embedder both read, so
+  they can't silently disagree.
+- **Storage is pgvector.** A `vector(256)` column; search is exact cosine distance
+  (`<=>`) with a sequential scan. **No ANN index on purpose**: an ivfflat/hnsw index is
+  *approximate* and on a tiny corpus its probes can miss the populated list and return
+  zero rows (it did, during the build — the reason the note exists). A full scan is
+  exact and instant at this scale; add an ivfflat index once the corpus is large enough
+  that scanning hurts — the earned upgrade.
 
 ## Rules
 
@@ -46,9 +96,9 @@ retrieval: the corpus is small and recency IS relevance for practice questions.
    input) requires: answer only from the evidence, cite matches as `[match:ID]`, admit
    gaps instead of inventing. The frontend turns citations into chips that open the
    match — every claim is checkable against the real dashboard.
-4. **Bounded evidence.** 15 matches / 40 kill rows / 10 trainings per request — the
-   prompt size and the per-call cost are capped by construction, not by hoping
-   questions stay small.
+4. **Bounded evidence.** 15 matches / 40 kill rows / 5 related cards / 10 trainings
+   per request — the prompt size and the per-call cost are capped by construction, not
+   by hoping questions stay small.
 5. **Degrade, never 500.** No `ANTHROPIC_API_KEY`, provider outage, or Meilisearch down
    → `503 analyst.unavailable` (search-down only drops the kills evidence; the answer
    still comes from scoreboards). Codes, not sentences, as everywhere.
@@ -71,12 +121,25 @@ Error codes: `analyst.question_required`, `analyst.question_too_short`,
 `ANTHROPIC_MODEL` (repo-root `.env` via Compose; key empty by default = feature off).
 The key is a secret: env-only, never committed — same rule as `DISCORD_WEBHOOK_URL`.
 
+`analyst_provider` (`ANALYST_PROVIDER`, default `claude`) chooses the generator. Only
+`claude` is wired; the `match` in `AppServiceProvider` is where an `ollama`/`llphant`
+case binds a different `AnalystLlm` — the contract is all the action depends on, so no
+other file changes. The embedder (`EmbeddingClient`) and store (`SemanticRetriever`)
+are bound there too; today `HashEmbeddings` + `PgVectorRetriever`.
+
+Postgres runs the `pgvector/pgvector:pg16` image (stock PG16 + the `vector` extension);
+the migration `CREATE EXTENSION`s it. Tests use sqlite (no vector type) and fake the
+retriever, so the suite never needs pgvector.
+
 ## Deliberate limitations (honest tradeoffs)
 
-- **Keyword retrieval, not embeddings.** Meilisearch matches the question's words
-  against killer/victim/weapon/map. Precise for structured data; blind to paraphrase
-  ("long-range duels" won't find AWP kills). A vector store + embeddings would fix
-  that — the earned upgrade, same logic as list→Streams for the queue.
+- **Crude embeddings.** Semantic recall exists (pgvector), but the default embedder is
+  the local hashing trick — it captures word overlap with light stemming, not true
+  meaning. "Duel" won't find "fight". A learned embedder behind `EmbeddingClient` is
+  the real fix; the whole store and retriever are already built for it.
+- **Match-level semantics only.** Cards summarize matches, so semantic search finds
+  relevant *games*, not relevant *rounds*. Round-level meaning would need embedded
+  round/kill cards — more vectors, same pattern.
 - **No conversation memory.** Each question is independent; there is no chat history.
 - **Recency window.** Evidence is the newest 15 matches — "last season" questions
   silently see only that window. The model is told to admit gaps, but the window

@@ -70,7 +70,10 @@ services:
     networks: [clutchnet]
 
   postgres:
-    image: postgres:16-alpine
+    # pgvector's image = stock Postgres 16 + the `vector` extension (semantic search
+    # read model for the analyst). Drop-in for postgres:16; the migration CREATEs the
+    # extension. Not -alpine — pgvector publishes a Debian-based image.
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_DB: ${DB_DATABASE}
       POSTGRES_USER: ${DB_USERNAME}

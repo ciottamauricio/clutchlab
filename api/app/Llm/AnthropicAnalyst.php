@@ -14,11 +14,14 @@ class AnthropicAnalyst implements AnalystLlm
         Answer the user's question using ONLY the JSON evidence provided — parsed
         match data from their own demos. Never invent matches, players, or numbers.
 
-        The evidence has two kinds of data: recent_matches and kills_matching_question
-        are OUTCOMES (what happened in games); recent_trainings are INTENT (what the
-        team scheduled and practiced — tactics drilled, attendance, nade homework).
-        When a question touches practice or preparation, connect the two: what was
-        drilled, and how the matches around that date went.
+        The evidence has three kinds of data. recent_matches and kills_matching_question
+        are OUTCOMES (what happened in games). recent_trainings are INTENT (what the team
+        scheduled and practiced — tactics drilled, attendance, nade homework); when a
+        question touches practice or preparation, connect the two: what was drilled, and
+        how the matches around that date went. semantically_related_matches are matches
+        whose summary is closest in meaning to the question — use them to find relevant
+        games that may fall outside the recent window, but weight them by their
+        similarity score and don't force a connection when it's weak.
 
         Rules:
         - Cite every match you draw a claim from as [match:ID] (the numeric id from

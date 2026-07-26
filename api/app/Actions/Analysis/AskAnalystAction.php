@@ -4,6 +4,7 @@ namespace App\Actions\Analysis;
 
 use App\Contracts\AnalystLlm;
 use App\Contracts\SearchIndex;
+use App\Contracts\SemanticRetriever;
 use App\Models\GameMatch;
 use App\Models\TrainingSession;
 use App\Models\User;
@@ -26,15 +27,20 @@ class AskAnalystAction
 
     private const TRAINING_LIMIT = 10;
 
+    private const RELATED_LIMIT = 5;
+
     public function __construct(
         private SearchIndex $search,
+        private SemanticRetriever $semantic,
         private AnalystLlm $llm,
     ) {}
 
     public function execute(User $user, string $question): string
     {
-        $matches = GameMatch::visibleTo($user)
-            ->where('status', 'parsed')
+        // The visible set anchors every retriever — nothing outside it can reach the model.
+        $visibleIds = GameMatch::visibleTo($user)->where('status', 'parsed')->pluck('id')->all();
+
+        $matches = GameMatch::whereIn('id', $visibleIds)
             ->with('playerStats')
             ->orderByDesc('played_at')
             ->limit(self::MATCH_LIMIT)
@@ -54,10 +60,26 @@ class AskAnalystAction
                 ])->all(),
             ])->all(),
             'kills_matching_question' => $this->relevantKills($user, $question, $matches->pluck('id')->all()),
+            // Semantic recall over the WHOLE visible set — can surface a relevant match
+            // older than the recency window, the gap keyword+recency alone leaves.
+            'semantically_related_matches' => $this->relatedMatches($question, $visibleIds),
             'recent_trainings' => $this->recentTrainings($user),
         ];
 
         return $this->llm->answer($question, $evidence);
+    }
+
+    // Nearest match cards by embedding distance. Two retrievers, two jobs: SearchIndex
+    // finds exact words in kill rows; this finds matches whose *summary* means something
+    // like the question ("our comeback games", "close matches on Nuke"). Degrades to []
+    // if the vector store is unavailable — the answer still stands on the other evidence.
+    private function relatedMatches(string $question, array $visibleIds): array
+    {
+        try {
+            return $this->semantic->related($question, $visibleIds, self::RELATED_LIMIT);
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     // Free-text retrieval over the kills index (killer/victim/weapon/map are searchable),

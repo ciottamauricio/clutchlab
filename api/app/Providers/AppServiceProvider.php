@@ -6,19 +6,23 @@ use Anthropic\Client as AnthropicClient;
 use App\Authorization\PermissionCatalog;
 use App\Contracts\AnalystLlm;
 use App\Contracts\DemoStorage;
+use App\Contracts\EmbeddingClient;
 use App\Contracts\EventBus;
 use App\Contracts\EventSubscriber;
 use App\Contracts\ParseQueue;
 use App\Contracts\PermissionService;
 use App\Contracts\SearchIndex;
+use App\Contracts\SemanticRetriever;
 use App\Events\Subscribers\EmailTrainingRoster;
 use App\Events\Subscribers\EventHandler;
 use App\Llm\AnthropicAnalyst;
+use App\Llm\HashEmbeddings;
 use App\Models\User;
 use App\Queue\RedisEventBus;
 use App\Queue\RedisEventSubscriber;
 use App\Queue\RedisParseQueue;
 use App\Search\MeilisearchIndex;
+use App\Search\PgVectorRetriever;
 use App\Services\DbPermissionService;
 use App\Storage\S3DemoStorage;
 use Illuminate\Support\Facades\Gate;
@@ -44,10 +48,23 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(SearchIndex::class, fn () => new MeilisearchIndex(
             new MeilisearchClient(config('clutch.meili.host'), config('clutch.meili.key'))
         ));
-        $this->app->bind(AnalystLlm::class, fn () => new AnthropicAnalyst(
-            new AnthropicClient(apiKey: config('clutch.anthropic.key')),
-            config('clutch.anthropic.model'),
-        ));
+        // The analyst generator, chosen by config. 'claude' is wired; add an 'ollama' or
+        // 'llphant' case here — the AnalystLlm contract is all AskAnalystAction depends on.
+        $this->app->bind(AnalystLlm::class, fn () => match (config('clutch.analyst_provider')) {
+            default => new AnthropicAnalyst(
+                new AnthropicClient(apiKey: config('clutch.anthropic.key')),
+                config('clutch.anthropic.model'),
+            ),
+        });
+
+        // Semantic retrieval: an embedder feeding a pgvector store, both seams. Only 'hash'
+        // (keyless local stand-in) is wired; add a 'voyage'/'ollama' case here once you've
+        // written the class. Its dimensions() must equal the migrated column width — pinned
+        // by EMBED_DIMENSIONS so the two can't silently disagree.
+        $this->app->bind(EmbeddingClient::class, fn () => match (config('clutch.embed.provider')) {
+            default => new HashEmbeddings((int) config('clutch.embed.dimensions')),
+        });
+        $this->app->bind(SemanticRetriever::class, PgVectorRetriever::class);
 
         // Singleton so the per-request grant cache is shared across every check in a request.
         $this->app->singleton(PermissionService::class, DbPermissionService::class);

@@ -105,6 +105,47 @@ class AnalystTest extends TestCase
         );
     }
 
+    public function test_semantic_recall_can_surface_matches_beyond_the_recent_window(): void
+    {
+        $me = $this->asMember();
+        // 15 recent matches fill the window; an older one falls out of recent_matches.
+        GameMatch::factory()->count(15)->create(['user_id' => $me->id, 'played_at' => now()]);
+        $old = GameMatch::factory()->create(['user_id' => $me->id, 'played_at' => now()->subYear()]);
+
+        // The vector store returns the old match as most related.
+        $this->semanticRetriever->hits = [
+            ['match_id' => $old->id, 'document' => 'Match on de_nuke...', 'similarity' => 0.82],
+        ];
+
+        $this->postJson('/api/analyst/ask', ['question' => 'our best game on Nuke ever'])->assertOk();
+
+        $recentIds = array_column($this->analystLlm->evidence['recent_matches'], 'id');
+        $this->assertNotContains($old->id, $recentIds); // pushed out of the window
+        $related = $this->analystLlm->evidence['semantically_related_matches'];
+        $this->assertSame($old->id, $related[0]['match_id']); // but recalled semantically
+        $this->assertSame(0.82, $related[0]['similarity']);
+    }
+
+    public function test_semantic_retrieval_is_scoped_to_visible_matches(): void
+    {
+        $me = $this->asMember();
+        $mine = GameMatch::factory()->create(['user_id' => $me->id]);
+        $strangers = GameMatch::factory()->create();
+
+        // Even if the store were to offer a stranger's match, the scope excludes it.
+        $this->semanticRetriever->hits = [
+            ['match_id' => $strangers->id, 'document' => 'secret', 'similarity' => 0.99],
+            ['match_id' => $mine->id, 'document' => 'mine', 'similarity' => 0.4],
+        ];
+
+        $this->postJson('/api/analyst/ask', ['question' => 'anything relevant here?'])->assertOk();
+
+        $this->assertContains($mine->id, $this->semanticRetriever->lastScope);
+        $this->assertNotContains($strangers->id, $this->semanticRetriever->lastScope);
+        $ids = array_column($this->analystLlm->evidence['semantically_related_matches'], 'match_id');
+        $this->assertSame([$mine->id], $ids);
+    }
+
     public function test_unparsed_matches_are_not_evidence(): void
     {
         $me = $this->asMember();
