@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { TOPICS } from '../features/study/tradeoffs'
 import Topology from '../features/study/Topology'
 
@@ -28,9 +29,12 @@ export default function StudyPage() {
           must be <em>earned</em> — and it is never free. Each decision below is a ledger: what it bought on
           the left, what it charged on the right.
         </p>
-        <button type="button" className="study-expand" onClick={toggleAll}>
-          {allOpen ? 'Collapse all' : 'Expand all'}
-        </button>
+        <div className="study-actions">
+          <button type="button" className="study-expand" onClick={toggleAll}>
+            {allOpen ? 'Collapse all' : 'Expand all'}
+          </button>
+          <Link to="/present" className="study-present-link">Present mode →</Link>
+        </div>
       </header>
 
       <Topology />

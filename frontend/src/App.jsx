@@ -11,6 +11,7 @@ import AwardsPage from './pages/AwardsPage'
 import AdminPage from './pages/AdminPage'
 import ProfilePage from './pages/ProfilePage'
 import StudyPage from './pages/StudyPage'
+import PresentPage from './pages/PresentPage'
 import TrainingsPage from './pages/TrainingsPage'
 import './App.css'
 
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="/awards" element={<RequireCan ability="awards.view"><AwardsPage /></RequireCan>} />
             <Route path="/admin" element={<AdminOnly><AdminPage /></AdminOnly>} />
             <Route path="/study" element={<StudyPage />} />
+            <Route path="/present" element={<PresentPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -3464,6 +3464,202 @@ a.brand:hover .brand-mark {
   margin: 0 auto;
 }
 
+/* Study hero action row: expand-all + the link into present mode. */
+.study-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.study-present-link {
+  font: 500 11px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--t);
+  text-decoration: none;
+}
+
+.study-present-link:hover {
+  color: var(--text-h);
+}
+
+/* ---------- Present mode: the rehearsal deck ---------- */
+/* A personal slide deck — one decision at a time, said out loud. Big readable type,
+   arrow-key nav, a number rail to jump. Distinct from the ledger: no gained/paid
+   columns, just the spoken pitch. */
+.deck {
+  max-width: 900px;
+  margin: 0 auto;
+  min-height: 72vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.deck-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.deck-kicker {
+  font: 500 11px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--ct);
+}
+
+.deck-count {
+  font: 600 13px var(--mono);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.deck-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 40px 0;
+}
+
+/* The card fades/rises in on each change (keyed by topic id in JSX). */
+.deck-card {
+  animation: deck-in 0.28s ease;
+}
+
+@keyframes deck-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deck-card { animation: none; }
+}
+
+.deck-n {
+  display: block;
+  font: 600 13px var(--mono);
+  letter-spacing: 0.18em;
+  color: var(--t);
+  margin-bottom: 12px;
+}
+
+.deck-title {
+  font: 600 42px/1.05 var(--display);
+  color: var(--text-h);
+  margin: 0 0 12px;
+  max-width: 18ch;
+}
+
+.deck-tag {
+  display: inline-block;
+  font: 500 10px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 3px 10px;
+  margin-bottom: 22px;
+}
+
+.deck-summary {
+  font: 500 18px/1.5 var(--sans);
+  color: var(--t);
+  margin: 0 0 20px;
+  max-width: 54ch;
+}
+
+/* The spoken pitch — the reason this page exists. Set larger and looser than body copy
+   so it reads like a script, not a paragraph. */
+.deck-pitch {
+  font-size: 20px;
+  line-height: 1.7;
+  color: var(--text);
+  margin: 0;
+  max-width: 60ch;
+}
+
+.deck-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.deck-arrow {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text);
+  font: 500 12px var(--mono);
+  cursor: pointer;
+}
+
+.deck-arrow:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--ct);
+  color: var(--text-h);
+}
+
+.deck-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.deck-rail {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deck-dot {
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font: 500 10px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.deck-dot:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.deck-dot.current {
+  background: var(--ct);
+  border-color: var(--ct);
+  color: var(--bg);
+}
+
+.deck-hint {
+  text-align: center;
+  margin: 14px 0 0;
+  font: 400 11px var(--mono);
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 640px) {
+  .deck-title { font-size: 30px; }
+  .deck-pitch { font-size: 17px; }
+  .deck-rail { display: none; } /* arrows carry navigation on small screens */
+}
+
 .study-hero {
   padding: 8px 0 30px;
   border-bottom: 1px solid var(--border);
