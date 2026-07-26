@@ -35,3 +35,21 @@ func TestJobDecodesTheContractFixture(t *testing.T) {
 		t.Errorf("fixture should be a single flat object")
 	}
 }
+
+// The api adds an optional traceparent when a trace is active. It must still decode with
+// DisallowUnknownFields (the field is known now) and land in Job.Traceparent so the
+// parse span can join the upload's trace.
+func TestJobDecodesWithOptionalTraceparent(t *testing.T) {
+	payload := `{"match_id":123,"demo_key":"demos/abc.dem","traceparent":"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"}`
+
+	dec := json.NewDecoder(strings.NewReader(payload))
+	dec.DisallowUnknownFields()
+
+	var job Job
+	if err := dec.Decode(&job); err != nil {
+		t.Fatalf("decode with traceparent: %v", err)
+	}
+	if job.Traceparent == "" {
+		t.Error("traceparent did not survive decode")
+	}
+}

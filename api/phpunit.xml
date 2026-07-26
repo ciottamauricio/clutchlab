@@ -42,5 +42,8 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Empty OTLP endpoint = no-op tracer: spans are created but never exported,
+             so tests never open a socket to Jaeger. -->
+        <env name="OTEL_ENDPOINT" value=""/>
     </php>
 </phpunit>

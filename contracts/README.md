@@ -14,3 +14,11 @@ The producer test compares byte-for-byte (it defines the canonical serialization
 consumer test decodes the fixture and checks every field survives. Containers see this
 directory read-only at `../contracts` relative to each module root (compose mounts);
 in CI the checkout provides the same relative path.
+
+## Optional trace context
+
+Messages that cross a non-HTTP hop may carry an **optional** `traceparent` (W3C trace
+context) so the consumer's span joins the producer's trace. It is additive and omitted
+when no trace is active, so the canonical fixtures above don't include it — the byte
+contract is the no-trace shape. `traceparent` is context only: it never carries data,
+and both sides test that no payload field ever hides in it.

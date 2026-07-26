@@ -27,6 +27,9 @@ import (
 type Job struct {
 	MatchID int64  `json:"match_id"`
 	DemoKey string `json:"demo_key"`
+	// W3C trace context from the api's enqueue span — additive, optional. When present,
+	// parse_job joins the api's trace so Jaeger shows the whole upload as one waterfall.
+	Traceparent string `json:"traceparent,omitempty"`
 }
 
 type worker struct {
@@ -102,8 +105,10 @@ func (w *worker) handle(ctx context.Context, payload string) {
 	}
 	log.Printf("match %d: parsing %s", job.MatchID, job.DemoKey)
 
-	// One trace per job; each stage below is a child span, so Jaeger shows the parse
-	// as a waterfall (download → parse → save → index) with the event hand-off at the end.
+	// Join the api's upload trace when the job carries one (a missing traceparent just
+	// yields a local root trace). Each stage below is a child span, so Jaeger shows the
+	// parse as a waterfall (download → parse → save → index) under the api's span.
+	ctx = telemetry.Extract(ctx, job.Traceparent)
 	ctx, span := otel.Tracer("worker").Start(ctx, "parse_job", trace.WithAttributes(
 		attribute.Int64("match_id", job.MatchID),
 		attribute.String("demo_key", job.DemoKey),

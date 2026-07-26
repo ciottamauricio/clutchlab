@@ -49,3 +49,14 @@ func Traceparent(ctx context.Context) string {
 	otel.GetTextMapPropagator().Inject(ctx, carrier)
 	return carrier.Get("traceparent")
 }
+
+// Extract is the inverse: given a W3C traceparent from an incoming payload, return a
+// context whose spans join that trace. An empty or malformed value yields ctx unchanged
+// (a new root trace) — a missing hand-off degrades to a local trace, never an error.
+func Extract(ctx context.Context, traceparent string) context.Context {
+	if traceparent == "" {
+		return ctx
+	}
+	carrier := propagation.MapCarrier{"traceparent": traceparent}
+	return otel.GetTextMapPropagator().Extract(ctx, carrier)
+}

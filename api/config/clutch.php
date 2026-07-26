@@ -9,6 +9,14 @@ return [
     // subscribes). Same name everywhere or events vanish silently.
     'events_channel' => env('EVENTS_CHANNEL', 'clutch_events'),
 
+    // OpenTelemetry tracing. Same OTLP/HTTP endpoint the Go services use (Jaeger in
+    // dev). Empty endpoint = tracing off — an unreachable backend must never affect a
+    // request, so exports are batched and failures are swallowed.
+    'otel' => [
+        'endpoint' => env('OTEL_ENDPOINT', 'http://jaeger:4318'),
+        'service' => env('OTEL_SERVICE_NAME', 'api'),
+    ],
+
     // Hard cap on uploaded demo size, in kilobytes (validation rule + nginx/php limits).
     'max_demo_kb' => env('MAX_DEMO_KB', 1048576),
 

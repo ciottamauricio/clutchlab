@@ -25,6 +25,7 @@ use App\Search\MeilisearchIndex;
 use App\Search\PgVectorRetriever;
 use App\Services\DbPermissionService;
 use App\Storage\S3DemoStorage;
+use App\Telemetry\Tracing;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\ServiceProvider;
@@ -68,6 +69,12 @@ class AppServiceProvider extends ServiceProvider
 
         // Singleton so the per-request grant cache is shared across every check in a request.
         $this->app->singleton(PermissionService::class, DbPermissionService::class);
+
+        // One tracer per process, exporting to the same OTLP endpoint the Go services use.
+        $this->app->singleton(Tracing::class, fn () => new Tracing(
+            config('clutch.otel.endpoint'),
+            config('clutch.otel.service'),
+        ));
     }
 
     /**
@@ -94,5 +101,13 @@ class AppServiceProvider extends ServiceProvider
                 Gate::define($key, fn (User $user) => $perms->canApp($user, $key));
             }
         }
+
+        // Flush batched spans after the response is sent — a short-lived request still
+        // ships its trace. Resolved lazily so a request that never traced pays nothing.
+        $this->app->terminating(function () {
+            if ($this->app->resolved(Tracing::class)) {
+                $this->app->make(Tracing::class)->shutdown();
+            }
+        });
     }
 }

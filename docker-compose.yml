@@ -24,7 +24,7 @@ services:
       - ./api:/var/www/html
       - ./contracts:/var/www/contracts:ro   # shared wire-contract fixtures (../contracts in tests)
     env_file: .env
-    depends_on: [postgres, redis, minio, meilisearch]
+    depends_on: [postgres, redis, minio, meilisearch, jaeger]
     networks: [clutchnet]
 
   # Laravel as an event subscriber: blocks on clutch_events and turns facts into
