@@ -199,13 +199,18 @@ log body); Grafana queries them at `localhost:3001`. `match_id` is the de-facto
 correlation id: `{project="clutchlab-project"} |= "match 18"` reconstructs one match's
 story across api, worker, and notifier. No service knows the pipeline exists.
 
-**Traces — OpenTelemetry → Jaeger** (`localhost:16686`). The worker starts one trace
-per job (`parse_job`, child spans download → parse → save → index) and injects a W3C
-`traceparent` into the events it publishes; the notifier extracts it, so its `notify`
-span joins the same trace across the pub/sub hop. That payload-carried context is the
-non-HTTP version of the `traceparent` header — the queue could carry one the same way
-(Laravel → worker is the natural next hop to instrument). Tracing is observability, not
-behavior: exports are async and an unreachable Jaeger never affects a parse.
+**Traces — OpenTelemetry → Jaeger** (`localhost:16686`). One trace now follows an upload
+across all three services. The api (Laravel) starts the root span on upload/reparse and
+injects a W3C `traceparent` into the parse job; the worker extracts it so `parse_job`
+(child spans download → parse → save → index) joins that trace rather than starting a new
+one; the worker in turn injects a `traceparent` into the event it publishes, and the
+notifier extracts it so its `notify` span joins too. Both non-HTTP hops (the queue list
+and the pub/sub channel) carry the context in the payload — the non-HTTP version of the
+`traceparent` header — and Go and PHP share one OTLP endpoint and propagator, so the
+whole path reassembles as one waterfall in Jaeger. Tracing is observability, not
+behavior: exports are batched/async and an unreachable Jaeger never affects a request or
+a parse. Metrics and cross-service log correlation beyond `match_id` are the named next
+rungs — tracing is the one pillar built.
 
 ## Testing the boundaries
 

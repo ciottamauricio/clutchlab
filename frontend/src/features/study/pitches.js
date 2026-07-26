@@ -55,4 +55,7 @@ export const PITCHES = {
 
   rag:
     "I built a feature that answers questions about our matches in plain English. The AI doesn't know our data, so instead of asking it to recall, I retrieve the relevant matches, kills, and trainings from our own database, hand them to the model along with the question, and let it write a grounded answer that cites each match. I fetch evidence two ways — by exact keyword and by meaning — so it catches both \"AWP kills on Mirage\" and vaguer questions like \"our comeback games.\" That's RAG: retrieval-augmented generation — an open-book exam for the AI.",
+
+  observability:
+    "When you upload a demo, the work touches three separate services in two languages — the app takes the file, a Go worker parses it, and another service posts to Discord. I already collect everyone's logs in one place and can pull up a single match's story by its ID. But logs tell you what happened, not how long each step took or what caused what. So I added tracing: every upload gets a trace ID that travels with it across all three services — riding inside the queue message and the event, since these don't talk over normal web requests — and they report their timing to one timeline I can open as a waterfall. What's still missing is the third piece, metrics: dashboards for overall rates and errors. Logs and traces are in; aggregate health is the next step.",
 }

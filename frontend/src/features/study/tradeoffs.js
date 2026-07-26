@@ -344,4 +344,24 @@ export const TOPICS = [
     code: 'semantically_related_matches: retriever.related(question, visibleIds, 5)',
     codeLabel: 'the semantic retriever searches the whole visible set by meaning — it can surface a match older than the recent-window the keyword pass sees',
   },
+  {
+    id: 'observability',
+    n: '18',
+    title: 'One request across four processes',
+    tag: 'tracing, OTel',
+    summary: 'Logs already reassemble one upload\'s story by match_id; tracing adds what they can\'t — the causal, timed waterfall across three languages and four processes.',
+    gained: [
+      'A single trace follows one upload end to end — the api\'s enqueue span, the worker\'s download/parse/save/index, and the notifier\'s send, drawn as one waterfall in Jaeger. Verified live: one trace id, services [api, worker, notifier].',
+      'The trace crosses non-HTTP hops the same way HTTP does — a W3C traceparent rides the queue job and the event JSON, so a consumer\'s span joins the producer\'s. Same OTLP endpoint and propagator in Go and PHP, so two languages share one trace.',
+    ],
+    paid: [
+      'Tracing must never change behavior: an unreachable collector can\'t slow a request or fail an upload, so spans are batched and export failures are swallowed. That means a broken collector fails silently — the observability tool has no observability of its own.',
+      'Two of three pillars now exist — logs (Loki/Alloy/Grafana, correlated by match_id) and traces — but not metrics: there are no rates, latencies, or error budgets, so you can see one request in detail yet not whether the system is healthy in aggregate. And logs and traces aren\'t linked (no shared trace_id in log lines), so jumping from a slow span to its logs is still manual.',
+    ],
+    body: [
+      'A monolith answers "what happened here" with one log file. Split the work across an api, a Go worker, and a notifier and that question fragments across three of them. The logs pillar (Loki/Alloy/Grafana) already reassembles the story by grepping a shared match_id — good enough for "show me everything about match 18." Tracing adds what logs can\'t: causality and timing — not just that the three services acted, but that the parse was a child of the upload and took 1.2s of it, drawn as a waterfall. The propagation rule mirrors the events themselves (topic 12): across the boundary the context is explicit, carried in the payload, not implicit in a framework. The honest gap is metrics — the third pillar — plus linking a log line to its trace; logs and traces are built, aggregate health is not.',
+    ],
+    code: "job['traceparent'] = tracing.traceparent()  // rides the queue into the worker",
+    codeLabel: 'the api injects its span context into the parse job; the worker extracts it so parse_job becomes a child of the upload — the cross-language hand-off',
+  },
 ]
