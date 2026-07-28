@@ -1,0 +1,38 @@
+# docs/STUDY.md is generated from the app's study source (tradeoffs.js + pitches.js) by
+# scripts/gen-study.mjs. This guards against drift: it regenerates and fails if the
+# committed doc differs — i.e. someone edited the topics but forgot to rerun the script.
+# The generator is dependency-free (plain Node reading the source), so no npm install.
+name: study-doc
+
+on:
+  push:
+    paths:
+      - "frontend/src/features/study/tradeoffs.js"
+      - "frontend/src/features/study/pitches.js"
+      - "scripts/gen-study.mjs"
+      - "docs/STUDY.md"
+      - ".github/workflows/study-doc.yml"
+  pull_request:
+    paths:
+      - "frontend/src/features/study/tradeoffs.js"
+      - "frontend/src/features/study/pitches.js"
+      - "scripts/gen-study.mjs"
+      - "docs/STUDY.md"
+      - ".github/workflows/study-doc.yml"
+
+jobs:
+  in-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node scripts/gen-study.mjs
+      - name: docs/STUDY.md must match the generated output
+        run: |
+          if ! git diff --quiet -- docs/STUDY.md; then
+            echo "::error::docs/STUDY.md is out of date. Run 'node scripts/gen-study.mjs' and commit the result."
+            git diff -- docs/STUDY.md
+            exit 1
+          fi

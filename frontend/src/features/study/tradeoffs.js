@@ -1,6 +1,9 @@
 // The engineering study behind Clutchlab: every architectural decision as a ledger of what it
 // *bought* and what it *cost*. Grounded in docs/ARCHITECTURE.md, docs/ROADMAP.md, and the
 // per-domain docs — this is the real shape of the system, not a generic explanation.
+//
+// This is the single source of truth for the study. docs/STUDY.md (the GitHub-readable
+// version) is generated from here — after editing topics, run `node scripts/gen-study.mjs`.
 
 export const TOPICS = [
   {
