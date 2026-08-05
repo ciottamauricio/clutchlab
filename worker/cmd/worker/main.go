@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"os"
 	"time"
 
 	"clutchlab/worker/internal/config"
@@ -35,19 +36,30 @@ type Job struct {
 }
 
 type worker struct {
-	store   *matches.Store
-	storage *storage.Client
-	indexer search.Indexer
-	events  events.Publisher
-	limits  parser.Limits
+	store     *matches.Store
+	storage   *storage.Client
+	indexer   search.Indexer
+	events    events.Publisher
+	limits    parser.Limits
+	isolation bool
 }
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
-	log.SetPrefix("[worker] ")
-
 	ctx := context.Background()
 	cfg := config.Load()
+
+	// Isolated-parse child mode: the parent re-execs the worker binary with this flag to
+	// parse one demo in a throwaway process. It must run before any normal startup — no
+	// DB, no Redis, no logging to stdout (stdout is reserved for the ParseResult JSON).
+	if len(os.Args) > 1 && os.Args[1] == parseChildFlag {
+		os.Exit(runParseChild(parser.Limits{
+			Timeout:      time.Duration(cfg.ParseTimeoutSeconds) * time.Second,
+			MaxHeapBytes: uint64(cfg.ParseMemoryLimitMB) * 1024 * 1024,
+		}))
+	}
+
+	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
+	log.SetPrefix("[worker] ")
 
 	conn, err := db.Connect(cfg.DSN())
 	if err != nil {
@@ -91,8 +103,9 @@ func main() {
 			Timeout:      time.Duration(cfg.ParseTimeoutSeconds) * time.Second,
 			MaxHeapBytes: uint64(cfg.ParseMemoryLimitMB) * 1024 * 1024,
 		},
+		isolation: cfg.ParseIsolation,
 	}
-	log.Printf("parse sandbox: timeout=%ds memory=%dMB", cfg.ParseTimeoutSeconds, cfg.ParseMemoryLimitMB)
+	log.Printf("parse sandbox: timeout=%ds memory=%dMB isolation=%v", cfg.ParseTimeoutSeconds, cfg.ParseMemoryLimitMB, cfg.ParseIsolation)
 
 	log.Printf("ready, blocking on redis list %q", cfg.Queue)
 	for {
@@ -138,6 +151,11 @@ func (w *worker) handle(ctx context.Context, payload string) {
 	defer obj.Close()
 
 	res, err := stageSpan(ctx, "parse", func(c context.Context) (*parser.ParseResult, error) {
+		// In prod the parse runs in a throwaway child process (crash/exploit stays there);
+		// in dev it runs in-process under the same limits (air has no binary to exec).
+		if w.isolation {
+			return parseIsolated(c, obj, w.limits)
+		}
 		return parser.ParseDemoWithLimits(c, obj, w.limits)
 	})
 	if err != nil {
@@ -175,11 +193,12 @@ func (w *worker) handle(ctx context.Context, payload string) {
 // pathological file, not just a broken one.
 func parseFailCode(err error) string {
 	switch {
-	case errors.Is(err, parser.ErrParseTimeout):
+	case errors.Is(err, parser.ErrParseTimeout), errors.Is(err, errChildTimeout):
 		return "parse_failed_timeout"
-	case errors.Is(err, parser.ErrParseMemory):
+	case errors.Is(err, parser.ErrParseMemory), errors.Is(err, errChildMemory):
 		return "parse_failed_memory"
 	default:
+		// Includes errChildParse — a crashed/OOM-killed/corrupt child, all contained.
 		return "parse_failed_corrupt"
 	}
 }

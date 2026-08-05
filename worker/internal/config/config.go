@@ -22,6 +22,10 @@ type Config struct {
 	// bound; these cap the blast radius to one job. See parser.Limits.
 	ParseTimeoutSeconds int
 	ParseMemoryLimitMB  int
+	// When true, each parse runs in a throwaway child process (worker re-execs itself in
+	// --parse-child mode) so a crash or exploit in the native parser is contained to that
+	// process, not the worker. Off in dev (air has no stable binary to exec); on in prod.
+	ParseIsolation bool
 }
 
 func Load() Config {
@@ -44,6 +48,7 @@ func Load() Config {
 		// Defaults sized for a long 128-tick match with headroom; tighten in prod.
 		ParseTimeoutSeconds: envInt("PARSE_TIMEOUT_SECONDS", 300),
 		ParseMemoryLimitMB:  envInt("PARSE_MEMORY_LIMIT_MB", 2048),
+		ParseIsolation:      envBool("PARSE_ISOLATION", false),
 	}
 }
 
@@ -63,6 +68,15 @@ func envInt(key string, fallback int) int {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			return n
+		}
+	}
+	return fallback
+}
+
+func envBool(key string, fallback bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
 		}
 	}
 	return fallback

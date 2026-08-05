@@ -5,6 +5,7 @@ package parser
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -102,6 +103,41 @@ type ParseResult struct {
 func ParseDemo(r io.Reader) (*ParseResult, error) {
 	return ParseDemoWithLimits(context.Background(), r, Limits{})
 }
+
+// RunChild is the entrypoint of the isolated parse subprocess (worker --parse-child): it
+// reads demo bytes from in, parses them under limits, and writes the ParseResult as JSON
+// to out. It returns an exit code, never touching the real stdout for anything but the
+// result — a crash or non-zero exit is the parent's signal that the parse failed. The
+// isolation itself (a throwaway process) is set up by the parent; this is just the body.
+func RunChild(in io.Reader, out io.Writer, limits Limits) int {
+	result, err := ParseDemoWithLimits(context.Background(), in, limits)
+	if err != nil {
+		// Distinguish a limit breach from an ordinary failure via the exit code, so the
+		// parent can still surface parse_failed_timeout / _memory through isolation.
+		switch {
+		case errors.Is(err, ErrParseTimeout):
+			return ExitTimeout
+		case errors.Is(err, ErrParseMemory):
+			return ExitMemory
+		default:
+			return ExitParseError
+		}
+	}
+
+	if err := json.NewEncoder(out).Encode(result); err != nil {
+		return ExitEncodeError
+	}
+	return ExitOK
+}
+
+// Exit codes the isolated child returns; the parent maps them back to status codes.
+const (
+	ExitOK          = 0
+	ExitParseError  = 1 // corrupt/unsupported demo (or a recovered panic)
+	ExitTimeout     = 2
+	ExitMemory      = 3
+	ExitEncodeError = 4
+)
 
 // ParseDemoWithLimits parses an untrusted demo under a wall-clock timeout and a heap
 // ceiling. It drives the frame loop itself (rather than ParseToEnd) so it can check both

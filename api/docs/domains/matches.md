@@ -178,12 +178,25 @@ is the only way to remove a match — there is no soft-delete.
 | `parse_failed_memory` | The parse exceeded the sandbox heap limit (`PARSE_MEMORY_LIMIT_MB`). |
 | `parse_failed_internal` | Parsing succeeded but persisting the results failed. |
 
-The demo is **attacker-controlled input** fed to a native parser, so the worker runs it
-under a sandbox: a wall-clock timeout and a heap ceiling, checked between demo frames
-(cooperative — no goroutine is force-killed). A breach of either caps the blast radius to
-that one job and surfaces as the distinct code above rather than a generic corrupt. This
-is defense-in-depth on top of the existing panic recovery; full isolation (separate
-process, no network, read-only FS) is the named next rung (see study topic 19).
+The demo is **attacker-controlled input** fed to a native parser, so the worker sandboxes
+it in layers (defense-in-depth):
+
+1. **Panic recovery** — a demo that makes the parser panic becomes `parse_failed_corrupt`,
+   never a crash.
+2. **Resource limits** — a wall-clock timeout and heap ceiling, checked between demo
+   frames (cooperative — no goroutine is force-killed), catch a demo that *hangs* or
+   *exhausts memory* → `parse_failed_timeout` / `parse_failed_memory`.
+3. **Process isolation** (`PARSE_ISOLATION=true`, on in prod) — the parse runs in a
+   throwaway child process (the worker re-execs itself as `worker --parse-child`, demo
+   bytes in on stdin, `ParseResult` JSON out on stdout). A hard crash, an OOM-kill, or a
+   parser exploit is confined to that child; the parent sees a non-zero exit, fails the one
+   job (`parse_failed_*`), and keeps running. The child gets an **empty environment** — no
+   DB creds, no S3 keys — since it needs only the bytes on stdin. Off in dev (air has no
+   stable binary to exec); the resource limits still apply in-process there.
+
+Each layer catches what the one before it can't: recovery handles panics, limits handle
+runaway resource use, isolation handles a crash or exploit. OS-level lockdown of the child
+(no network, read-only filesystem) is the remaining rung.
 
 **Upload / reassignment** (HTTP 422/500): the `demo.*` codes under Validation, plus
 `match.invalid_team` (team the caller can't upload to), `match.upload_forbidden` (caller

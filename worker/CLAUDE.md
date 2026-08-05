@@ -15,9 +15,12 @@ to the shared Postgres `matches` / `match_player_stats` tables.
   shared with Laravel — change both sides together.
 - Parsing **recovers panics** into errors; a corrupt demo becomes `status=failed` /
   `error_code=parse_failed_corrupt`, never a crash.
-- The demo is **untrusted input**, so the parse runs under a **sandbox** (`parser.Limits`):
-  a wall-clock timeout (`PARSE_TIMEOUT_SECONDS`) and heap ceiling (`PARSE_MEMORY_LIMIT_MB`),
-  checked between frames; a breach → `parse_failed_timeout` / `parse_failed_memory`. Full
-  isolation (separate process) is the next rung.
+- The demo is **untrusted input**, so the parse is sandboxed in layers: panic recovery,
+  **resource limits** (`parser.Limits` — timeout + heap cap, `PARSE_TIMEOUT_SECONDS` /
+  `PARSE_MEMORY_LIMIT_MB`, checked between frames → `parse_failed_timeout`/`_memory`), and
+  **process isolation** (`PARSE_ISOLATION=true`) — the binary re-execs itself as
+  `worker --parse-child` to parse one demo in a throwaway process (demo on stdin,
+  ParseResult JSON on stdout, empty env). Off in dev (air has no binary to exec), on in
+  prod. OS-level lockdown (no network, read-only FS) is the remaining rung.
 - Writes are **idempotent** (delete-then-insert stats), so re-delivered jobs don't double.
 - Toolchain pinned to **Go 1.24**; `minio-go` and `air` pinned to match.
