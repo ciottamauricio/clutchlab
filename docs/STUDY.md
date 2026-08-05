@@ -29,6 +29,7 @@ what it **cost**.
 17. [RAG: retrieval you already had](#17--rag-retrieval-you-already-had) — *AI, read models*
 18. [One request across four processes](#18--one-request-across-four-processes) — *tracing, OTel*
 19. [The trust boundary is the network](#19--the-trust-boundary-is-the-network) — *security, threat model*
+20. [Sandboxing the untrusted parser](#20--sandboxing-the-untrusted-parser) — *security, defense-in-depth*
 
 ---
 
@@ -535,5 +536,33 @@ ports: ["8080:80"]   # nginx — the only service that publishes to the host
 *every other service omits ports: and is reachable only on the internal network — the trust boundary, in one line of compose*
 
 > **In plain English.** Security here is really about one question: what can the outside world reach? My answer is a hard shell — only one service, the gateway, is open to the internet. Everything else — the app, the parser, the databases, storage — lives on a private network no outsider can touch, and they talk to each other by name. At that one door I check everything: you need a valid token, sensitive actions are rate-limited, and uploaded files are validated before anything opens them. The honest trade-off is that inside the wall, the services trust each other completely — the parser will process any job it's handed, no questions asked. That's fine as long as the wall holds, but it's a single layer of defense, and a couple of developer-convenience doors (a database port, an admin dashboard with no login) would need closing before this ever went to production. I know exactly where those gaps are — naming them is half of taking security seriously.
+
+---
+
+## 20 · Sandboxing the untrusted parser
+
+*security, defense-in-depth*
+
+**A demo is attacker-controlled input fed to a native parser — the app's sharpest edge, hardened in three layers that each catch what the last cannot.**
+
+**Gained**
+
+- Three layers, three failure modes: panic recovery turns a crashing demo into a failed job; resource limits (a wall-clock timeout + heap ceiling checked between frames) stop one that hangs or exhausts memory; process isolation runs the parse in a throwaway child (worker re-execs itself, demo on stdin, result JSON on stdout) so a hard crash or an exploited parser bug is confined to that process, not the worker.
+- Isolation reuses a boundary that already existed. The worker was split from the api for a performance reason (CPU-bound parsing); the same split now doubles as a security boundary — the risky native work is already off in its own service, and the child process hardens it further. The child gets an empty environment: no DB creds, no S3 keys, only the bytes on stdin, so even a successful exploit inherits nothing.
+
+**Paid**
+
+- Isolation costs a process spawn per parse and a serialization round-trip (ParseResult back over a pipe as JSON) — negligible against a multi-second parse, but real, and it adds a moving part: the binary must be able to re-exec itself, which the air dev container can't do cleanly, so isolation is a prod-only flag and dev runs the in-process path. Two code paths to keep honest.
+- It stops at the process. The child still shares the host kernel, network, and filesystem — a true jail (no network, read-only FS, seccomp, or a microVM) is the next rung. And a crashed child is reported as a generic corrupt parse; the parent can't always tell "hostile" from "broken" once the OS has killed the process for it.
+
+Most of this project's boundaries are about structure; this one is about trust. Everything else assumes inputs are broadly well-formed, but the demo parser eats bytes a stranger uploaded, through a large native library that was never promised to be hostile-input-safe. That makes it the one place worth defense-in-depth: not one check but a stack, ordered so each layer handles the failure the previous can't see. Panic recovery was there first (it catches demos that error out). Resource limits came next (they catch the ones that don't error but never stop). Isolation is the floor under both — when a demo does something neither anticipated, the damage is a dead subprocess and a failed job, not a downed worker or a foothold in the network. The honest frame is that security is layers, not a wall: this is three of them, the OS-level jail is the fourth, and naming that gap is the same discipline the rest of the ledger uses.
+
+```
+exec.CommandContext(ctx, self, "--parse-child")  // parse in a throwaway process; Env: none
+```
+
+*the worker re-execs itself to parse one demo in isolation — a crash or exploit dies with the child, and it inherits no secrets*
+
+> **In plain English.** The riskiest thing this app does is parse a demo file, because that file came from a stranger and it's read by a big, complex library that was never built to be safe against a deliberately evil file. So I defend it in layers, each catching what the last one misses. First, if the parser crashes on a broken file, I catch it and just mark the upload failed. Second, if a file is crafted to run forever or eat all the memory, a time limit and a memory limit stop it. Third — and this is the new part — the actual parsing runs in a separate throwaway process: I hand it only the file's bytes, nothing else, not even my database passwords, and if that file manages to break or hijack the parser, the damage dies with that little process instead of taking down the whole worker. The point isn't one perfect defense; it's a stack of them, so no single trick gets through. The last rung — fully jailing that process from the network and disk — is the next thing I'd add.
 
 ---

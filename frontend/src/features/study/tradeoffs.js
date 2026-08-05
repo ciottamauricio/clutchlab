@@ -387,4 +387,24 @@ export const TOPICS = [
     code: 'ports: ["8080:80"]   # nginx — the only service that publishes to the host',
     codeLabel: 'every other service omits ports: and is reachable only on the internal network — the trust boundary, in one line of compose',
   },
+  {
+    id: 'untrusted-parse',
+    n: '20',
+    title: 'Sandboxing the untrusted parser',
+    tag: 'security, defense-in-depth',
+    summary: 'A demo is attacker-controlled input fed to a native parser — the app\'s sharpest edge, hardened in three layers that each catch what the last cannot.',
+    gained: [
+      'Three layers, three failure modes: panic recovery turns a crashing demo into a failed job; resource limits (a wall-clock timeout + heap ceiling checked between frames) stop one that hangs or exhausts memory; process isolation runs the parse in a throwaway child (worker re-execs itself, demo on stdin, result JSON on stdout) so a hard crash or an exploited parser bug is confined to that process, not the worker.',
+      'Isolation reuses a boundary that already existed. The worker was split from the api for a performance reason (CPU-bound parsing); the same split now doubles as a security boundary — the risky native work is already off in its own service, and the child process hardens it further. The child gets an empty environment: no DB creds, no S3 keys, only the bytes on stdin, so even a successful exploit inherits nothing.',
+    ],
+    paid: [
+      'Isolation costs a process spawn per parse and a serialization round-trip (ParseResult back over a pipe as JSON) — negligible against a multi-second parse, but real, and it adds a moving part: the binary must be able to re-exec itself, which the air dev container can\'t do cleanly, so isolation is a prod-only flag and dev runs the in-process path. Two code paths to keep honest.',
+      'It stops at the process. The child still shares the host kernel, network, and filesystem — a true jail (no network, read-only FS, seccomp, or a microVM) is the next rung. And a crashed child is reported as a generic corrupt parse; the parent can\'t always tell "hostile" from "broken" once the OS has killed the process for it.',
+    ],
+    body: [
+      'Most of this project\'s boundaries are about structure; this one is about trust. Everything else assumes inputs are broadly well-formed, but the demo parser eats bytes a stranger uploaded, through a large native library that was never promised to be hostile-input-safe. That makes it the one place worth defense-in-depth: not one check but a stack, ordered so each layer handles the failure the previous can\'t see. Panic recovery was there first (it catches demos that error out). Resource limits came next (they catch the ones that don\'t error but never stop). Isolation is the floor under both — when a demo does something neither anticipated, the damage is a dead subprocess and a failed job, not a downed worker or a foothold in the network. The honest frame is that security is layers, not a wall: this is three of them, the OS-level jail is the fourth, and naming that gap is the same discipline the rest of the ledger uses.',
+    ],
+    code: 'exec.CommandContext(ctx, self, "--parse-child")  // parse in a throwaway process; Env: none',
+    codeLabel: 'the worker re-execs itself to parse one demo in isolation — a crash or exploit dies with the child, and it inherits no secrets',
+  },
 ]
