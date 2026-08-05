@@ -174,7 +174,16 @@ is the only way to remove a match — there is no soft-delete.
 |---|---|
 | `parse_failed_download` | The demo object couldn't be fetched from storage. |
 | `parse_failed_corrupt` | The demo couldn't be parsed — corrupt/unsupported (includes parser panics). |
+| `parse_failed_timeout` | The parse exceeded the sandbox time limit (`PARSE_TIMEOUT_SECONDS`) — a pathological or hostile demo. |
+| `parse_failed_memory` | The parse exceeded the sandbox heap limit (`PARSE_MEMORY_LIMIT_MB`). |
 | `parse_failed_internal` | Parsing succeeded but persisting the results failed. |
+
+The demo is **attacker-controlled input** fed to a native parser, so the worker runs it
+under a sandbox: a wall-clock timeout and a heap ceiling, checked between demo frames
+(cooperative — no goroutine is force-killed). A breach of either caps the blast radius to
+that one job and surfaces as the distinct code above rather than a generic corrupt. This
+is defense-in-depth on top of the existing panic recovery; full isolation (separate
+process, no network, read-only FS) is the named next rung (see study topic 19).
 
 **Upload / reassignment** (HTTP 422/500): the `demo.*` codes under Validation, plus
 `match.invalid_team` (team the caller can't upload to), `match.upload_forbidden` (caller

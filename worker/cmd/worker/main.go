@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
+	"time"
 
 	"clutchlab/worker/internal/config"
 	"clutchlab/worker/internal/db"
@@ -37,6 +39,7 @@ type worker struct {
 	storage *storage.Client
 	indexer search.Indexer
 	events  events.Publisher
+	limits  parser.Limits
 }
 
 func main() {
@@ -84,7 +87,12 @@ func main() {
 		storage: store,
 		indexer: search.NewMeili(cfg.MeiliHost, cfg.MeiliKey),
 		events:  publisher,
+		limits: parser.Limits{
+			Timeout:      time.Duration(cfg.ParseTimeoutSeconds) * time.Second,
+			MaxHeapBytes: uint64(cfg.ParseMemoryLimitMB) * 1024 * 1024,
+		},
 	}
+	log.Printf("parse sandbox: timeout=%ds memory=%dMB", cfg.ParseTimeoutSeconds, cfg.ParseMemoryLimitMB)
 
 	log.Printf("ready, blocking on redis list %q", cfg.Queue)
 	for {
@@ -129,12 +137,12 @@ func (w *worker) handle(ctx context.Context, payload string) {
 	}
 	defer obj.Close()
 
-	res, err := stageSpan(ctx, "parse", func(context.Context) (*parser.ParseResult, error) {
-		return parser.ParseDemo(obj)
+	res, err := stageSpan(ctx, "parse", func(c context.Context) (*parser.ParseResult, error) {
+		return parser.ParseDemoWithLimits(c, obj, w.limits)
 	})
 	if err != nil {
 		log.Printf("match %d: parse failed: %v", job.MatchID, err)
-		w.fail(ctx, span, job.MatchID, "parse_failed_corrupt")
+		w.fail(ctx, span, job.MatchID, parseFailCode(err))
 		return
 	}
 
@@ -160,6 +168,20 @@ func (w *worker) handle(ctx context.Context, payload string) {
 		Demo: w.store.Filename(job.MatchID), Map: res.MapName,
 		ScoreCT: int(res.ScoreCT), ScoreT: int(res.ScoreT),
 	})
+}
+
+// parseFailCode distinguishes a sandbox-limit breach from an ordinary corrupt demo, so
+// the status the user sees says which. A timeout/memory kill is likely a hostile or
+// pathological file, not just a broken one.
+func parseFailCode(err error) string {
+	switch {
+	case errors.Is(err, parser.ErrParseTimeout):
+		return "parse_failed_timeout"
+	case errors.Is(err, parser.ErrParseMemory):
+		return "parse_failed_memory"
+	default:
+		return "parse_failed_corrupt"
+	}
 }
 
 // stageSpan runs one step of the job inside its own child span, recording the error on it.

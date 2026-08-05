@@ -10,6 +10,8 @@ const MESSAGES = {
 
   parse_failed_download: 'Could not download the demo from storage',
   parse_failed_corrupt: 'The demo could not be parsed (corrupt or unsupported)',
+  parse_failed_timeout: 'The demo took too long to parse and was stopped',
+  parse_failed_memory: 'The demo used too much memory to parse and was stopped',
   parse_failed_internal: 'An internal error occurred while saving results',
 
   'demo.required': 'Please choose a .dem file',

@@ -15,5 +15,9 @@ to the shared Postgres `matches` / `match_player_stats` tables.
   shared with Laravel — change both sides together.
 - Parsing **recovers panics** into errors; a corrupt demo becomes `status=failed` /
   `error_code=parse_failed_corrupt`, never a crash.
+- The demo is **untrusted input**, so the parse runs under a **sandbox** (`parser.Limits`):
+  a wall-clock timeout (`PARSE_TIMEOUT_SECONDS`) and heap ceiling (`PARSE_MEMORY_LIMIT_MB`),
+  checked between frames; a breach → `parse_failed_timeout` / `parse_failed_memory`. Full
+  isolation (separate process) is the next rung.
 - Writes are **idempotent** (delete-then-insert stats), so re-delivered jobs don't double.
 - Toolchain pinned to **Go 1.24**; `minio-go` and `air` pinned to match.

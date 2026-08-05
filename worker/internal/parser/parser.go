@@ -4,14 +4,34 @@
 package parser
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"strings"
+	"time"
 
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs"
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/events"
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/msg"
+)
+
+// Limits sandbox the parse of an untrusted, attacker-controlled .dem: a crafted file
+// can send the native parser into an unbounded loop or allocation. These cap the blast
+// radius to the single job. Zero on either field disables that check.
+type Limits struct {
+	Timeout      time.Duration
+	MaxHeapBytes uint64
+}
+
+// Sentinel errors so the caller can map a limit breach to a distinct status code (vs.
+// a merely corrupt demo).
+var (
+	ErrParseTimeout = errors.New("parse exceeded time limit")
+	ErrParseMemory  = errors.New("parse exceeded memory limit")
+	memCheckEveryN  = 2048 // check heap every N frames — cheap, ReadMemStats stops the world
 )
 
 type PlayerStat struct {
@@ -25,19 +45,19 @@ type PlayerStat struct {
 }
 
 type KillEvent struct {
-	Round         int
-	KillerSteamID uint64
-	KillerName    string
+	Round           int
+	KillerSteamID   uint64
+	KillerName      string
 	VictimSteamID   uint64
 	VictimName      string
 	AssisterSteamID uint64
 	AssisterName    string
 	Weapon          string
-	Headshot      bool
-	Opening       bool
-	Side          string
-	KillerTeam    string
-	Tick          int
+	Headshot        bool
+	Opening         bool
+	Side            string
+	KillerTeam      string
+	Tick            int
 	// Clutch is the size of the 1vN this kill was part of (the killer was the last player
 	// alive on their team). 0 means it wasn't a clutch kill.
 	Clutch  int
@@ -77,7 +97,16 @@ type ParseResult struct {
 	Rounds           []RoundEvent
 }
 
-func ParseDemo(r io.Reader) (result *ParseResult, err error) {
+// ParseDemo parses with no sandbox limits — kept for callers/tests that parse a trusted
+// local file. Untrusted uploads go through ParseDemoWithLimits.
+func ParseDemo(r io.Reader) (*ParseResult, error) {
+	return ParseDemoWithLimits(context.Background(), r, Limits{})
+}
+
+// ParseDemoWithLimits parses an untrusted demo under a wall-clock timeout and a heap
+// ceiling. It drives the frame loop itself (rather than ParseToEnd) so it can check both
+// limits between frames — cooperative cancellation, no goroutine is force-killed.
+func ParseDemoWithLimits(ctx context.Context, r io.Reader, limits Limits) (result *ParseResult, err error) {
 	// demoinfocs panics (not just errors) on some corrupt/unsupported demos, so
 	// recover here and turn it into a normal error — one bad upload must not take
 	// the whole worker down.
@@ -87,6 +116,18 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 			err = fmt.Errorf("panic during parse: %v", rec)
 		}
 	}()
+
+	if limits.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, limits.Timeout)
+		defer cancel()
+	}
+
+	// Fail fast if the deadline is already blown before we even open the parser (also
+	// what makes the timeout observable without a valid demo in tests).
+	if err := ctx.Err(); err != nil {
+		return nil, ErrParseTimeout
+	}
 
 	p := demoinfocs.NewParser(r)
 	defer p.Close()
@@ -227,21 +268,21 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		}
 
 		res.Kills = append(res.Kills, KillEvent{
-			Round:         currentRound,
-			KillerSteamID: steamID(e.Killer),
-			KillerName:    name(e.Killer),
+			Round:           currentRound,
+			KillerSteamID:   steamID(e.Killer),
+			KillerName:      name(e.Killer),
 			VictimSteamID:   steamID(e.Victim),
 			VictimName:      name(e.Victim),
 			AssisterSteamID: steamID(e.Assister),
 			AssisterName:    name(e.Assister),
 			Weapon:          weaponName(e.Weapon),
-			Headshot:      e.IsHeadshot,
-			Opening:       opening,
-			Side:          teamSide(killerTeam(e.Killer)),
-			Tick:          gs.IngameTick(),
-			Clutch:        clutch,
-			VictimX:       vx,
-			VictimY:       vy,
+			Headshot:        e.IsHeadshot,
+			Opening:         opening,
+			Side:            teamSide(killerTeam(e.Killer)),
+			Tick:            gs.IngameTick(),
+			Clutch:          clutch,
+			VictimX:         vx,
+			VictimY:         vy,
 		})
 
 		// Remove the victim, then start a clutch the first time a side is cut to one
@@ -288,7 +329,9 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 		})
 	})
 
-	if err := p.ParseToEnd(); err != nil {
+	// Drive the parse frame-by-frame so the time and memory limits get a check point
+	// between frames. ParseToEnd() would block past any deadline; this yields control.
+	if err := parseGuarded(ctx, p, limits); err != nil {
 		return nil, err
 	}
 
@@ -336,6 +379,40 @@ func ParseDemo(r io.Reader) (result *ParseResult, err error) {
 	stripKnifeRound(res, byID)
 
 	return res, nil
+}
+
+// parseGuarded runs the demo frame loop, checking the time and memory limits between
+// frames. A frame is small, so a per-frame check bounds how far past a limit a crafted
+// demo can push before it's stopped. Returns ErrParseTimeout / ErrParseMemory on breach,
+// or whatever demoinfocs returns for a genuinely corrupt stream.
+func parseGuarded(ctx context.Context, p demoinfocs.Parser, limits Limits) error {
+	frames := 0
+	for {
+		select {
+		case <-ctx.Done():
+			// The only cancellation source we set is the parse timeout.
+			return ErrParseTimeout
+		default:
+		}
+
+		// ReadMemStats stops the world, so amortize it over many frames.
+		if limits.MaxHeapBytes > 0 && frames%memCheckEveryN == 0 {
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			if m.HeapAlloc > limits.MaxHeapBytes {
+				return ErrParseMemory
+			}
+		}
+		frames++
+
+		more, err := p.ParseNextFrame()
+		if err != nil {
+			return err
+		}
+		if !more {
+			return nil
+		}
+	}
 }
 
 // stripKnifeRound removes the pre-match knife round (which only decides side choice) from the
