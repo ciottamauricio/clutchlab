@@ -28,6 +28,7 @@ what it **cost**.
 16. [The pipeline as a sixth service](#16--the-pipeline-as-a-sixth-service) — *CI, path filters*
 17. [RAG: retrieval you already had](#17--rag-retrieval-you-already-had) — *AI, read models*
 18. [One request across four processes](#18--one-request-across-four-processes) — *tracing, OTel*
+19. [The trust boundary is the network](#19--the-trust-boundary-is-the-network) — *security, threat model*
 
 ---
 
@@ -506,5 +507,33 @@ job['traceparent'] = tracing.traceparent()  // rides the queue into the worker
 *the api injects its span context into the parse job; the worker extracts it so parse_job becomes a child of the upload — the cross-language hand-off*
 
 > **In plain English.** When you upload a demo, the work touches three separate services in two languages — the app takes the file, a Go worker parses it, and another service posts to Discord. I already collect everyone's logs in one place and can pull up a single match's story by its ID. But logs tell you what happened, not how long each step took or what caused what. So I added tracing: every upload gets a trace ID that travels with it across all three services — riding inside the queue message and the event, since these don't talk over normal web requests — and they report their timing to one timeline I can open as a waterfall. What's still missing is the third piece, metrics: dashboards for overall rates and errors. Logs and traces are in; aggregate health is the next step.
+
+---
+
+## 19 · The trust boundary is the network
+
+*security, threat model*
+
+**One container is the front door; everything behind it trusts the private network — a real boundary with a real cost, drawn like the others.**
+
+**Gained**
+
+- A single attack surface: only nginx publishes to the host (8080). The api, both Go services, Postgres, Redis, MinIO, and Meilisearch are unreachable from outside — they answer only on the internal clutchnet, by service name. One thing to harden, not nine.
+- Auth is layered at that door, not sprinkled: bearer tokens (Sanctum) gate every route past login; auth and mutation endpoints are rate-limited; ownership violations return 403 not 404; uploads are validated at the boundary (type, size, content-hash dedup) before a byte reaches the parser. The perimeter is where the checks live.
+
+**Paid**
+
+- Trust inside the network is implicit, and that is a real risk, not a free simplification: the worker parses whatever demo lands on the Redis list, the notifier trusts any event on the channel — no service authenticates another. It holds only because the network is sealed; anything that gets a foothold inside inherits that trust. Service-to-service auth (mTLS, signed jobs) is the earned upgrade, unbuilt.
+- Developer convenience punches holes in the front-door story: Postgres (5432), MinIO (9000/9001), Meili (7700), Jaeger (16686), and an anonymous-admin Grafana (3001) all publish to the host too. Harmless on a laptop, a breach in production — so "only nginx is exposed" is a rule the dev compose already bends, and shipping means binding those to localhost or dropping them. Naming the gap is the point.
+
+Security in a service-oriented app is a boundaries problem, which is why it belongs in this ledger. The model here is a hard shell around a soft interior: nginx is the one door, authenticated and rate-limited, and behind it the services trust each other because the Docker network is the wall. That is a legitimate, common posture — and stating it plainly is what makes its cost visible. The interior trust is the sharp edge: it is defense-in-depth with only one layer, so the day something slips inside (a poisoned demo crashing the parser, a leaked internal port), there is no second check to catch it. The honest security roadmap is the same shape as the rest of the project — the boundary is earned and real today, and the next rungs (sandboxing the untrusted-file parse, per-service auth, binding dev ports to localhost) are named, not yet built.
+
+```
+ports: ["8080:80"]   # nginx — the only service that publishes to the host
+```
+
+*every other service omits ports: and is reachable only on the internal network — the trust boundary, in one line of compose*
+
+> **In plain English.** Security here is really about one question: what can the outside world reach? My answer is a hard shell — only one service, the gateway, is open to the internet. Everything else — the app, the parser, the databases, storage — lives on a private network no outsider can touch, and they talk to each other by name. At that one door I check everything: you need a valid token, sensitive actions are rate-limited, and uploaded files are validated before anything opens them. The honest trade-off is that inside the wall, the services trust each other completely — the parser will process any job it's handed, no questions asked. That's fine as long as the wall holds, but it's a single layer of defense, and a couple of developer-convenience doors (a database port, an admin dashboard with no login) would need closing before this ever went to production. I know exactly where those gaps are — naming them is half of taking security seriously.
 
 ---
