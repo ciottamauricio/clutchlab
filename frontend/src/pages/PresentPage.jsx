@@ -32,7 +32,7 @@ export default function PresentPage() {
 
       <div className="deck-stage">
         <article className="deck-card" key={topic.id}>
-          <span className="deck-n">{topic.n}</span>
+          <span className="deck-n">{topic.n} · {topic.group}</span>
           <h1 className="deck-title">{topic.title}</h1>
           <span className="deck-tag">{topic.tag}</span>
           <p className="deck-summary">{topic.summary}</p>

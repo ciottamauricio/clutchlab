@@ -10,28 +10,44 @@ what it **cost**.
 
 ## Topics
 
-1. [Finding the seam](#01--finding-the-seam) — *principle*
-2. [Go worker vs. Laravel](#02--go-worker-vs-laravel) — *the core split*
-3. [Realtime service vs. the api](#03--realtime-service-vs-the-api) — *a second, different split*
-4. [Sync vs. async](#04--sync-vs-async) — *the queue boundary*
-5. [The polyglot queue tax](#05--the-polyglot-queue-tax) — *redis*
-6. [A list, not a broker — and swappable](#06--a-list-not-a-broker-and-swappable) — *the boundary paying off*
-7. [Search: CQRS across a boundary](#07--search-cqrs-across-a-boundary) — *eventual consistency*
-8. [Shared database (for now)](#08--shared-database-for-now) — *a deliberate later refactor*
-9. [Authentication & authorization](#09--authentication-authorization) — *sanctum + data-driven permissions*
-10. [Codes, not sentences](#10--codes-not-sentences) — *i18n boundary*
-11. [Monorepo](#11--monorepo) — *repo strategy*
-12. [Commands vs. events — the notifier](#12--commands-vs-events-the-notifier) — *pub/sub*
-13. [Testing the seams](#13--testing-the-seams) — *contracts, fakes, CI*
-14. [Orchestration: compose vs. cloud](#14--orchestration-compose-vs-cloud) — *leaving the laptop*
-15. [One fact, two frameworks — Laravel as subscriber](#15--one-fact-two-frameworks-laravel-as-subscriber) — *events, mail*
-16. [The pipeline as a sixth service](#16--the-pipeline-as-a-sixth-service) — *CI, path filters*
-17. [RAG: retrieval you already had](#17--rag-retrieval-you-already-had) — *AI, read models*
-18. [One request across four processes](#18--one-request-across-four-processes) — *tracing, OTel*
-19. [The trust boundary is the network](#19--the-trust-boundary-is-the-network) — *security, threat model*
-20. [Sandboxing the untrusted parser](#20--sandboxing-the-untrusted-parser) — *security, defense-in-depth*
+**Software Architecture**
+
+- 01. [Finding the seam](#01--finding-the-seam) — *principle*
+- 02. [Go worker vs. Laravel](#02--go-worker-vs-laravel) — *the core split*
+- 03. [Realtime service vs. the api](#03--realtime-service-vs-the-api) — *a second, different split*
+- 04. [Sync vs. async](#04--sync-vs-async) — *the queue boundary*
+- 05. [The polyglot queue tax](#05--the-polyglot-queue-tax) — *redis*
+- 06. [A list, not a broker — and swappable](#06--a-list-not-a-broker-and-swappable) — *the boundary paying off*
+- 07. [Search: CQRS across a boundary](#07--search-cqrs-across-a-boundary) — *eventual consistency*
+- 08. [Shared database (for now)](#08--shared-database-for-now) — *a deliberate later refactor*
+- 11. [Monorepo](#11--monorepo) — *repo strategy*
+- 12. [Commands vs. events — the notifier](#12--commands-vs-events-the-notifier) — *pub/sub*
+
+**AI & Data**
+
+- 17. [RAG: retrieval you already had](#17--rag-retrieval-you-already-had) — *AI, read models*
+
+**DevOps & Delivery**
+
+- 13. [Testing the seams](#13--testing-the-seams) — *contracts, fakes, CI*
+- 14. [Orchestration: compose vs. cloud](#14--orchestration-compose-vs-cloud) — *leaving the laptop*
+- 15. [One fact, two frameworks — Laravel as subscriber](#15--one-fact-two-frameworks-laravel-as-subscriber) — *events, mail*
+- 16. [The pipeline as a sixth service](#16--the-pipeline-as-a-sixth-service) — *CI, path filters*
+- 18. [One request across four processes](#18--one-request-across-four-processes) — *tracing, OTel*
+
+**Cybersecurity**
+
+- 09. [Authentication & authorization](#09--authentication-authorization) — *sanctum + data-driven permissions*
+- 19. [The trust boundary is the network](#19--the-trust-boundary-is-the-network) — *security, threat model*
+- 20. [Sandboxing the untrusted parser](#20--sandboxing-the-untrusted-parser) — *security, defense-in-depth*
+
+**Frontend & UX**
+
+- 10. [Codes, not sentences](#10--codes-not-sentences) — *i18n boundary*
 
 ---
+
+# Software Architecture
 
 ## 01 · Finding the seam
 
@@ -232,54 +248,6 @@ Starting with a shared DB is deliberate. Feeling the pain of the shared-DB versi
 
 ---
 
-## 09 · Authentication & authorization
-
-*sanctum + data-driven permissions*
-
-**Bearer tokens for auth; a runtime-editable grant matrix for authorization.**
-
-**Gained**
-
-- Sanctum API tokens (Bearer) — the SPA sends Authorization: Bearer, guarded by auth:sanctum.
-- Permissions are data, not code: abilities grant to roles across two scopes — team abilities resolve against the relevant team, app abilities gate whole pages.
-- One PermissionService is the single source of truth; policies and gates delegate to it, and an admin edits the matrix live.
-
-**Paid**
-
-- Two authority axes to keep straight: a global role (member/admin) and a per-team role (owner/igl/player/coach).
-- The client must be told what it may do — resources ship capability flags (can.delete, can.manage_members) so the UI hides what the server would refuse.
-- The realtime service re-checks tokens against the shared table rather than calling the api — cross-service auth by shared state.
-
-Auth answers "who are you" (a token); authorization answers "what may you do" (grants). Keeping them separate let authorization grow from hard-coded owner/igl checks into a data-driven system without touching the login path.
-
-The master admin is orthogonal to it all: a single Gate::before short-circuit that passes every check, so it can never lock itself out by editing the matrix.
-
-> **In plain English.** Logging in uses a token — you sign in, get a token, and send it with each request to prove who you are. What you're allowed to do is separate, and I made it editable at runtime: instead of permissions being hard-coded, they live in a grant matrix an admin can change without a code deploy. So promoting someone to "can delete matches" is a setting, not a release. Auth answers "who are you"; this answers "what may you do" — and the second one shouldn't require a developer.
-
----
-
-## 10 · Codes, not sentences
-
-*i18n boundary*
-
-**Backends return error codes; the frontend is the only place that speaks a language.**
-
-**Gained**
-
-- The api and worker stay language-agnostic — a rejected upload returns demo.file_too_large, never a Portuguese or English string.
-- Translation logic lives in one codebase (React), not duplicated across three services in two languages.
-
-**Paid**
-
-- Every backend error needs a stable code, and the frontend must map each one — an extra indirection over just returning a sentence.
-- A user's language choice persists as a locale column on users, so it survives across devices.
-
-The language boundary lives in the frontend; backend services stay language-agnostic. The two backends never need to know the user's language, and there is one source of truth for words. Decided up front because retrofitting i18n is painful, even though the full implementation is deferred until there's UI to translate.
-
-> **In plain English.** My backend services never return sentences meant for humans — they return short codes like "file too large." The frontend is the only place that turns a code into words a person reads, in their language. That keeps the two backends, in two languages, from each having to know about translations. There's one place words live, and the servers stay language-neutral. It's a little more indirection, but it means adding a new language never touches the backend.
-
----
-
 ## 11 · Monorepo
 
 *repo strategy*
@@ -333,6 +301,39 @@ The event also carries an optional W3C traceparent, so a subscriber's span joins
 > **In plain English.** There are two very different kinds of messages in the system. The queue is a command — it tells one specific worker "parse this demo," and exactly one worker does it. The event channel is an announcement — it broadcasts "a match just finished" to whoever cares, and any number of listeners can react. Commands are one-to-one and about what to do; events are one-to-many and about what happened. Keeping them separate keeps the system loosely coupled — I can add a new reaction without touching whoever raised the event.
 
 ---
+
+# AI & Data
+
+## 17 · RAG: retrieval you already had
+
+*AI, read models*
+
+**Asking an LLM about your matches is mostly a retrieval problem — and the retrieval half is infrastructure this project already ran.**
+
+**Gained**
+
+- The analyst is a thin loop — retrieve evidence, paste it in the prompt, generate. The model knows nothing about your team; the real work is which evidence to fetch.
+- Two retrievers cover each other's blind spots: keyword (Meilisearch) matches words exactly; semantic (pgvector) matches meaning, catching "our comeback games" and reaching past the recency window.
+- Every part is a seam behind a contract — generator, embedder, store all swap without touching the action, so swapping the crude embedder for a real one is a recipe (set EMBED_DIMENSIONS, migrate, re-embed), not a rewrite.
+
+**Paid**
+
+- The default embedder is the hashing trick: keyless and local, but only as smart as word overlap — "duel" and "fight" miss. The plumbing is production-shaped; the intelligence is a placeholder built to be replaced.
+- An ivfflat index on the tiny corpus returned zero rows — approximate search lies quietly at small scale, so it's a plain exact scan until a full scan actually hurts.
+
+Every RAG project starts at "how do I use an LLM here", but the useful reframing is "what do I retrieve" — and Clutchlab answered most of that before the word came up: the search read model (topic 04) and Postgres already held the evidence. Generation was the small new part, behind an interface, grounded so every claim cites a real [match:N]. Adding semantic search made the two-read-model idea concrete: keyword and vector search aren't rivals but complements from the same source of truth, failing in opposite directions — the boundary discipline the whole project studies, pointed at AI.
+
+```
+semantically_related_matches: retriever.related(question, visibleIds, 5)
+```
+
+*the semantic retriever searches the whole visible set by meaning — it can surface a match older than the recent-window the keyword pass sees*
+
+> **In plain English.** I built a feature that answers questions about our matches in plain English. The AI doesn't know our data, so instead of asking it to recall, I retrieve the relevant matches, kills, and trainings from our own database, hand them to the model along with the question, and let it write a grounded answer that cites each match. I fetch evidence two ways — by exact keyword and by meaning — so it catches both "AWP kills on Mirage" and vaguer questions like "our comeback games." That's RAG: retrieval-augmented generation — an open-book exam for the AI.
+
+---
+
+# DevOps & Delivery
 
 ## 13 · Testing the seams
 
@@ -454,35 +455,6 @@ paths: ["worker/**", "contracts/**", ".github/workflows/worker.yml"]
 
 ---
 
-## 17 · RAG: retrieval you already had
-
-*AI, read models*
-
-**Asking an LLM about your matches is mostly a retrieval problem — and the retrieval half is infrastructure this project already ran.**
-
-**Gained**
-
-- The analyst is a thin loop — retrieve evidence, paste it in the prompt, generate. The model knows nothing about your team; the real work is which evidence to fetch.
-- Two retrievers cover each other's blind spots: keyword (Meilisearch) matches words exactly; semantic (pgvector) matches meaning, catching "our comeback games" and reaching past the recency window.
-- Every part is a seam behind a contract — generator, embedder, store all swap without touching the action, so swapping the crude embedder for a real one is a recipe (set EMBED_DIMENSIONS, migrate, re-embed), not a rewrite.
-
-**Paid**
-
-- The default embedder is the hashing trick: keyless and local, but only as smart as word overlap — "duel" and "fight" miss. The plumbing is production-shaped; the intelligence is a placeholder built to be replaced.
-- An ivfflat index on the tiny corpus returned zero rows — approximate search lies quietly at small scale, so it's a plain exact scan until a full scan actually hurts.
-
-Every RAG project starts at "how do I use an LLM here", but the useful reframing is "what do I retrieve" — and Clutchlab answered most of that before the word came up: the search read model (topic 04) and Postgres already held the evidence. Generation was the small new part, behind an interface, grounded so every claim cites a real [match:N]. Adding semantic search made the two-read-model idea concrete: keyword and vector search aren't rivals but complements from the same source of truth, failing in opposite directions — the boundary discipline the whole project studies, pointed at AI.
-
-```
-semantically_related_matches: retriever.related(question, visibleIds, 5)
-```
-
-*the semantic retriever searches the whole visible set by meaning — it can surface a match older than the recent-window the keyword pass sees*
-
-> **In plain English.** I built a feature that answers questions about our matches in plain English. The AI doesn't know our data, so instead of asking it to recall, I retrieve the relevant matches, kills, and trainings from our own database, hand them to the model along with the question, and let it write a grounded answer that cites each match. I fetch evidence two ways — by exact keyword and by meaning — so it catches both "AWP kills on Mirage" and vaguer questions like "our comeback games." That's RAG: retrieval-augmented generation — an open-book exam for the AI.
-
----
-
 ## 18 · One request across four processes
 
 *tracing, OTel*
@@ -508,6 +480,34 @@ job['traceparent'] = tracing.traceparent()  // rides the queue into the worker
 *the api injects its span context into the parse job; the worker extracts it so parse_job becomes a child of the upload — the cross-language hand-off*
 
 > **In plain English.** When you upload a demo, the work touches three separate services in two languages — the app takes the file, a Go worker parses it, and another service posts to Discord. I already collect everyone's logs in one place and can pull up a single match's story by its ID. But logs tell you what happened, not how long each step took or what caused what. So I added tracing: every upload gets a trace ID that travels with it across all three services — riding inside the queue message and the event, since these don't talk over normal web requests — and they report their timing to one timeline I can open as a waterfall. What's still missing is the third piece, metrics: dashboards for overall rates and errors. Logs and traces are in; aggregate health is the next step.
+
+---
+
+# Cybersecurity
+
+## 09 · Authentication & authorization
+
+*sanctum + data-driven permissions*
+
+**Bearer tokens for auth; a runtime-editable grant matrix for authorization.**
+
+**Gained**
+
+- Sanctum API tokens (Bearer) — the SPA sends Authorization: Bearer, guarded by auth:sanctum.
+- Permissions are data, not code: abilities grant to roles across two scopes — team abilities resolve against the relevant team, app abilities gate whole pages.
+- One PermissionService is the single source of truth; policies and gates delegate to it, and an admin edits the matrix live.
+
+**Paid**
+
+- Two authority axes to keep straight: a global role (member/admin) and a per-team role (owner/igl/player/coach).
+- The client must be told what it may do — resources ship capability flags (can.delete, can.manage_members) so the UI hides what the server would refuse.
+- The realtime service re-checks tokens against the shared table rather than calling the api — cross-service auth by shared state.
+
+Auth answers "who are you" (a token); authorization answers "what may you do" (grants). Keeping them separate let authorization grow from hard-coded owner/igl checks into a data-driven system without touching the login path.
+
+The master admin is orthogonal to it all: a single Gate::before short-circuit that passes every check, so it can never lock itself out by editing the matrix.
+
+> **In plain English.** Logging in uses a token — you sign in, get a token, and send it with each request to prove who you are. What you're allowed to do is separate, and I made it editable at runtime: instead of permissions being hard-coded, they live in a grant matrix an admin can change without a code deploy. So promoting someone to "can delete matches" is a setting, not a release. Auth answers "who are you"; this answers "what may you do" — and the second one shouldn't require a developer.
 
 ---
 
@@ -564,5 +564,29 @@ exec.CommandContext(ctx, self, "--parse-child")  // parse in a throwaway process
 *the worker re-execs itself to parse one demo in isolation — a crash or exploit dies with the child, and it inherits no secrets*
 
 > **In plain English.** The riskiest thing this app does is parse a demo file, because that file came from a stranger and it's read by a big, complex library that was never built to be safe against a deliberately evil file. So I defend it in layers, each catching what the last one misses. First, if the parser crashes on a broken file, I catch it and just mark the upload failed. Second, if a file is crafted to run forever or eat all the memory, a time limit and a memory limit stop it. Third — and this is the new part — the actual parsing runs in a separate throwaway process: I hand it only the file's bytes, nothing else, not even my database passwords, and if that file manages to break or hijack the parser, the damage dies with that little process instead of taking down the whole worker. The point isn't one perfect defense; it's a stack of them, so no single trick gets through. The last rung — fully jailing that process from the network and disk — is the next thing I'd add.
+
+---
+
+# Frontend & UX
+
+## 10 · Codes, not sentences
+
+*i18n boundary*
+
+**Backends return error codes; the frontend is the only place that speaks a language.**
+
+**Gained**
+
+- The api and worker stay language-agnostic — a rejected upload returns demo.file_too_large, never a Portuguese or English string.
+- Translation logic lives in one codebase (React), not duplicated across three services in two languages.
+
+**Paid**
+
+- Every backend error needs a stable code, and the frontend must map each one — an extra indirection over just returning a sentence.
+- A user's language choice persists as a locale column on users, so it survives across devices.
+
+The language boundary lives in the frontend; backend services stay language-agnostic. The two backends never need to know the user's language, and there is one source of truth for words. Decided up front because retrofitting i18n is painful, even though the full implementation is deferred until there's UI to translate.
+
+> **In plain English.** My backend services never return sentences meant for humans — they return short codes like "file too large." The frontend is the only place that turns a code into words a person reads, in their language. That keeps the two backends, in two languages, from each having to know about translations. There's one place words live, and the servers stay language-neutral. It's a little more indirection, but it means adding a new language never touches the backend.
 
 ---

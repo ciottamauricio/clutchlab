@@ -12,8 +12,16 @@ import { fileURLToPath } from 'node:url'
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '..')
 
-const { TOPICS } = await import(resolve(root, 'frontend/src/features/study/tradeoffs.js'))
+const { TOPICS, groupedTopics } = await import(resolve(root, 'frontend/src/features/study/tradeoffs.js'))
 const { PITCHES } = await import(resolve(root, 'frontend/src/features/study/pitches.js'))
+
+const groups = groupedTopics()
+
+const slugOf = (t) =>
+  `${t.n}--${t.title}`
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
 
 // Fenced code blocks in body/pitch prose would break the doc's own fences; none exist
 // today, but guard anyway by neutralizing stray backtick fences in prose.
@@ -31,63 +39,69 @@ lines.push('be *earned* — and it is never free. Each decision below is a ledge
 lines.push('what it **cost**.')
 lines.push('')
 
-// A table of contents — anchors match GitHub's slugging of the "NN · Title" headings.
+// Table of contents, grouped by discipline. Anchors match GitHub's slugging of the
+// "NN · Title" headings; topics keep their narrative numbers as identity.
 lines.push('## Topics')
 lines.push('')
-for (const t of TOPICS) {
-  const slug = `${t.n}--${t.title}`
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/\s+/g, '-')
-  lines.push(`${Number(t.n)}. [${t.title}](#${slug}) — *${t.tag}*`)
+for (const { group, topics } of groups) {
+  lines.push(`**${group}**`)
+  lines.push('')
+  for (const t of topics) {
+    lines.push(`- ${t.n}. [${t.title}](#${slugOf(t)}) — *${t.tag}*`)
+  }
+  lines.push('')
 }
-lines.push('')
 lines.push('---')
 lines.push('')
 
-for (const t of TOPICS) {
-  lines.push(`## ${t.n} · ${clean(t.title)}`)
-  lines.push('')
-  lines.push(`*${clean(t.tag)}*`)
-  lines.push('')
-  lines.push(`**${clean(t.summary)}**`)
+for (const { group, topics } of groups) {
+  lines.push(`# ${clean(group)}`)
   lines.push('')
 
-  lines.push('**Gained**')
-  lines.push('')
-  for (const g of t.gained) lines.push(`- ${clean(g)}`)
-  lines.push('')
-
-  lines.push('**Paid**')
-  lines.push('')
-  for (const p of t.paid) lines.push(`- ${clean(p)}`)
-  lines.push('')
-
-  for (const para of t.body) {
-    lines.push(clean(para))
+  for (const t of topics) {
+    lines.push(`## ${t.n} · ${clean(t.title)}`)
     lines.push('')
-  }
+    lines.push(`*${clean(t.tag)}*`)
+    lines.push('')
+    lines.push(`**${clean(t.summary)}**`)
+    lines.push('')
 
-  if (t.code) {
-    lines.push('```')
-    lines.push(t.code)
-    lines.push('```')
-    if (t.codeLabel) {
+    lines.push('**Gained**')
+    lines.push('')
+    for (const g of t.gained) lines.push(`- ${clean(g)}`)
+    lines.push('')
+
+    lines.push('**Paid**')
+    lines.push('')
+    for (const p of t.paid) lines.push(`- ${clean(p)}`)
+    lines.push('')
+
+    for (const para of t.body) {
+      lines.push(clean(para))
       lines.push('')
-      lines.push(`*${clean(t.codeLabel)}*`)
     }
+
+    if (t.code) {
+      lines.push('```')
+      lines.push(t.code)
+      lines.push('```')
+      if (t.codeLabel) {
+        lines.push('')
+        lines.push(`*${clean(t.codeLabel)}*`)
+      }
+      lines.push('')
+    }
+
+    const pitch = PITCHES[t.id]
+    if (pitch) {
+      lines.push(`> **In plain English.** ${clean(pitch)}`)
+      lines.push('')
+    }
+
+    lines.push('---')
     lines.push('')
   }
-
-  const pitch = PITCHES[t.id]
-  if (pitch) {
-    lines.push(`> **In plain English.** ${clean(pitch)}`)
-    lines.push('')
-  }
-
-  lines.push('---')
-  lines.push('')
 }
 
 writeFileSync(resolve(root, 'docs/STUDY.md'), lines.join('\n'))
-console.log(`Wrote docs/STUDY.md — ${TOPICS.length} topics.`)
+console.log(`Wrote docs/STUDY.md — ${TOPICS.length} topics in ${groups.length} groups.`)

@@ -5,9 +5,29 @@
 // This is the single source of truth for the study. docs/STUDY.md (the GitHub-readable
 // version) is generated from here — after editing topics, run `node scripts/gen-study.mjs`.
 
+// Display order of the discipline groups. Topics keep their narrative numbers (01–20) as
+// identity; this only controls how they're clustered on the page, in the deck, and in
+// docs/STUDY.md. A topic's `group` must be one of these.
+export const GROUPS = [
+  'Software Architecture',
+  'AI & Data',
+  'DevOps & Delivery',
+  'Cybersecurity',
+  'Frontend & UX',
+]
+
+// Return topics grouped for display: [{ group, topics: [...] }, …] in GROUPS order, each
+// group's topics in their original (numeric) order. One source of truth for every surface.
+export function groupedTopics() {
+  return GROUPS
+    .map((group) => ({ group, topics: TOPICS.filter((t) => t.group === group) }))
+    .filter((g) => g.topics.length > 0)
+}
+
 export const TOPICS = [
   {
     id: 'seam',
+    group: 'Software Architecture',
     n: '01',
     title: 'Finding the seam',
     tag: 'principle',
@@ -26,6 +46,7 @@ export const TOPICS = [
   },
   {
     id: 'worker',
+    group: 'Software Architecture',
     n: '02',
     title: 'Go worker vs. Laravel',
     tag: 'the core split',
@@ -45,6 +66,7 @@ export const TOPICS = [
   },
   {
     id: 'realtime',
+    group: 'Software Architecture',
     n: '03',
     title: 'Realtime service vs. the api',
     tag: 'a second, different split',
@@ -64,6 +86,7 @@ export const TOPICS = [
   },
   {
     id: 'sync-async',
+    group: 'Software Architecture',
     n: '04',
     title: 'Sync vs. async',
     tag: 'the queue boundary',
@@ -82,6 +105,7 @@ export const TOPICS = [
   },
   {
     id: 'polyglot-queue',
+    group: 'Software Architecture',
     n: '05',
     title: 'The polyglot queue tax',
     tag: 'redis',
@@ -102,6 +126,7 @@ export const TOPICS = [
   },
   {
     id: 'swappable-queue',
+    group: 'Software Architecture',
     n: '06',
     title: 'A list, not a broker — and swappable',
     tag: 'the boundary paying off',
@@ -124,6 +149,7 @@ export const TOPICS = [
   },
   {
     id: 'search-cqrs',
+    group: 'Software Architecture',
     n: '07',
     title: 'Search: CQRS across a boundary',
     tag: 'eventual consistency',
@@ -144,6 +170,7 @@ export const TOPICS = [
   },
   {
     id: 'shared-db',
+    group: 'Software Architecture',
     n: '08',
     title: 'Shared database (for now)',
     tag: 'a deliberate later refactor',
@@ -162,6 +189,7 @@ export const TOPICS = [
   },
   {
     id: 'authz',
+    group: 'Cybersecurity',
     n: '09',
     title: 'Authentication & authorization',
     tag: 'sanctum + data-driven permissions',
@@ -183,6 +211,7 @@ export const TOPICS = [
   },
   {
     id: 'i18n',
+    group: 'Frontend & UX',
     n: '10',
     title: 'Codes, not sentences',
     tag: 'i18n boundary',
@@ -201,6 +230,7 @@ export const TOPICS = [
   },
   {
     id: 'monorepo',
+    group: 'Software Architecture',
     n: '11',
     title: 'Monorepo',
     tag: 'repo strategy',
@@ -219,6 +249,7 @@ export const TOPICS = [
   },
   {
     id: 'pub-sub',
+    group: 'Software Architecture',
     n: '12',
     title: 'Commands vs. events — the notifier',
     tag: 'pub/sub',
@@ -242,6 +273,7 @@ export const TOPICS = [
   },
   {
     id: 'testing',
+    group: 'DevOps & Delivery',
     n: '13',
     title: 'Testing the seams',
     tag: 'contracts, fakes, CI',
@@ -265,6 +297,7 @@ export const TOPICS = [
   },
   {
     id: 'orchestration',
+    group: 'DevOps & Delivery',
     n: '14',
     title: 'Orchestration: compose vs. cloud',
     tag: 'leaving the laptop',
@@ -288,6 +321,7 @@ export const TOPICS = [
   },
   {
     id: 'subscriber',
+    group: 'DevOps & Delivery',
     n: '15',
     title: 'One fact, two frameworks — Laravel as subscriber',
     tag: 'events, mail',
@@ -308,6 +342,7 @@ export const TOPICS = [
   },
   {
     id: 'pipeline',
+    group: 'DevOps & Delivery',
     n: '16',
     title: 'The pipeline as a sixth service',
     tag: 'CI, path filters',
@@ -328,6 +363,7 @@ export const TOPICS = [
   },
   {
     id: 'rag',
+    group: 'AI & Data',
     n: '17',
     title: 'RAG: retrieval you already had',
     tag: 'AI, read models',
@@ -349,6 +385,7 @@ export const TOPICS = [
   },
   {
     id: 'observability',
+    group: 'DevOps & Delivery',
     n: '18',
     title: 'One request across four processes',
     tag: 'tracing, OTel',
@@ -369,6 +406,7 @@ export const TOPICS = [
   },
   {
     id: 'trust-boundary',
+    group: 'Cybersecurity',
     n: '19',
     title: 'The trust boundary is the network',
     tag: 'security, threat model',
@@ -389,6 +427,7 @@ export const TOPICS = [
   },
   {
     id: 'untrusted-parse',
+    group: 'Cybersecurity',
     n: '20',
     title: 'Sandboxing the untrusted parser',
     tag: 'security, defense-in-depth',

@@ -3854,6 +3854,76 @@ a.brand:hover .brand-mark {
   .topo-legend-note { margin-left: 0; flex-basis: 100%; }
 }
 
+/* Section title over the grouped ledger — announces the list under the topology diagram. */
+.study-ledger-head {
+  margin: 4px 0 22px;
+}
+
+.study-ledger-title {
+  margin: 0 0 4px;
+  font: 600 26px var(--display);
+  letter-spacing: 0.01em;
+  color: var(--text-h);
+}
+
+.study-ledger-sub {
+  margin: 0;
+  font: 400 13px var(--mono);
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+}
+
+/* Discipline groups: a labeled band before each cluster of topics. */
+.study-group {
+  margin-bottom: 34px;
+}
+
+.study-group-head {
+  margin: 0 0 14px;
+}
+
+/* The whole band is the toggle — full-width so the click target is generous. */
+.study-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0 0 8px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border-strong);
+  font: 600 13px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ct);
+  cursor: pointer;
+  text-align: left;
+}
+
+.study-group-toggle:hover {
+  color: var(--text-h);
+}
+
+.study-group-chevron {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.study-group-count {
+  margin-left: auto;
+  font: 500 11px var(--mono);
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+/* A collapsed group is just its header band, no bottom margin gap swallowing. */
+.study-group.collapsed {
+  margin-bottom: 18px;
+}
+
 .study-list {
   list-style: none;
   margin: 0;
