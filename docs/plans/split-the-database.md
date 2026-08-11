@@ -20,6 +20,27 @@ service's tables. Two schemas in one server with a role scoped to each enforces 
 for real — you hit every wall — at a fraction of the cost, and it sets up the physical
 split as an increment rather than a big bang.
 
+## Data safety: no reparse, and don't wipe anything
+
+**No reparse is ever needed.** Reparsing re-runs the Go worker on the `.dem` files to
+*regenerate* parsed output; the split only relocates existing rows and changes who may
+write them. The parsed data's shape and content don't change, so there is nothing to
+regenerate.
+
+- **Phase 1** — `ALTER TABLE … SET SCHEMA` is a metadata rename, not a row move; instant,
+  data untouched.
+- **Phase 2** — changes only how *future* parses report status; existing parsed matches
+  keep their rows and status.
+- **Phase 3** — moves data *between servers*, but as a `pg_dump`/`COPY` migration, never a
+  reparse.
+
+The real risk in this kind of change is not the data model — it's **wiping the data during
+a botched migration** (this project has wiped real Postgres twice; hence the sqlite
+tripwire in `tests/TestCase.php`). So: every migration guards on the pgsql driver and has
+a genuine reversible `down()`, and **take a `pg_dump` snapshot before running phase 1**
+against real data. `SET SCHEMA` and `GRANT` are non-destructive by nature, but the snapshot
+is the cheap safety net.
+
 ## The ownership line (from the real code)
 
 The worker's DB surface today (`worker/internal/matches/store.go`) is small and clean:
