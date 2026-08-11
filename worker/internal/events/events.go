@@ -20,14 +20,22 @@ import (
 // subscriber). Additive changes only; bump V for anything breaking. Keep it in sync
 // with notifier/internal/sub — change both sides in the same commit.
 type Event struct {
-	Event     string `json:"event"` // "match.parsed" | "match.failed"
-	V         int    `json:"v"`
-	MatchID   int64  `json:"match_id"`
-	Demo      string `json:"demo,omitempty"`
-	Map       string `json:"map,omitempty"`
-	ScoreCT   int    `json:"score_ct"`
-	ScoreT    int    `json:"score_t"`
-	ErrorCode string `json:"error_code,omitempty"`
+	Event   string `json:"event"` // "match.parsed" | "match.failed"
+	V       int    `json:"v"`
+	MatchID int64  `json:"match_id"`
+	Demo    string `json:"demo,omitempty"`
+	Map     string `json:"map,omitempty"`
+	ScoreCT int    `json:"score_ct"`
+	ScoreT  int    `json:"score_t"`
+	// Full parsed summary — since the DB split, the worker no longer writes `matches`;
+	// the api fills the row from this event. Additive to the old parsed payload.
+	CTName           string  `json:"ct_name,omitempty"`
+	TName            string  `json:"t_name,omitempty"`
+	TotalRounds      int     `json:"total_rounds"`
+	TickRate         float64 `json:"tick_rate"`
+	DurationSeconds  float64 `json:"duration_seconds"`
+	KnifeRoundWinner string  `json:"knife_round_winner,omitempty"`
+	ErrorCode        string  `json:"error_code,omitempty"`
 	// W3C trace context — non-HTTP hops carry it in the payload instead of a header,
 	// so a subscriber's span joins the publisher's trace. Additive; optional.
 	Traceparent string `json:"traceparent,omitempty"`

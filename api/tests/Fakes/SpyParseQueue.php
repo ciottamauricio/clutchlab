@@ -8,11 +8,11 @@ use App\Contracts\ParseQueue;
 // matches domain: one upload ⇒ exactly one enqueued job.
 class SpyParseQueue implements ParseQueue
 {
-    /** @var array<array{0:int,1:string}> */
+    /** @var array<array{0:int,1:string,2:?int,3:?string}> */
     public array $pushed = [];
 
-    public function push(int $matchId, string $demoKey): void
+    public function push(int $matchId, string $demoKey, ?int $ownerId = null, ?string $filename = null): void
     {
-        $this->pushed[] = [$matchId, $demoKey];
+        $this->pushed[] = [$matchId, $demoKey, $ownerId, $filename];
     }
 }

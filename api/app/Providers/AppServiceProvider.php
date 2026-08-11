@@ -13,6 +13,8 @@ use App\Contracts\ParseQueue;
 use App\Contracts\PermissionService;
 use App\Contracts\SearchIndex;
 use App\Contracts\SemanticRetriever;
+use App\Events\Subscribers\ApplyMatchFailed;
+use App\Events\Subscribers\ApplyMatchParsed;
 use App\Events\Subscribers\EmailTrainingRoster;
 use App\Events\Subscribers\EventHandler;
 use App\Llm\AnthropicAnalyst;
@@ -45,7 +47,11 @@ class AppServiceProvider extends ServiceProvider
 
         // Handlers for incoming cross-service facts (events:listen). Registering a new
         // reaction is one line here — the listener routes by each handler's handles().
-        $this->app->tag([EmailTrainingRoster::class], EventHandler::class);
+        $this->app->tag([
+            EmailTrainingRoster::class,
+            ApplyMatchParsed::class,
+            ApplyMatchFailed::class,
+        ], EventHandler::class);
         $this->app->bind(SearchIndex::class, fn () => new MeilisearchIndex(
             new MeilisearchClient(config('clutch.meili.host'), config('clutch.meili.key'))
         ));

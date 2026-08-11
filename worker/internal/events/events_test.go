@@ -19,6 +19,8 @@ func TestEventMarshalsToTheContractFixture(t *testing.T) {
 	e := Event{
 		Event: "match.parsed", V: 1, MatchID: 42,
 		Demo: "x.dem", Map: "de_mirage", ScoreCT: 13, ScoreT: 9,
+		CTName: "Team A", TName: "Team B", TotalRounds: 22, TickRate: 64,
+		DurationSeconds: 2100.5, KnifeRoundWinner: "CT",
 	}
 	got, err := json.Marshal(e)
 	if err != nil {

@@ -20,33 +20,10 @@ func NewStore(db *sql.DB) *Store {
 	return &Store{db: db}
 }
 
-func (s *Store) SetParsing(id int64) error {
-	_, err := s.db.Exec("UPDATE matches SET status='parsing', updated_at=now() WHERE id=$1", id)
-	return err
-}
-
-func (s *Store) Fail(id int64, code string) error {
-	_, err := s.db.Exec("UPDATE matches SET status='failed', error_code=$2, updated_at=now() WHERE id=$1", id, code)
-	return err
-}
-
-// OwnerID returns the match's owner (0 if it predates auth / has none).
-func (s *Store) OwnerID(matchID int64) int64 {
-	var owner sql.NullInt64
-	_ = s.db.QueryRow("SELECT user_id FROM matches WHERE id=$1", matchID).Scan(&owner)
-	return owner.Int64
-}
-
-// Filename returns the match's original demo filename (display only, may be empty).
-func (s *Store) Filename(matchID int64) string {
-	var name sql.NullString
-	_ = s.db.QueryRow("SELECT original_filename FROM matches WHERE id=$1", matchID).Scan(&name)
-	return name.String
-}
-
-// Save writes the whole result atomically. Delete-then-insert makes redelivery
-// of the same job idempotent instead of doubling a player's stats.
-func (s *Store) Save(id int64, res *parser.ParseResult) error {
+// SaveStats writes the scoreboard into analytics.match_player_stats. It no longer touches
+// `matches` (that's the api's table since the DB split — the api applies the parsed summary
+// from the match.parsed event). Delete-then-insert keeps redelivery idempotent.
+func (s *Store) SaveStats(id int64, res *parser.ParseResult) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -72,22 +49,14 @@ func (s *Store) Save(id int64, res *parser.ParseResult) error {
 		}
 	}
 
-	if _, err := tx.Exec(`UPDATE matches SET
-		status='parsed', error_code=NULL,
-		map_name=$2, score_ct=$3, score_t=$4, ct_name=$5, t_name=$6, total_rounds=$7, tick_rate=$8,
-		duration_seconds=$9, knife_round_winner=$10, parsed_at=now(), updated_at=now()
-		WHERE id=$1`,
-		id, res.MapName, res.ScoreCT, res.ScoreT, res.CTName, res.TName, res.TotalRounds, res.TickRate,
-		res.DurationSeconds, nullIfEmpty(res.KnifeRoundWinner)); err != nil {
-		return err
-	}
-
 	return tx.Commit()
 }
 
 // SaveEvents persists the canonical kill/round events (source of truth) idempotently
-// and returns them as read-model documents (with their new row ids) for indexing.
-func (s *Store) SaveEvents(matchID, ownerID int64, res *parser.ParseResult) ([]search.KillDoc, []search.RoundDoc, error) {
+// and returns them as read-model documents (with their new row ids) for indexing. owner
+// and demoName now come from the job (the api knows both at enqueue) rather than a
+// `matches` lookup — the worker has no access to that table anymore.
+func (s *Store) SaveEvents(matchID, ownerID int64, demoName string, res *parser.ParseResult) ([]search.KillDoc, []search.RoundDoc, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, nil, err
@@ -103,10 +72,8 @@ func (s *Store) SaveEvents(matchID, ownerID int64, res *parser.ParseResult) ([]s
 
 	owner := ownerArg(ownerID)
 
-	// The demo filename is denormalized into each kill doc so a search hit (which may
-	// span matches) can build its own "watch in game" command without another lookup.
-	var demoName string
-	_ = tx.QueryRow("SELECT original_filename FROM matches WHERE id=$1", matchID).Scan(&demoName)
+	// demoName (denormalized into each kill doc so a search hit can build its own "watch
+	// in game" command) is passed in from the job now — the worker can't read `matches`.
 
 	killStmt, err := tx.Prepare(`INSERT INTO kill_events
 		(match_id, owner_id, map, round, killer_steam_id, killer_name, victim_steam_id, victim_name, assister_name, weapon, headshot, opening, side, killer_team, clutch, tick, victim_x, victim_y, hitgroups)
@@ -195,11 +162,4 @@ func ownerArg(ownerID int64) any {
 		return nil
 	}
 	return ownerID
-}
-
-func nullIfEmpty(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
 }

@@ -1,1 +1,1 @@
-{"event":"match.parsed","v":1,"match_id":42,"demo":"x.dem","map":"de_mirage","score_ct":13,"score_t":9}
+{"event":"match.parsed","v":1,"match_id":42,"demo":"x.dem","map":"de_mirage","score_ct":13,"score_t":9,"ct_name":"Team A","t_name":"Team B","total_rounds":22,"tick_rate":64,"duration_seconds":2100.5,"knife_round_winner":"CT"}

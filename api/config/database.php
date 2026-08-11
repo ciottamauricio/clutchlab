@@ -95,7 +95,9 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => 'public',
+            // Both schemas resolve so unqualified table names work after the DB split
+            // (analytics.* moved out of public — docs/plans/split-the-database.md).
+            'search_path' => env('DB_SEARCH_PATH', 'public,analytics'),
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 

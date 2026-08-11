@@ -53,7 +53,9 @@ func Load() Config {
 }
 
 func (c Config) DSN() string {
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+	// search_path spans both schemas so unqualified names resolve after the DB split
+	// (analytics.* moved out of public — docs/plans/split-the-database.md).
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable search_path=public,analytics",
 		c.DBHost, c.DBPort, c.DBUser, c.DBPass, c.DBName)
 }
 

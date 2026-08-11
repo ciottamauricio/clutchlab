@@ -44,8 +44,11 @@ changes.** The code follows the doc, not the other way around.
 - Config comes from Docker Compose `env_file` (repo-root `.env`). **Do not create
   `api/.env`** — `php artisan serve` forwards it and silently overrides Compose
   (e.g. flipping the DB back to SQLite for web requests only).
-- DB is Postgres (`pgsql`), **shared with the worker** for now — deliberate; to be
-  split in a later step (see architecture doc).
+- DB is Postgres (`pgsql`), **logically split** (`docs/plans/split-the-database.md`): the
+  api owns `public`, the worker owns the `analytics` schema, enforced by the `clutch_app` /
+  `clutch_worker` roles. The worker cannot write `matches` — it reports parse outcomes as
+  `match.parsed` / `match.failed` events and the api applies them (`app/Events/Subscribers/`).
+  Reads rely on `search_path=public,analytics`, so table names stay unqualified.
 - The parse queue is a **plain Redis list** (`demo_parse_jobs`) with JSON payload
   `{ "match_id": int, "demo_key": string }`, shared with Go. `REDIS_PREFIX` is empty
   so both sides use the raw key. This is **not** Laravel's queue system.

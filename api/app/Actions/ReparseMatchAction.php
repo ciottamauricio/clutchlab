@@ -25,11 +25,13 @@ class ReparseMatchAction
 
         try {
             $span->setAttribute('match_id', $match->id);
-            $match->status = 'queued';
+            // The api owns matches now: set the in-flight status here (not the worker) so a
+            // dropped terminal event can't strand a match that never left 'queued'.
+            $match->status = 'parsing';
             $match->error_code = null;
             $match->save();
 
-            $this->queue->push($match->id, $match->demo_key);
+            $this->queue->push($match->id, $match->demo_key, $match->user_id, $match->original_filename);
         } finally {
             $scope->detach();
             $span->end();

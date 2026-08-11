@@ -16,14 +16,22 @@ import (
 )
 
 type Event struct {
-	Event     string `json:"event"` // "match.parsed" | "match.failed" | "training.scheduled"
-	V         int    `json:"v"`
-	MatchID   int64  `json:"match_id"`
-	Demo      string `json:"demo"`
-	Map       string `json:"map"`
-	ScoreCT   int    `json:"score_ct"`
-	ScoreT    int    `json:"score_t"`
-	ErrorCode string `json:"error_code"`
+	Event   string `json:"event"` // "match.parsed" | "match.failed" | "training.scheduled"
+	V       int    `json:"v"`
+	MatchID int64  `json:"match_id"`
+	Demo    string `json:"demo"`
+	Map     string `json:"map"`
+	ScoreCT int    `json:"score_ct"`
+	ScoreT  int    `json:"score_t"`
+	// Summary fields the api consumes to fill the matches row (DB split). The notifier
+	// only posts a headline, so it ignores most of them — but must still decode the payload.
+	CTName           string  `json:"ct_name"`
+	TName            string  `json:"t_name"`
+	TotalRounds      int     `json:"total_rounds"`
+	TickRate         float64 `json:"tick_rate"`
+	DurationSeconds  float64 `json:"duration_seconds"`
+	KnifeRoundWinner string  `json:"knife_round_winner"`
+	ErrorCode        string  `json:"error_code"`
 	// training.scheduled fields (published by the api — contracts/training_scheduled.json).
 	TrainingID  int64  `json:"training_id"`
 	Team        string `json:"team"`

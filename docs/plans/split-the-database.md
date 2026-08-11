@@ -5,11 +5,16 @@ Written 2026-08-09. The api and worker share one Postgres today — a deliberate
 line**, chosen approach **Option C first** (logical split via schemas + scoped DB roles),
 staged so it later becomes a physical split (Option A) without a rewrite.
 
-Execute in phases, in order. Phase 1 is one sitting; phase 2 is its own session (it
-changes a cross-service flow); phase 3 is later and optional. Each phase leaves the app
-working and green.
+Execute in phases, in order. Phase 3 is later and optional, and leaves the app working
+and green.
 
-**Progress:** not started.
+**Phases 1 and 2 must land together.** They read as separable but are not: phase 1 revokes
+the worker's write on `matches`, which *breaks the worker* unless phase 2 has already moved
+the status update onto an event. Splitting them across sittings leaves the tree red in
+between. Phase 3 remains genuinely independent.
+
+**Progress:** phases 1 + 2 landed — analytics schema, scoped roles (`clutch_app`,
+`clutch_worker`), and the `match.parsed` / `match.failed` event handoff. Phase 3 not started.
 
 ## Why Option C (schemas + roles), not a second Postgres yet
 

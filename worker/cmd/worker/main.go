@@ -30,6 +30,10 @@ import (
 type Job struct {
 	MatchID int64  `json:"match_id"`
 	DemoKey string `json:"demo_key"`
+	// Owner and filename now ride the job (the api knows both at enqueue) so the worker
+	// needs zero access to the matches table — it owns only analytics.* after the DB split.
+	OwnerID  int64  `json:"owner_id,omitempty"`
+	Filename string `json:"filename,omitempty"`
 	// W3C trace context from the api's enqueue span — additive, optional. When present,
 	// parse_job joins the api's trace so Jaeger shows the whole upload as one waterfall.
 	Traceparent string `json:"traceparent,omitempty"`
@@ -136,9 +140,9 @@ func (w *worker) handle(ctx context.Context, payload string) {
 	))
 	defer span.End()
 
-	if err := w.store.SetParsing(job.MatchID); err != nil {
-		log.Printf("match %d: set parsing failed: %v", job.MatchID, err)
-	}
+	// No SetParsing here anymore: the worker no longer writes `matches` (it owns only
+	// analytics.* since the DB split). The api sets status=parsing at enqueue; the worker
+	// reports the terminal outcome as an event the api applies.
 
 	obj, err := stageSpan(ctx, "download", func(c context.Context) (io.ReadCloser, error) {
 		return w.storage.Download(c, job.DemoKey)
@@ -164,8 +168,10 @@ func (w *worker) handle(ctx context.Context, payload string) {
 		return
 	}
 
+	// Write the scoreboard into analytics.* only. matches is the api's; its parsed summary
+	// is applied by the api from the match.parsed event below.
 	if _, err := stageSpan(ctx, "save", func(context.Context) (struct{}, error) {
-		return struct{}{}, w.store.Save(job.MatchID, res)
+		return struct{}{}, w.store.SaveStats(job.MatchID, res)
 	}); err != nil {
 		log.Printf("match %d: save failed: %v", job.MatchID, err)
 		w.fail(ctx, span, job.MatchID, "parse_failed_internal")
@@ -178,13 +184,18 @@ func (w *worker) handle(ctx context.Context, payload string) {
 	func() {
 		ctx, s := otel.Tracer("worker").Start(ctx, "index")
 		defer s.End()
-		w.index(ctx, job.MatchID, res)
+		w.index(ctx, job.MatchID, res, job.OwnerID, job.Filename)
 	}()
 
+	// The api applies this to the matches row (the worker can't write it). Carries the
+	// full summary the UPDATE used to set.
 	w.publish(ctx, events.Event{
 		Event: "match.parsed", V: 1, MatchID: job.MatchID,
-		Demo: w.store.Filename(job.MatchID), Map: res.MapName,
+		Demo: job.Filename, Map: res.MapName,
 		ScoreCT: int(res.ScoreCT), ScoreT: int(res.ScoreT),
+		CTName: res.CTName, TName: res.TName,
+		TotalRounds: int(res.TotalRounds), TickRate: res.TickRate,
+		DurationSeconds: res.DurationSeconds, KnifeRoundWinner: res.KnifeRoundWinner,
 	})
 }
 
@@ -215,11 +226,11 @@ func stageSpan[T any](ctx context.Context, name string, fn func(context.Context)
 	return v, err
 }
 
-// fail marks the match failed and announces the fact. The status write is the source
-// of truth; the event is best-effort on top of it.
+// fail announces the failure as an event the api applies to the matches row — the worker
+// can't write `matches` itself since the DB split. (At-most-once: a dropped match.failed
+// leaves the row in 'parsing'; see the reconcile note in docs/plans/split-the-database.md.)
 func (w *worker) fail(ctx context.Context, span trace.Span, matchID int64, code string) {
 	span.SetStatus(codes.Error, code)
-	w.store.Fail(matchID, code)
 	w.publish(ctx, events.Event{Event: "match.failed", V: 1, MatchID: matchID, ErrorCode: code})
 }
 
@@ -233,9 +244,8 @@ func (w *worker) publish(ctx context.Context, e events.Event) {
 	}
 }
 
-func (w *worker) index(ctx context.Context, matchID int64, res *parser.ParseResult) {
-	ownerID := w.store.OwnerID(matchID)
-	kills, rounds, err := w.store.SaveEvents(matchID, ownerID, res)
+func (w *worker) index(ctx context.Context, matchID int64, res *parser.ParseResult, ownerID int64, filename string) {
+	kills, rounds, err := w.store.SaveEvents(matchID, ownerID, filename, res)
 	if err != nil {
 		log.Printf("match %d: save events failed: %v", matchID, err)
 		return

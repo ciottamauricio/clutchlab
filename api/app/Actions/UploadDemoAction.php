@@ -42,7 +42,8 @@ class UploadDemoAction
             ]);
 
             $span->setAttribute('match_id', $match->id);
-            $this->queue->push($match->id, $key);
+            // owner_id + filename ride the job so the worker never reads the matches table.
+            $this->queue->push($match->id, $key, $owner->id, $filename);
 
             return $match;
         } finally {
