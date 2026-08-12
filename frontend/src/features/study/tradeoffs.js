@@ -172,19 +172,19 @@ export const TOPICS = [
     id: 'shared-db',
     group: 'Software Architecture',
     n: '08',
-    title: 'Shared database (for now)',
-    tag: 'a deliberate later refactor',
-    summary: 'api and worker share one Postgres — on purpose, to learn the queue first.',
+    title: 'Starting with a shared database',
+    tag: 'a deliberate start, split later',
+    summary: 'api and worker began on one Postgres, on purpose — to learn the queue before taking on data ownership. The split came later (topic 21).',
     gained: [
-      'Simplicity up front: no cross-service data composition to solve while you\'re still learning the async flow.',
-      'A planned lesson: split the databases later and feel exactly what breaks.',
+      'Simplicity up front: no cross-service data composition to solve while still learning the async flow. One hard thing at a time — the queue first, the store split second.',
+      'A planned lesson, not a shortcut left unpaid: start shared, then split under justified pressure and feel exactly what breaks. That split is now done — see topic 21.',
     ],
     paid: [
-      'Two services coupled through a shared schema — the thing a clean SOA would avoid.',
-      'The eventual split forces a hard question with no free answer: API composition (Laravel calls Go and stitches) vs. denormalization (duplicate a summary, accept eventual consistency).',
+      'While it lasted, two services were coupled through a shared schema — the thing a clean SOA avoids — and the worker could reach straight into the api\'s matches table. Convenient, and exactly the coupling the split had to undo.',
+      'Deferring the split meant the hard question was deferred, not answered: when it came due (topic 21), the worker\'s direct write had to become an event, with no free path around the loss of cross-table transactions and joins.',
     ],
     body: [
-      'Starting with a shared DB is deliberate. Feeling the pain of the shared-DB version first is more educational than starting "correct." The progression is the actual curriculum: monolith-ish → split under justified pressure → feel the tradeoffs → decide what was worth it.',
+      'Starting with a shared DB was deliberate, and the progression is the actual curriculum: monolith-ish → split under justified pressure → feel the tradeoffs → decide what was worth it. Feeling the shared-DB version first — where the worker just UPDATEs matches directly — is what makes the split legible later: you can only appreciate what the ownership line costs once you\'ve lived with its absence. This topic is the "start"; topic 21 is the "split," and the pair is the whole lesson: shared-by-default is a fine place to begin and a deliberate thing to leave, not an accident to apologize for.',
     ],
   },
   {

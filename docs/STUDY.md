@@ -19,7 +19,7 @@ what it **cost**.
 - 05. [The polyglot queue tax](#05--the-polyglot-queue-tax) — *redis*
 - 06. [A list, not a broker — and swappable](#06--a-list-not-a-broker-and-swappable) — *the boundary paying off*
 - 07. [Search: CQRS across a boundary](#07--search-cqrs-across-a-boundary) — *eventual consistency*
-- 08. [Shared database (for now)](#08--shared-database-for-now) — *a deliberate later refactor*
+- 08. [Starting with a shared database](#08--starting-with-a-shared-database) — *a deliberate start, split later*
 - 11. [Monorepo](#11--monorepo) — *repo strategy*
 - 12. [Commands vs. events — the notifier](#12--commands-vs-events-the-notifier) — *pub/sub*
 - 21. [Splitting the store: ownership over convenience](#21--splitting-the-store-ownership-over-convenience) — *data ownership, the event handoff*
@@ -227,23 +227,23 @@ The worker projects: after it persists events to Postgres it indexes the same do
 
 ---
 
-## 08 · Shared database (for now)
+## 08 · Starting with a shared database
 
-*a deliberate later refactor*
+*a deliberate start, split later*
 
-**api and worker share one Postgres — on purpose, to learn the queue first.**
+**api and worker began on one Postgres, on purpose — to learn the queue before taking on data ownership. The split came later (topic 21).**
 
 **Gained**
 
-- Simplicity up front: no cross-service data composition to solve while you're still learning the async flow.
-- A planned lesson: split the databases later and feel exactly what breaks.
+- Simplicity up front: no cross-service data composition to solve while still learning the async flow. One hard thing at a time — the queue first, the store split second.
+- A planned lesson, not a shortcut left unpaid: start shared, then split under justified pressure and feel exactly what breaks. That split is now done — see topic 21.
 
 **Paid**
 
-- Two services coupled through a shared schema — the thing a clean SOA would avoid.
-- The eventual split forces a hard question with no free answer: API composition (Laravel calls Go and stitches) vs. denormalization (duplicate a summary, accept eventual consistency).
+- While it lasted, two services were coupled through a shared schema — the thing a clean SOA avoids — and the worker could reach straight into the api's matches table. Convenient, and exactly the coupling the split had to undo.
+- Deferring the split meant the hard question was deferred, not answered: when it came due (topic 21), the worker's direct write had to become an event, with no free path around the loss of cross-table transactions and joins.
 
-Starting with a shared DB is deliberate. Feeling the pain of the shared-DB version first is more educational than starting "correct." The progression is the actual curriculum: monolith-ish → split under justified pressure → feel the tradeoffs → decide what was worth it.
+Starting with a shared DB was deliberate, and the progression is the actual curriculum: monolith-ish → split under justified pressure → feel the tradeoffs → decide what was worth it. Feeling the shared-DB version first — where the worker just UPDATEs matches directly — is what makes the split legible later: you can only appreciate what the ownership line costs once you've lived with its absence. This topic is the "start"; topic 21 is the "split," and the pair is the whole lesson: shared-by-default is a fine place to begin and a deliberate thing to leave, not an accident to apologize for.
 
 > **In plain English.** Right now the app and the worker share one database, and that's a deliberate choice, not laziness. Splitting the database is the harder, more advanced move, and I wanted to learn the queue boundary first without taking on two hard problems at once. I'm being honest that it's a shortcut, and I've written down exactly when and why I'd split it later. Naming a shortcut as a shortcut is part of the study.
 
