@@ -22,6 +22,7 @@ what it **cost**.
 - 08. [Shared database (for now)](#08--shared-database-for-now) — *a deliberate later refactor*
 - 11. [Monorepo](#11--monorepo) — *repo strategy*
 - 12. [Commands vs. events — the notifier](#12--commands-vs-events-the-notifier) — *pub/sub*
+- 21. [Splitting the store: ownership over convenience](#21--splitting-the-store-ownership-over-convenience) — *data ownership, the event handoff*
 
 **AI & Data**
 
@@ -299,6 +300,34 @@ The event also carries an optional W3C traceparent, so a subscriber's span joins
 *the event contract — additive changes only, worker and notifier in the same commit*
 
 > **In plain English.** There are two very different kinds of messages in the system. The queue is a command — it tells one specific worker "parse this demo," and exactly one worker does it. The event channel is an announcement — it broadcasts "a match just finished" to whoever cares, and any number of listeners can react. Commands are one-to-one and about what to do; events are one-to-many and about what happened. Keeping them separate keeps the system loosely coupled — I can add a new reaction without touching whoever raised the event.
+
+---
+
+## 21 · Splitting the store: ownership over convenience
+
+*data ownership, the event handoff*
+
+**The shared database topic 08 kept "for now" gets split along an ownership line — and the worker's direct UPDATE to a table it didn't own becomes an event to the table's owner.**
+
+**Gained**
+
+- A real ownership line, enforced by Postgres: the analytics schema (match_player_stats, kill_events, round_events) is the worker's; matches stays the api's. Per-service DB roles scope each side to its own schema, so the worker is physically denied a write to matches — the wall is a grant, not a guideline.
+- The convenience that had to go was the worker's direct UPDATE matches. It becomes a match.parsed event carrying the full summary; the api's events-listener applies it to the row it owns. The seam it crossed is the events channel that already existed (topic 12) — the split reused the pub/sub boundary rather than inventing one, and owner_id + filename now ride the parse job so the worker reads matches zero times.
+
+**Paid**
+
+- You lose the cross-boundary conveniences that were really loans against a shared DB: no foreign key from analytics.kill_events to matches, no join across the line (a dashboard stitches two reads in code), and the atomic "stats + status in one transaction" is now two steps — a DB write and a separate event. Phase 1 (schema + roles) and phase 2 (the event handoff) are coupled: revoking the write without removing the need for it just breaks the worker, so they land together.
+- The status handoff inherits pub/sub's at-most-once delivery: a dropped match.parsed leaves the row stuck in "parsing" — today's gap, where the old direct UPDATE was a guaranteed write. A reconciler (sweep stale "parsing" rows, or a durable stream) is the earned upgrade. And the role wall is only half-hung: the migration creates clutch_worker, but flipping the worker's connection onto it in compose is the last wire still to land.
+
+Topic 08 shared one Postgres between the api and worker deliberately, to learn the queue before taking on a second hard thing. This is that second thing, cashed in — and the lesson is that splitting a database is not a schema chore but a question of who owns each fact. Draw that line and every convenience you had comes due: the foreign key, the join, the one-transaction write, and above all the worker's direct UPDATE to the api's matches table. That last one is the whole story in miniature — it was only ever possible because the two services shared a database, and the split converts it into a message to the owner. The events you already publish are how you pay the loan back without a distributed transaction. It went in as one logical unit (schema move, scoped roles, event handoff) because the pieces don't stand alone, and it leaves two honest rungs named: the reconciler for the dropped-event gap, and wiring the worker onto its scoped role so the wall is enforced in the running system, not just in the schema.
+
+```
+// worker, post-split:  writes analytics.*  +  publishes match.parsed  (never touches matches)
+```
+
+*the worker's old UPDATE matches became an event; the api owns the row and applies the summary from it*
+
+> **In plain English.** For a while the app and the parser shared one database — simpler to start, and I wanted to learn the queue between them first. Splitting it was the next step, and the real lesson is that it's not about tables, it's about deciding who owns what. I drew a line: the parser owns the analytics tables (the scoreboard, the kill data), and the app owns the matches list. Then I locked it down so the database itself won't let the parser write to the app's table. The catch is that the parser used to just reach over and update the match's status directly — which only worked because they shared one database. Now it can't. So instead it announces "I finished match 39, here's the result," and the app, which owns that record, updates it. The convenience I gave up — one quick cross-table write — came back as a message to the owner. That's the whole trade: you lose the shortcuts a shared database quietly allowed, and you pay them back with events. Two honest loose ends remain: a dropped message can leave a match stuck on "parsing," and I still need to flip the parser onto its restricted database login in the running setup.
 
 ---
 
