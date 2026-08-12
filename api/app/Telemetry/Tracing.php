@@ -70,6 +70,18 @@ class Tracing
         return $carrier['traceparent'] ?? '';
     }
 
+    // Inverse of traceparent(): given a W3C traceparent from an incoming event, return the
+    // Context whose spans join that trace. Empty/malformed → the current context unchanged
+    // (a new local root), so a missing hand-off degrades to a local trace, never an error.
+    public function extract(string $traceparent): Context
+    {
+        if ($traceparent === '') {
+            return Context::getCurrent();
+        }
+
+        return TraceContextPropagator::getInstance()->extract(['traceparent' => $traceparent]);
+    }
+
     // Flush pending spans. Called on terminate so a short-lived request-response still
     // ships its batch before the process ends.
     public function shutdown(): void
