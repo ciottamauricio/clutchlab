@@ -40,6 +40,20 @@ services:
     depends_on: [postgres, redis]
     networks: [clutchnet]
 
+  # Laravel's scheduler as its own process (schedule:work blocks and fires due tasks).
+  # Its one job today is matches:reconcile every minute — the safety net that self-heals a
+  # match stranded in "parsing" by a lost parse-outcome event (the split's at-most-once
+  # gap; see docs/plans/split-the-database.md). Same image as api; no inbound anything.
+  scheduler:
+    build: ./api
+    command: php artisan schedule:work
+    volumes:
+      - ./api:/var/www/html
+      - ./contracts:/var/www/contracts:ro
+    env_file: .env
+    depends_on: [postgres, redis]
+    networks: [clutchnet]
+
   worker:
     build: ./worker
     volumes:
