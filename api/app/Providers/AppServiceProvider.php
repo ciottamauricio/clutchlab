@@ -19,6 +19,7 @@ use App\Events\Subscribers\EmailTrainingRoster;
 use App\Events\Subscribers\EventHandler;
 use App\Llm\AnthropicAnalyst;
 use App\Llm\HashEmbeddings;
+use App\Llm\OllamaAnalyst;
 use App\Llm\OllamaEmbeddings;
 use App\Models\User;
 use App\Queue\RedisEventBus;
@@ -60,6 +61,12 @@ class AppServiceProvider extends ServiceProvider
         // The analyst generator, chosen by config. 'claude' is wired; add an 'ollama' or
         // 'llphant' case here — the AnalystLlm contract is all AskAnalystAction depends on.
         $this->app->bind(AnalystLlm::class, fn () => match (config('clutch.analyst_provider')) {
+            'ollama' => new OllamaAnalyst(
+                $this->app->make(Http::class),
+                config('clutch.ollama.host'),
+                config('clutch.ollama.model'),
+                (int) config('clutch.ollama.timeout'),
+            ),
             default => new AnthropicAnalyst(
                 new AnthropicClient(apiKey: config('clutch.anthropic.key')),
                 config('clutch.anthropic.model'),

@@ -175,13 +175,31 @@ class AnalystTest extends TestCase
         $me = $this->asMember();
         GameMatch::factory()->create(['user_id' => $me->id]);
 
-        config(['clutch.anthropic.key' => '']);
+        // Only the hosted provider is gated on a key — 'ollama' is reachable or it isn't.
+        config(['clutch.analyst_provider' => 'claude', 'clutch.anthropic.key' => '']);
         $this->postJson('/api/analyst/ask', ['question' => 'Are we improving?'])
             ->assertStatus(503)
             ->assertJsonPath('message', 'analyst.unavailable');
 
         config(['clutch.anthropic.key' => 'test-key']);
         $this->analystLlm->failWith = new \RuntimeException('provider down');
+        $this->postJson('/api/analyst/ask', ['question' => 'Are we improving?'])
+            ->assertStatus(503)
+            ->assertJsonPath('message', 'analyst.unavailable');
+    }
+
+    // The local provider needs no key, so a missing ANTHROPIC_API_KEY must NOT gate it —
+    // an unreachable container surfaces as a throw, which degrades the same way.
+    public function test_the_local_provider_is_not_gated_on_an_anthropic_key(): void
+    {
+        $me = $this->asMember();
+        GameMatch::factory()->create(['user_id' => $me->id]);
+
+        config(['clutch.analyst_provider' => 'ollama', 'clutch.anthropic.key' => '']);
+        $this->postJson('/api/analyst/ask', ['question' => 'Are we improving?'])
+            ->assertOk();
+
+        $this->analystLlm->failWith = new \RuntimeException('ollama down');
         $this->postJson('/api/analyst/ask', ['question' => 'Are we improving?'])
             ->assertStatus(503)
             ->assertJsonPath('message', 'analyst.unavailable');

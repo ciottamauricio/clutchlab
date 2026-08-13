@@ -33,15 +33,30 @@ return [
         'model' => env('ANTHROPIC_MODEL', 'claude-opus-4-8'),
     ],
 
-    // Which generator answers analyst questions. 'claude' is wired; 'ollama'/'llphant'
-    // are seams left open (bind them in AppServiceProvider) — the contract stays the same.
+    // Which generator answers analyst questions. 'claude' calls Anthropic (needs a key,
+    // bills per call); 'ollama' runs a local model in the ollama container (free, private,
+    // and weaker at grounding — see docs/domains/analyst.md). Same AnalystLlm contract
+    // either way, so AskAnalystAction is unaffected by the choice.
     'analyst_provider' => env('ANALYST_PROVIDER', 'claude'),
 
-    // Semantic search embedder. Only 'hash' is wired (keyless local stand-in). To use a
-    // real embedder: write the class (implements EmbeddingClient), bind its case in
-    // AppServiceProvider, set EMBED_PROVIDER + EMBED_DIMENSIONS to the model's width,
-    // then migrate the vector column and re-run `php artisan analyst:embed`. The column
-    // width and the embedder MUST agree — that's what EMBED_DIMENSIONS pins.
+    // The local generator. Shares the ollama container with the embedder but not the
+    // model: generation needs a chat model, embedding needs an embedding model.
+    'ollama' => [
+        'host' => env('OLLAMA_HOST', 'http://ollama:11434'),
+        'model' => env('OLLAMA_CHAT_MODEL', 'qwen2.5-coder:7b'),
+        // Generous because a full evidence payload through a 7B model falls back to CPU
+        // whenever the GPU is busy (a desktop card is often mostly consumed by the
+        // desktop), and CPU inference scales badly with prompt size. Bounded so a wedged
+        // model can't hang a request forever, but well past the point where a hosted
+        // provider would have answered — the honest cost of running this locally.
+        'timeout' => (int) env('OLLAMA_TIMEOUT', 600),
+    ],
+
+    // Semantic search embedder: 'hash' (keyless local stand-in, word overlap only) or
+    // 'ollama' (learned, 768 dims, real meaning). Switching providers means setting
+    // EMBED_PROVIDER + EMBED_DIMENSIONS to the model's width, migrating the vector column,
+    // then re-running `php artisan analyst:embed`. The column width and the embedder MUST
+    // agree — that's what EMBED_DIMENSIONS pins.
     'embed' => [
         'provider' => env('EMBED_PROVIDER', 'hash'),
         'dimensions' => (int) env('EMBED_DIMENSIONS', 256),

@@ -10,9 +10,10 @@ class AnalystController extends Controller
 {
     public function ask(AskAnalystRequest $request, AskAnalystAction $action): JsonResponse
     {
-        // No key configured, or the provider is down — degrade like search does,
-        // instead of surfacing a 500 with provider internals.
-        if (config('clutch.anthropic.key') === '') {
+        // Not configured, or the provider is down — degrade like search does, instead of
+        // surfacing a 500 with provider internals. Only the hosted provider needs a key;
+        // the local one is reachable or it isn't, and that shows up as a throw below.
+        if (config('clutch.analyst_provider') !== 'ollama' && config('clutch.anthropic.key') === '') {
             return response()->json(['message' => 'analyst.unavailable'], 503);
         }
 

@@ -61,8 +61,14 @@ match (`BuildMatchCardAction`), rebuildable any time with `php artisan analyst:e
   account, but captures word overlap, not meaning ("duel" and "fight" land in different
   buckets).
 
-  **Swapping in a real embedder** (Voyage, OpenAI, an Ollama model) is four steps, no
-  changes to the retriever or action:
+  **`OllamaEmbeddings` is the wired learned embedder** (`EMBED_PROVIDER=ollama`,
+  `nomic-embed-text`, 768 dims), served by the local `ollama` container — no account, no
+  per-call bill, nothing leaving the machine. It does what the hash stand-in can't:
+  "long-range duels" scores 0.59 against "awp sniper fights" and 0.38 against "pistol
+  round eco save", despite sharing no words with either.
+
+  **Swapping in a different embedder** (Voyage, OpenAI, another Ollama model) is four
+  steps, no changes to the retriever or action:
   1. Write the class implementing `EmbeddingClient`; its `dimensions()` returns the
      model's width (voyage-3 = 1024, nomic-embed-text = 768).
   2. Bind its case in the `EmbeddingClient` match in `AppServiceProvider`, and set
@@ -84,8 +90,9 @@ match (`BuildMatchCardAction`), rebuildable any time with `php artisan analyst:e
 ## Rules
 
 1. **Generation sits behind an interface.** `App\Contracts\AnalystLlm` (one method:
-   `answer(question, evidence)`); `App\Llm\AnthropicAnalyst` is bound in
-   `AppServiceProvider`. Tests swap in `SpyAnalystLlm` — no real API call ever happens
+   `answer(question, evidence)`); `App\Llm\AnthropicAnalyst` (hosted) and
+   `App\Llm\OllamaAnalyst` (local) are bound in `AppServiceProvider`, selected by
+   `ANALYST_PROVIDER`. Tests swap in `SpyAnalystLlm` — no real API call ever happens
    in tests, and assertions target the *retrieved evidence*, never generated prose.
 2. **Retrieval is visibility-scoped.** Match retrievers run inside
    `GameMatch::visibleTo($user)`; trainings are limited to the caller's own teams
@@ -121,11 +128,15 @@ Error codes: `analyst.question_required`, `analyst.question_too_short`,
 `ANTHROPIC_MODEL` (repo-root `.env` via Compose; key empty by default = feature off).
 The key is a secret: env-only, never committed — same rule as `DISCORD_WEBHOOK_URL`.
 
-`analyst_provider` (`ANALYST_PROVIDER`, default `claude`) chooses the generator. Only
-`claude` is wired; the `match` in `AppServiceProvider` is where an `ollama`/`llphant`
-case binds a different `AnalystLlm` — the contract is all the action depends on, so no
-other file changes. The embedder (`EmbeddingClient`) and store (`SemanticRetriever`)
-are bound there too; today `HashEmbeddings` + `PgVectorRetriever`.
+`analyst_provider` (`ANALYST_PROVIDER`, default `claude`) chooses the generator:
+`claude` (needs `ANTHROPIC_API_KEY`, bills per call) or `ollama` (local container, free).
+`clutch.ollama.*` configures the local one — `OLLAMA_CHAT_MODEL`, and `OLLAMA_TIMEOUT`
+(default 600s, because CPU fallback is slow). The controller's availability check is
+provider-aware: only the hosted provider is gated on a key, since an unreachable local
+container already degrades through the `catch`.
+
+The embedder (`EmbeddingClient`) and store (`SemanticRetriever`) are bound in the same
+provider; `OllamaEmbeddings`/`HashEmbeddings` + `PgVectorRetriever`.
 
 Postgres runs the `pgvector/pgvector:pg16` image (stock PG16 + the `vector` extension);
 the migration `CREATE EXTENSION`s it. Tests use sqlite (no vector type) and fake the
@@ -133,10 +144,19 @@ retriever, so the suite never needs pgvector.
 
 ## Deliberate limitations (honest tradeoffs)
 
-- **Crude embeddings.** Semantic recall exists (pgvector), but the default embedder is
-  the local hashing trick — it captures word overlap with light stemming, not true
-  meaning. "Duel" won't find "fight". A learned embedder behind `EmbeddingClient` is
-  the real fix; the whole store and retriever are already built for it.
+- **The local generator is materially weaker.** `ANALYST_PROVIDER=ollama` costs nothing
+  and keeps every question on the machine, but a 7B model holds the system prompt loosely:
+  it obeys the citation and verbatim-name rules while ignoring the format ones (asked for
+  a few sentences of plain text, it returns a bolded, numbered report). Treat local as the
+  private/free option, not the good one — `ANALYST_PROVIDER` switches back to `claude`
+  with no code change.
+- **Local generation is slow, and silently slower without a GPU.** A full evidence payload
+  took ~4.5 minutes on CPU. Ollama falls back to CPU whenever the model doesn't fit in
+  VRAM — on a desktop card mostly consumed by the desktop itself, that's the normal case,
+  and nothing reports it except `ollama ps` showing `100% CPU`. Hence the 600s timeout.
+- **Crude embeddings, when the hash stand-in is selected.** `EMBED_PROVIDER=hash` captures
+  word overlap with light stemming, not meaning — "duel" won't find "fight". It exists so
+  the architecture runs with no external anything; `ollama` is the real embedder.
 - **Match-level semantics only.** Cards summarize matches, so semantic search finds
   relevant *games*, not relevant *rounds*. Round-level meaning would need embedded
   round/kill cards — more vectors, same pattern.
