@@ -18,10 +18,10 @@ class ReconcileStuckMatchesTest extends TestCase
     protected $seed = true;
 
     // Age a match's updated_at past the grace window without tripping auto-timestamps.
-    private function strand(GameMatch $match): void
+    private function strand(GameMatch $match, string $status = 'parsing'): void
     {
         DB::table('matches')->where('id', $match->id)->update([
-            'status' => 'parsing',
+            'status' => $status,
             'updated_at' => now()->subMinutes(3),
         ]);
     }
@@ -65,6 +65,43 @@ class ReconcileStuckMatchesTest extends TestCase
         $this->artisan('matches:reconcile')->assertSuccessful();
 
         $this->assertSame('parsing', $match->fresh()->status);
+        $this->assertSame([], $this->parseQueue->pushed);
+    }
+
+    // Upload creates a match as 'queued' and a handler moves it on, so a listener down for
+    // the WHOLE parse leaves it there — never reaching 'parsing'. Sweeping only 'parsing'
+    // let these sit stranded forever with their stats already written.
+    public function test_a_stuck_queued_match_with_stats_is_marked_parsed(): void
+    {
+        $match = GameMatch::factory()->create();
+        $this->strand($match, 'queued');
+        $this->addStat($match);
+
+        $this->artisan('matches:reconcile')->assertSuccessful();
+
+        $this->assertSame('parsed', $match->fresh()->status);
+        $this->assertSame([], $this->parseQueue->pushed);
+    }
+
+    public function test_a_stuck_queued_match_without_stats_is_re_enqueued(): void
+    {
+        $match = GameMatch::factory()->create(['demo_key' => 'demos/y.dem']);
+        $this->strand($match, 'queued'); // the job itself was lost before any parse ran
+
+        $this->artisan('matches:reconcile')->assertSuccessful();
+
+        $this->assertSame([$match->id], array_column($this->parseQueue->pushed, 0));
+    }
+
+    public function test_a_freshly_queued_match_is_left_alone(): void
+    {
+        // The common case: just uploaded, worker hasn't picked it up yet. Re-enqueuing
+        // inside the grace window would double-parse every single upload.
+        $match = GameMatch::factory()->create(['status' => 'queued']);
+
+        $this->artisan('matches:reconcile')->assertSuccessful();
+
+        $this->assertSame('queued', $match->fresh()->status);
         $this->assertSame([], $this->parseQueue->pushed);
     }
 }

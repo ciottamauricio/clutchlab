@@ -20,6 +20,13 @@ class ListenForEvents extends Command
 
     public function handle(EventSubscriber $subscriber, Tracing $tracing): int
     {
+        // phpredis reads the blocking SUBSCRIBE through PHP's default_socket_timeout (60s),
+        // which config('database.redis.*.read_timeout') does NOT override. Idle longer than
+        // that between events and the socket read fails: the process exits 0 and every
+        // outcome published afterwards is lost, stranding matches mid-pipeline. This is the
+        // one process that must wait forever, so it opts out here rather than in php.ini.
+        ini_set('default_socket_timeout', '-1');
+
         // event name -> the handlers that react to it (many-to-one allowed). Handlers are
         // tagged EventHandler in AppServiceProvider; resolving the tag builds them all.
         $byEvent = [];

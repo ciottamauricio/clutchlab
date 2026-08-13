@@ -24,15 +24,19 @@ class ReconcileStuckMatches extends Command
     // or a slow one) is never falsely reconciled, short enough that a match stranded by a
     // lost event heals quickly rather than sitting "parsing" for minutes. A real parse
     // finishes in seconds, so ~90s stuck almost always means a missed event, not slowness.
-    protected $signature = 'matches:reconcile {--seconds=90 : how long a match may sit in parsing before it is considered stuck}';
+    protected $signature = 'matches:reconcile {--seconds=90 : how long a match may sit unfinished before it is considered stuck}';
 
-    protected $description = 'Rescue matches stranded in "parsing" by a lost parse-outcome event';
+    protected $description = 'Rescue matches stranded before a terminal status by a lost parse-outcome event';
 
     public function handle(ReparseMatchAction $reparse): int
     {
         $cutoff = now()->subSeconds((int) $this->option('seconds'));
 
-        $stuck = GameMatch::where('status', 'parsing')
+        // Both pre-terminal states, not just 'parsing'. Upload creates a match as 'queued'
+        // and only a handler moves it on, so a listener that's down for the WHOLE parse
+        // leaves it at 'queued' forever — never entering the state a parsing-only sweep
+        // watches, and invisible to the very safety net meant to catch it.
+        $stuck = GameMatch::whereIn('status', ['queued', 'parsing'])
             ->where('updated_at', '<', $cutoff)
             ->get();
 
