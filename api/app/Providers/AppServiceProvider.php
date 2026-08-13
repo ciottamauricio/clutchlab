@@ -19,6 +19,7 @@ use App\Events\Subscribers\EmailTrainingRoster;
 use App\Events\Subscribers\EventHandler;
 use App\Llm\AnthropicAnalyst;
 use App\Llm\HashEmbeddings;
+use App\Llm\OllamaEmbeddings;
 use App\Models\User;
 use App\Queue\RedisEventBus;
 use App\Queue\RedisEventSubscriber;
@@ -28,6 +29,7 @@ use App\Search\PgVectorRetriever;
 use App\Services\DbPermissionService;
 use App\Storage\S3DemoStorage;
 use App\Telemetry\Tracing;
+use Illuminate\Http\Client\Factory as Http;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\ServiceProvider;
@@ -64,11 +66,17 @@ class AppServiceProvider extends ServiceProvider
             ),
         });
 
-        // Semantic retrieval: an embedder feeding a pgvector store, both seams. Only 'hash'
-        // (keyless local stand-in) is wired; add a 'voyage'/'ollama' case here once you've
-        // written the class. Its dimensions() must equal the migrated column width — pinned
-        // by EMBED_DIMENSIONS so the two can't silently disagree.
+        // Semantic retrieval: an embedder feeding a pgvector store, both seams. 'hash' is
+        // the keyless local stand-in; 'ollama' is a learned model served by the ollama
+        // container. Whichever is bound, its dimensions() must equal the migrated column
+        // width — pinned by EMBED_DIMENSIONS so the two can't silently disagree.
         $this->app->bind(EmbeddingClient::class, fn () => match (config('clutch.embed.provider')) {
+            'ollama' => new OllamaEmbeddings(
+                $this->app->make(Http::class),
+                config('clutch.embed.ollama.host'),
+                config('clutch.embed.ollama.model'),
+                (int) config('clutch.embed.dimensions'),
+            ),
             default => new HashEmbeddings((int) config('clutch.embed.dimensions')),
         });
         $this->app->bind(SemanticRetriever::class, PgVectorRetriever::class);

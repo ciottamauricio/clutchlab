@@ -102,6 +102,44 @@ services:
     image: redis:7-alpine
     networks: [clutchnet]
 
+  # Local model runtime, reached at http://ollama:11434 (the default in
+  # config/clutch.php's embed.ollama.host). Today it serves embeddings for the analyst's
+  # semantic read model; the same server is what an 'ollama' AnalystLlm would generate
+  # against. Weights live in a named volume — pulled once, survive `down`.
+  #
+  # KEEP_ALIVE is short on purpose: this is a batch workload (analyst:embed), not a hot
+  # path, so the model should release VRAM instead of squatting on a desktop GPU.
+  ollama:
+    image: ollama/ollama:0.5.7
+    environment:
+      OLLAMA_KEEP_ALIVE: 30s
+    volumes:
+      - ollamadata:/root/.ollama
+    networks: [clutchnet]
+    # GPU is an optimisation, not a requirement: embedding a small corpus on CPU is
+    # seconds. Needs the NVIDIA Container Toolkit on the host — without it Compose fails
+    # to START this service, so drop this block to run CPU-only.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # One-shot: pulls the embedding model so the first analyst:embed doesn't fail on a
+  # missing model. Same shape as minio-init (wait for the service, make the thing exist).
+  ollama-init:
+    image: ollama/ollama:0.5.7
+    depends_on: [ollama]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: >
+      sh -c "until ollama list >/dev/null 2>&1; do echo 'waiting for ollama'; sleep 2; done;
+             ollama pull ${OLLAMA_EMBED_MODEL:-nomic-embed-text};
+             echo 'embedding model ready'"
+    networks: [clutchnet]
+
   meilisearch:
     image: getmeili/meilisearch:v1.12
     environment:
@@ -185,6 +223,7 @@ volumes:
   meilidata:
   lokidata:
   grafanadata:
+  ollamadata:
 
 networks:
   clutchnet:
