@@ -6,6 +6,7 @@ use App\Contracts\EventSubscriber;
 use App\Events\Subscribers\EventHandler;
 use App\Telemetry\Tracing;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use OpenTelemetry\API\Trace\SpanKind;
 
 // Laravel as a subscriber on clutch_events — the mirror of the Go notifier, and the
@@ -55,7 +56,18 @@ class ListenForEvents extends Command
 
             try {
                 foreach ($handlers as $handler) {
-                    $handler->handle($payload);
+                    // Isolated per handler: reactions to one fact are independent, and one
+                    // failing must not skip the rest. This stopped being theoretical once a
+                    // handler started calling an external service (embedding hits ollama) —
+                    // a down container would otherwise suppress the handlers after it.
+                    try {
+                        $handler->handle($payload);
+                    } catch (\Throwable $e) {
+                        Log::error(sprintf(
+                            'events:listen: %s failed on %s: %s',
+                            class_basename($handler), $event, $e->getMessage(),
+                        ));
+                    }
                 }
             } finally {
                 $scope->detach();

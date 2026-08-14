@@ -55,6 +55,14 @@ A third read model, same CQRS shape as search: Postgres matches are the source o
 truth; `match_embeddings` is a **projection** — one embedded prose "card" per parsed
 match (`BuildMatchCardAction`), rebuildable any time with `php artisan analyst:embed`.
 
+The index **follows parses on its own**: `EmbedParsedMatch` is a second `match.parsed`
+handler that embeds the one new card, so a freshly parsed match is semantically
+searchable without anyone running the command. It is registered *after*
+`ApplyMatchParsed` because the card is built from the row that handler writes, and it
+re-checks `status === 'parsed'` rather than trusting registration order — embedding early
+would store a contentless card ("unknown map", no score) that looks perfectly valid.
+`analyst:embed` remains the bulk rebuild path, for an embedder swap or a backfill.
+
 - **Embedding is a seam.** `EmbeddingClient` turns text → a fixed-width vector, and
   reports that width via `dimensions()`. The default `HashEmbeddings` is a keyless local
   embedder (the "hashing trick") — it runs the whole architecture with no external

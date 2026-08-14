@@ -38,6 +38,14 @@ commands: see `docs/ARCHITECTURE.md` "Commands vs. events".
   decoded event to every `App\Events\Subscribers\EventHandler` whose `handles()` matches.
 - Adding a reaction is **one class** implementing `EventHandler`, tagged in
   `AppServiceProvider` — never a `switch` to edit.
+- Handlers for one event are **isolated from each other**: each `handle()` is wrapped, so
+  a thrower is logged and the rest still run. Reactions to the same fact are independent
+  by design, and one of them now calls an external service (`EmbedParsedMatch` → ollama),
+  where "down" must not mean "the handlers after it silently stopped".
+- Registration order **is** execution order, which matters when one handler reads what
+  another wrote (`EmbedParsedMatch` after `ApplyMatchParsed`). A handler that depends on
+  another's write should verify it rather than trust the array — order is a convenience,
+  not a guarantee.
 - The listener is **not the request path**, so handlers run **inline** (no queue worker
   needed): the reason to move email off the request — not blocking scheduling — is already
   satisfied by the daemon being off the request path.

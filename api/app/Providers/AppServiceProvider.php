@@ -16,6 +16,7 @@ use App\Contracts\SemanticRetriever;
 use App\Events\Subscribers\ApplyMatchFailed;
 use App\Events\Subscribers\ApplyMatchParsed;
 use App\Events\Subscribers\EmailTrainingRoster;
+use App\Events\Subscribers\EmbedParsedMatch;
 use App\Events\Subscribers\EventHandler;
 use App\Llm\AnthropicAnalyst;
 use App\Llm\HashEmbeddings;
@@ -50,9 +51,13 @@ class AppServiceProvider extends ServiceProvider
 
         // Handlers for incoming cross-service facts (events:listen). Registering a new
         // reaction is one line here — the listener routes by each handler's handles().
+        // Order matters within one event: EmbedParsedMatch builds its card from the row
+        // ApplyMatchParsed writes, so it is listed after it (and re-checks the status
+        // itself, rather than trusting this array to stay in order).
         $this->app->tag([
             EmailTrainingRoster::class,
             ApplyMatchParsed::class,
+            EmbedParsedMatch::class,
             ApplyMatchFailed::class,
         ], EventHandler::class);
         $this->app->bind(SearchIndex::class, fn () => new MeilisearchIndex(
