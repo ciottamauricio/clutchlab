@@ -8,6 +8,7 @@ use App\Contracts\SemanticRetriever;
 use App\Models\GameMatch;
 use App\Models\TrainingSession;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 
 // The RAG loop: retrieve (recent matches + scoreboards and recent trainings from
 // Postgres, question-relevant kills from the Meilisearch read model) → augment
@@ -66,7 +67,26 @@ class AskAnalystAction
             'recent_trainings' => $this->recentTrainings($user),
         ];
 
-        return $this->llm->answer($question, $evidence);
+        // One line per question, because nothing else records that the analyst ran: the
+        // route logs a status, the retrievers log nothing, and a slow or empty answer is
+        // otherwise indistinguishable from a fast one. Evidence counts explain the prompt
+        // size, and the duration is the number that moves when the local model falls back
+        // to CPU. The answer's TEXT is deliberately not logged — the question is enough to
+        // reproduce it, and generated prose would sit in Loki for anyone with Grafana.
+        $started = microtime(true);
+        $answer = $this->llm->answer($question, $evidence);
+
+        Log::info('analyst: answered', [
+            'question' => $question,
+            'matches' => count($evidence['recent_matches']),
+            'kills' => count($evidence['kills_matching_question']),
+            'related' => count($evidence['semantically_related_matches']),
+            'trainings' => count($evidence['recent_trainings']),
+            'answer_chars' => mb_strlen($answer),
+            'seconds' => round(microtime(true) - $started, 1),
+        ]);
+
+        return $answer;
     }
 
     // Nearest match cards by embedding distance. Two retrievers, two jobs: SearchIndex

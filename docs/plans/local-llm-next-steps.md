@@ -16,8 +16,9 @@ Already built and pushed:
 
 Two measurements worth keeping in view, because they shape every step below:
 
-- A full analyst answer took **~4.5 minutes** with the model on CPU. Ollama falls back to
-  CPU whenever the model doesn't fit in VRAM, and reports it only in `ollama ps`.
+- A full analyst answer takes **~9s on the GPU and ~265s on CPU** — same question, 30x
+  apart. Ollama falls back to CPU whenever the model doesn't fit in VRAM and reports it
+  only in `ollama ps`, so "the analyst is slow today" is a VRAM question first.
 - The 7B model **obeyed the citation rules and ignored the formatting ones**. Grounding
   discipline degrades with model size; it doesn't disappear.
 

@@ -150,6 +150,27 @@ Postgres runs the `pgvector/pgvector:pg16` image (stock PG16 + the `vector` exte
 the migration `CREATE EXTENSION`s it. Tests use sqlite (no vector type) and fake the
 retriever, so the suite never needs pgvector.
 
+## Observability
+
+One `analyst: answered` line per question (`AskAnalystAction`), carrying the question, the
+four evidence counts, the answer's length, and the generation time. Nothing else records
+that the analyst ran — the route logs only a status, and a slow or empty answer looks
+exactly like a fast one from outside.
+
+The counts are what make it diagnostic rather than decorative: `"kills":0` means
+Meilisearch matched nothing and the answer stood on scoreboards and semantic recall alone
+(the documented degrade path), and `seconds` is the number that jumps when the local model
+falls back to CPU — 8.9s on GPU against ~265s on CPU for the same shape of question.
+
+The answer's **text is deliberately not logged**. The question is enough to reproduce it,
+and generated prose about the team's matches would otherwise sit in Loki for anyone with
+Grafana access.
+
+`LOG_CHANNEL=stderr` sends api logs to the container's stdout, where Alloy already scrapes
+every service off the Docker socket — so this is queryable in Grafana with
+`{service="api"} |= "analyst"`. (Logs written from `docker compose exec` sessions go to
+that session's stderr, not the container's, so only real requests appear in Loki.)
+
 ## Deliberate limitations (honest tradeoffs)
 
 - **The local generator is materially weaker.** `ANALYST_PROVIDER=ollama` costs nothing
@@ -158,10 +179,13 @@ retriever, so the suite never needs pgvector.
   a few sentences of plain text, it returns a bolded, numbered report). Treat local as the
   private/free option, not the good one — `ANALYST_PROVIDER` switches back to `claude`
   with no code change.
-- **Local generation is slow, and silently slower without a GPU.** A full evidence payload
-  took ~4.5 minutes on CPU. Ollama falls back to CPU whenever the model doesn't fit in
-  VRAM — on a desktop card mostly consumed by the desktop itself, that's the normal case,
-  and nothing reports it except `ollama ps` showing `100% CPU`. Hence the 600s timeout.
+- **Local generation is usable on a GPU and unusable without one.** The same shape of
+  question takes **~9s with the model on the GPU and ~265s on CPU** — a 30x swing, with no
+  error and nothing in the response to distinguish them. Ollama falls back to CPU whenever
+  the model doesn't fit in VRAM, which on a desktop card mostly consumed by the desktop is
+  the normal case; only `ollama ps` reports it (`100% CPU`). The 600s timeout exists for
+  the bad case, and the `seconds` field in the `analyst: answered` log is how you tell
+  which one you got.
 - **Crude embeddings, when the hash stand-in is selected.** `EMBED_PROVIDER=hash` captures
   word overlap with light stemming, not meaning — "duel" won't find "fight". It exists so
   the architecture runs with no external anything; `ollama` is the real embedder.
