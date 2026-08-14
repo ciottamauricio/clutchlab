@@ -263,6 +263,8 @@ export const TOPICS = [
       'Pub/sub is fire-and-forget: only subscribers connected at that instant receive the event. A notifier restart loses the gap — at-most-once delivery, felt rather than read about. Redis Streams (acks + consumer groups) is the earned upgrade behind the same interfaces.',
       'The dual write: the worker writes Postgres, then publishes. A crash between the two loses the event (the status row stays correct — it is the source of truth). The industrial fix is a transactional outbox; accepting the gap is a documented decision.',
       'One more cross-language contract, now one-to-many: unknown future subscribers mean additive changes only, with a version field for anything breaking.',
+      'Subscribers being independent is a claim the dispatch loop has to honor. Handlers for one event ran in a bare loop, so the first to throw skipped the rest — invisible while every handler only touched Postgres, and a real fault the moment one of them called an external service. "Nobody knows about anybody" only holds if one failing reaction cannot silently cancel the others.',
+      'Order becomes load-bearing the moment two handlers react to the same fact and one reads what the other wrote — embedding a match needs the row the apply handler persists. Registration order supplies that, but it is a convenience, not a guarantee, so the dependent handler verifies the state instead of trusting its position in an array.',
     ],
     body: [
       'The parse queue and the event channel look similar — both are JSON on Redis — but they are opposite ideas. A command ("parse this") is addressed to a role and must be consumed exactly once; losing one loses work. An event ("this happened") is addressed to no one; missing one loses only a notification. Matching the guarantee to the stakes is the lesson: parsing earns idempotent writes and a waiting queue, notifications get best-effort by design — an event must never fail a parse.',
@@ -371,14 +373,17 @@ export const TOPICS = [
     gained: [
       'The analyst is a thin loop — retrieve evidence, paste it in the prompt, generate. The model knows nothing about your team; the real work is which evidence to fetch.',
       'Two retrievers cover each other\'s blind spots: keyword (Meilisearch) matches words exactly; semantic (pgvector) matches meaning, catching "our comeback games" and reaching past the recency window.',
-      'Every part is a seam behind a contract — generator, embedder, store all swap without touching the action, so swapping the crude embedder for a real one is a recipe (set EMBED_DIMENSIONS, migrate, re-embed), not a rewrite.',
+      'The seams were claimed, then tested: swapping the placeholder embedder for a real one (nomic-embed-text) and Claude for a local model was two new classes, two match arms, and a re-embed — no change to the action, the retriever, or a single test of the RAG loop. A contract you have actually substituted behind is worth more than one you assert is swappable.',
+      'The upgrade is measurable, not vibes: "long-range duels" now scores 0.585 against "awp sniper fights" and 0.383 against "pistol round eco save" — no shared words with either. The exact case the hash embedder could not do.',
     ],
     paid: [
-      'The default embedder is the hashing trick: keyless and local, but only as smart as word overlap — "duel" and "fight" miss. The plumbing is production-shaped; the intelligence is a placeholder built to be replaced.',
+      'The projection has to be rebuilt on every swap, because vectors from different models are mutually meaningless: change the embedder and the column width changes (256 → 768), the migration wipes it, and analyst:embed rebuilds. Disposable-by-design is what makes that safe rather than frightening.',
+      'The index only stays current because a second handler embeds each match as it parses. Before that, it moved only when someone remembered a command — and a stale index never announces itself, it just quietly answers as though the newest matches do not exist.',
       'An ivfflat index on the tiny corpus returned zero rows — approximate search lies quietly at small scale, so it\'s a plain exact scan until a full scan actually hurts.',
     ],
     body: [
       'Every RAG project starts at "how do I use an LLM here", but the useful reframing is "what do I retrieve" — and Clutchlab answered most of that before the word came up: the search read model (topic 04) and Postgres already held the evidence. Generation was the small new part, behind an interface, grounded so every claim cites a real [match:N]. Adding semantic search made the two-read-model idea concrete: keyword and vector search aren\'t rivals but complements from the same source of truth, failing in opposite directions — the boundary discipline the whole project studies, pointed at AI.',
+      'The placeholder embedder turned out to be the most useful part of the design. Shipping a keyless, deliberately dumb implementation meant the whole architecture — column, retriever, scoping, prompt — ran for real long before any model was involved, so when the real embedder arrived the only open question was the embedder itself. Building the pipeline around a stub you intend to replace is a cheaper way to learn the pipeline than waiting until you can afford the real thing.',
     ],
     code: 'semantically_related_matches: retriever.related(question, visibleIds, 5)',
     codeLabel: 'the semantic retriever searches the whole visible set by meaning — it can surface a match older than the recent-window the keyword pass sees',
@@ -466,5 +471,29 @@ export const TOPICS = [
     ],
     code: "// worker, post-split:  writes analytics.*  +  publishes match.parsed  (never touches matches)",
     codeLabel: 'the worker\'s old UPDATE matches became an event; the api owns the row and applies the summary from it',
+  },
+  {
+    id: 'local-model',
+    group: 'AI & Data',
+    n: '22',
+    title: 'Local model or hosted',
+    tag: 'AI, cost vs. quality',
+    summary: 'The same interface can be served by a metered API or a container on your desk — and running both makes the tradeoff measurable instead of theoretical.',
+    gained: [
+      'Cost and privacy go to zero: an ollama container answers with no account, no per-call bill, and no evidence about the team leaving the machine. For embeddings — a batch job over a small corpus — that is a straight win with no downside to weigh.',
+      'One env var chooses the provider, because both sit behind the same AnalystLlm contract. Switching back is a config change, not a migration, so the cheap option never becomes a trap.',
+      'It turns an abstraction into an experiment. Two implementations of one interface, swappable at runtime, is the only honest way to find out what a hosted model was actually buying — and the answer was legible within one question.',
+    ],
+    paid: [
+      'Quality degrades unevenly, which is worse than degrading uniformly. The 7B model held the rules that matter structurally — cited real match ids, copied player names verbatim — and dropped the cosmetic ones, returning a bolded report where the prompt asked for a few plain sentences. A model that fails the visible rules while keeping the invisible ones is easy to mistake for working correctly.',
+      'Performance is a cliff, not a slope: ~9s with the model on the GPU against ~265s on CPU for the same question. Ollama falls back to CPU whenever the model does not fit in VRAM — normal on a desktop card the desktop is already using — and reports it nowhere except `ollama ps`. Nothing in the response distinguishes a fast answer from a 30x slow one.',
+      'Free is not free: ~5GB of weights, VRAM that competes with everything else on the machine, and a timeout raised to 600s to survive the bad case. The hosted provider\'s bill buys away an entire class of operational concern.',
+    ],
+    body: [
+      'The interesting part is not that a local model works — it is that the project could find out cheaply. AnalystLlm and EmbeddingClient existed before either implementation did, so testing "how much worse is local?" cost two classes and no changes to the RAG loop, and the answer arrived as evidence rather than opinion. That is the argument for interfaces stated more precisely than "swappable": the value is not that you might replace a dependency someday, it is that you can run the alternative today and compare.',
+      'The two halves came out differently, which is the honest conclusion. For embedding, local wins outright — the work is batched, the model is small, and the alternative was a placeholder that could not tell "duel" from "fight". For generation, local is the private and free option, not the good one, and the study is worth more than the feature: it is a concrete answer to what a frontier model is for, priced in seconds and in rules the small one quietly stopped following.',
+    ],
+    code: "ANALYST_PROVIDER=ollama   # or claude — same contract, same action, different bill",
+    codeLabel: 'one variable picks the generator; the RAG loop never learns which one answered',
   },
 ]
