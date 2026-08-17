@@ -19,6 +19,12 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <!-- Also as <server>, and for the same reason as the DB block below: Compose's
+             env_file puts APP_ENV=local in $_SERVER, and LoadEnvironmentVariables reads it
+             from there to choose WHICH dotenv file to load — before PHPUnit's <env> has
+             any effect. Without this it looks for the .env this service deliberately does
+             not have, and the resulting warning is stamped on every test in the suite. -->
+        <server name="APP_ENV" value="testing" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
