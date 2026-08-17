@@ -129,7 +129,7 @@ ivfflat. Re-measure again if kill-level cards ever land (~30x more).
 
 ---
 
-## 4. RAG over the project's own docs
+## 4. RAG over the project's own docs — DONE (retrieval only)
 
 **Why:** `ARCHITECTURE.md`, four `CLAUDE.md` files and nine domain docs are a corpus of
 *design rationale*. It answers "why is the parse queue a plain Redis list?" — a question
@@ -150,6 +150,42 @@ to. That's a real test of the abstraction, and the same mechanics as any
 - Honest limit: you wrote these docs. The lesson is architectural, not daily utility.
 
 **Cost:** ~3 hours. **Risk:** low, but least payoff per hour.
+
+**Built as `DocRetriever` + `doc_embeddings`, 224 chunks over 29 files.** Deliberately
+stops short of `AskAnalystAction`: the retriever and `docs:embed` are verified standalone,
+but no `semantically_related_docs` reaches the prompt yet. Letting an untuned corpus into
+every answer is how you make the analyst worse without noticing.
+
+**The abstraction question got its answer, and it was "stay separate".** This corpus scopes
+by nothing — no `match_id`, no per-user visibility — so `related()` takes no scope argument
+where both siblings take `$matchIds`. The seam that actually generalized across all three
+is `EmbeddingClient`, which never changed.
+
+Two things the sketch didn't anticipate. **The corpus is defined by its exclusions**: 20
+files of vendored Terraform docs outweigh the hand-written ones 3:2, and Laravel's stock
+`api/README.md` put its *Code of Conduct* in the top 3 for a question about error codes
+until scaffolding was filtered by content. And the api container mounts only `./api`, so
+the repo root needed a read-only bind mount before a docs corpus could exist at all — the
+boundary being the point of the project, this one was worth the extra line in Compose.
+
+**The measured ceiling, which is also the argument against step 5.** Conceptual questions
+retrieve well ("why Go instead of PHP" → 0.682, right section first). Questions naming a
+*symbol* do not ("what does `DocRetriever` do" → 0.523, misses a section that answers it
+directly). The embedder knows prose, and an identifier is not a word to it. Step 5 is RAG
+over code, where **every** question names a symbol — so this step's result is evidence its
+ranking at the bottom of this list was right.
+
+**Two unrelated things fixed on the way** (both were quietly costing more than they looked):
+
+- `OllamaEmbeddings` had a hardcoded 30s timeout and no retry. On a desktop GPU the model
+  is evicted mid-batch by whatever else holds VRAM — on WSL2, the Windows desktop's usage
+  counts against the same 8GB and is invisible from Linux — and a reload under pressure
+  looks exactly like a hang. Now configurable (120s default) with two backed-off retries.
+- The whole test suite reported **warnings instead of passes** — 89 of them — because
+  Laravel's env bootstrapper read a `.env` this service deliberately doesn't have.
+  `APP_ENV` needed a `<server>` override in `phpunit.xml` for the same reason the DB
+  settings already had one: Compose's `env_file` lands in `$_SERVER`, which is read before
+  PHPUnit's `<env>` applies. 112 tests had been passing silently behind that warning.
 
 ---
 

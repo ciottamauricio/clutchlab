@@ -8,6 +8,7 @@ use App\Contracts\AnalystLlm;
 use App\Contracts\DemoStorage;
 use App\Contracts\EmbeddingClient;
 use App\Contracts\EventBus;
+use App\Contracts\DocRetriever;
 use App\Contracts\EventSubscriber;
 use App\Contracts\ParseQueue;
 use App\Contracts\PermissionService;
@@ -28,6 +29,7 @@ use App\Queue\RedisEventBus;
 use App\Queue\RedisEventSubscriber;
 use App\Queue\RedisParseQueue;
 use App\Search\MeilisearchIndex;
+use App\Search\PgVectorDocRetriever;
 use App\Search\PgVectorRetriever;
 use App\Search\PgVectorRoundRetriever;
 use App\Services\DbPermissionService;
@@ -90,11 +92,13 @@ class AppServiceProvider extends ServiceProvider
                 config('clutch.embed.ollama.host'),
                 config('clutch.embed.ollama.model'),
                 (int) config('clutch.embed.dimensions'),
+                (int) config('clutch.embed.ollama.timeout'),
             ),
             default => new HashEmbeddings((int) config('clutch.embed.dimensions')),
         });
         $this->app->bind(SemanticRetriever::class, PgVectorRetriever::class);
         $this->app->bind(RoundRetriever::class, PgVectorRoundRetriever::class);
+        $this->app->bind(DocRetriever::class, PgVectorDocRetriever::class);
 
         // Singleton so the per-request grant cache is shared across every check in a request.
         $this->app->singleton(PermissionService::class, DbPermissionService::class);

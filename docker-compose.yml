@@ -23,6 +23,7 @@ services:
     volumes:
       - ./api:/var/www/html
       - ./contracts:/var/www/contracts:ro   # shared wire-contract fixtures (../contracts in tests)
+      - .:/var/www/project:ro               # repo root, read-only: docs:embed reads markdown outside ./api
     env_file: .env
     depends_on: [postgres, redis, minio, meilisearch, jaeger]
     networks: [clutchnet]

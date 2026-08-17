@@ -52,6 +52,11 @@ return [
         'timeout' => (int) env('OLLAMA_TIMEOUT', 600),
     ],
 
+    // Where docs:embed looks for the project's markdown. The api container only mounts
+    // ./api, so the repo root is bind-mounted read-only at /var/www/project — without it
+    // the corpus would be one service's docs rather than the architecture's.
+    'docs_root' => env('DOCS_ROOT', '/var/www/project'),
+
     // Semantic search embedder: 'hash' (keyless local stand-in, word overlap only) or
     // 'ollama' (learned, 768 dims, real meaning). Switching providers means setting
     // EMBED_PROVIDER + EMBED_DIMENSIONS to the model's width, migrating the vector column,

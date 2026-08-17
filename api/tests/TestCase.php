@@ -4,15 +4,17 @@ namespace Tests;
 
 use App\Contracts\AnalystLlm;
 use App\Contracts\DemoStorage;
+use App\Contracts\DocRetriever;
 use App\Contracts\EventBus;
 use App\Contracts\ParseQueue;
-use App\Contracts\SearchIndex;
 use App\Contracts\RoundRetriever;
+use App\Contracts\SearchIndex;
 use App\Contracts\SemanticRetriever;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Tests\Fakes\FakeDemoStorage;
-use Tests\Fakes\FakeSearchIndex;
+use Tests\Fakes\FakeDocRetriever;
 use Tests\Fakes\FakeRoundRetriever;
+use Tests\Fakes\FakeSearchIndex;
 use Tests\Fakes\FakeSemanticRetriever;
 use Tests\Fakes\SpyAnalystLlm;
 use Tests\Fakes\SpyEventBus;
@@ -34,6 +36,8 @@ abstract class TestCase extends BaseTestCase
 
     protected FakeRoundRetriever $roundRetriever;
 
+    protected FakeDocRetriever $docRetriever;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -50,6 +54,7 @@ abstract class TestCase extends BaseTestCase
         $this->analystLlm = new SpyAnalystLlm;
         $this->semanticRetriever = new FakeSemanticRetriever;
         $this->roundRetriever = new FakeRoundRetriever;
+        $this->docRetriever = new FakeDocRetriever;
 
         $this->app->instance(DemoStorage::class, $this->demoStorage);
         $this->app->instance(ParseQueue::class, $this->parseQueue);
@@ -58,5 +63,6 @@ abstract class TestCase extends BaseTestCase
         $this->app->instance(AnalystLlm::class, $this->analystLlm);
         $this->app->instance(SemanticRetriever::class, $this->semanticRetriever);
         $this->app->instance(RoundRetriever::class, $this->roundRetriever);
+        $this->app->instance(DocRetriever::class, $this->docRetriever);
     }
 }

@@ -66,6 +66,58 @@ longer exist. Match cards need no such thing — one match is always exactly one
 scale the "no ANN index" note said to re-check. An exact sequential scan is **2.15ms**, so
 the decision stands: still no ivfflat. Embedding all 611 cards takes ~14s on the GPU.
 
+### A third corpus: the project's own documentation
+
+`doc_embeddings` holds this repository's markdown, chunked by heading and retrieved by
+`DocRetriever`. It answers *design rationale* questions — "why is the parse queue a plain
+Redis list?" — that grep cannot, because the answer is an argument rather than a string.
+
+**Built, but not yet wired into `AskAnalystAction`.** `docs:embed` and the retriever exist
+and are verified standalone; no `semantically_related_docs` key reaches the prompt. A
+corpus that answers questions about the codebase is easy to make *worse* than nothing by
+letting it into every answer before its retrieval quality is known.
+
+**The contract question, finally settled.** `RoundRetriever` was kept separate from
+`SemanticRetriever` on the bet that a third corpus would show what they actually shared.
+It did, by not fitting either: both siblings scope results to a caller's visible matches,
+and a design doc belongs to no match and no user. `DocRetriever::related()` therefore takes
+no scope argument at all. A generalized `corpus` parameter would have carried a `$matchIds`
+argument that is meaningless here. **The seam that genuinely generalized is
+`EmbeddingClient`** — the one that never had to change.
+
+**What the corpus excludes is load-bearing.** Vendored dependency docs (a Terraform module
+ships ~5,000 lines of upstream README and CHANGELOG) outweigh the hand-written docs roughly
+3:2. Framework scaffolding is the subtler case: `api/README.md` is Laravel's stock readme,
+and before it was excluded, "how do error codes reach the user interface?" retrieved
+**Laravel's Code of Conduct** in the top 3. Scaffolding is matched on content, not path,
+because the giveaway text is stable while filenames are not.
+
+**Chunking is the whole game, and the docs were already written for it.** Sections are
+argument-per-heading and top out around 46 lines, so `##`/`###` boundaries need no fallback
+splitter. Two things a naive split gets wrong: headings inside fenced code blocks are shell
+comments, not structure; and a chunk reading "merge them when a third corpus arrives" is
+useless alone because it never says what "them" is — so every chunk is prefixed with its
+file and heading ancestry, which is both the retrieval surface and what makes a hit
+readable. Headings with no prose under them are dropped: a table-of-contents entry embeds
+to a vector that can only ever match its own title.
+
+**Scan cost.** 224 chunks scan exactly in **1.21ms** — smaller than the round corpus, so
+for the third time there is no ivfflat.
+
+**It retrieves concepts, not identifiers — measured.** "Why is the worker written in Go
+instead of PHP?" scores **0.682** on the right section. "What does `DocRetriever` do?"
+scores **0.523** and misses, even though a section explaining exactly that exists. The
+embedder is trained on prose, and a class name is a token it has no meaning for; the
+`bomb_defused` → "defusing the bomb" lesson from round cards applies to *queries* too, and
+here the query is the half we don't control. This is the honest ceiling on RAG-over-docs:
+it answers the questions a newcomer asks in English, not the ones you ask with a symbol in
+hand — which is what step 5 (RAG over *code*) would need and a reason to expect less of it.
+
+**Staleness is manual here, by design.** The other two indexes are projections of Postgres
+and rebuild from `match.parsed`. This one projects the *working tree*, and nothing
+publishes a "docs changed" event — so `docs:embed` is run by hand, and the index is stale
+between runs.
+
 ### Two retrievers, two jobs (keyword vs. semantic)
 
 The analyst runs **two** retrievers on every question, because they fail differently:
@@ -94,7 +146,10 @@ searchable without anyone running the command. It is registered *after*
 `ApplyMatchParsed` because the card is built from the row that handler writes, and it
 re-checks `status === 'parsed'` rather than trusting registration order — embedding early
 would store a contentless card ("unknown map", no score) that looks perfectly valid.
-`analyst:embed` remains the bulk rebuild path, for an embedder swap or a backfill.
+`analyst:embed` remains the bulk rebuild path, for an embedder swap or a backfill. It
+rebuilds match **and** round cards together; `docs:embed` is the separate command for the
+documentation corpus, which projects files rather than Postgres and so has no event to
+follow (`--dry` lists what would be chunked without calling the embedder).
 
 - **Embedding is a seam.** `EmbeddingClient` turns text → a fixed-width vector, and
   reports that width via `dimensions()`. The default `HashEmbeddings` is a keyless local
@@ -222,6 +277,15 @@ that session's stderr, not the container's, so only real requests appear in Loki
 - **Crude embeddings, when the hash stand-in is selected.** `EMBED_PROVIDER=hash` captures
   word overlap with light stemming, not meaning — "duel" won't find "fight". It exists so
   the architecture runs with no external anything; `ollama` is the real embedder.
+- **The docs corpus is retrievable but not consulted.** `doc_embeddings` is built and
+  queryable, and the analyst never sees it: no `semantically_related_docs` is in the
+  evidence payload. Wiring it in is a deliberate second decision, because a corpus that
+  answers "why is it built this way?" competes for prompt space with the evidence that
+  answers "what happened in our matches?" — and the second is what the analyst is for.
+- **The docs index goes stale silently.** It projects the working tree, not Postgres, and
+  nothing publishes a "docs changed" event. Edit a doc and the index describes the old one
+  until `docs:embed` runs again. The match and round indexes don't have this problem —
+  `match.parsed` keeps them current.
 - **Round-level semantics stop at the round.** Rounds are embedded (see below), but kills
   are not: a question about a specific duel still resolves only to the round it happened
   in. Kill cards would be the next grain down — ~30x again, and the point where the
