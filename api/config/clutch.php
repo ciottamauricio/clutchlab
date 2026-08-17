@@ -69,6 +69,11 @@ return [
         'ollama' => [
             'host' => env('OLLAMA_HOST', 'http://ollama:11434'),
             'model' => env('OLLAMA_EMBED_MODEL', 'nomic-embed-text'), // 768 dims
+            // Embedding one chunk is ~20ms once the model is resident, so this budget is
+            // almost entirely for the RELOAD: on a shared desktop GPU the model gets
+            // evicted mid-batch and has to come back, sometimes on CPU. 30s was too tight
+            // and turned a slow reload into a failed batch.
+            'timeout' => (int) env('OLLAMA_EMBED_TIMEOUT', 120),
         ],
     ],
 ];
