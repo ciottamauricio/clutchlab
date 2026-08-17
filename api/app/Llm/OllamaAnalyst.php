@@ -29,6 +29,9 @@ class OllamaAnalyst implements AnalystLlm
         whose summary is closest in meaning to the question — use them to find relevant
         games that may fall outside the recent window, but weight them by their
         similarity score and don't force a connection when it's weak.
+        semantically_related_rounds are individual ROUNDS retrieved the same way: use
+        them when the question is about a situation rather than a game (clutches, eco
+        rounds, how rounds were won or lost), and cite the match they belong to.
 
         Rules:
         - Cite every match you draw a claim from as [match:ID] (the numeric id from

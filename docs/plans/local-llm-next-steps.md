@@ -88,7 +88,7 @@ service split, and where a long-lived connection belongs in a polyglot stack.
 
 ---
 
-## 3. Round-level embeddings
+## 3. Round-level embeddings — DONE
 
 **Why:** `analyst.md` lists this under deliberate limitations — cards summarize *matches*,
 so semantic search finds relevant games, never relevant rounds. "Rounds where we lost a
@@ -112,6 +112,20 @@ the largest *answer-quality* gain on the list.
   visible rather than fixing.
 
 **Cost:** ~2 hours. **Risk:** medium — mostly the contract decision.
+
+**Built as `RoundRetriever` + `round_embeddings`.** The contract went to a separate
+interface rather than a generalized `corpus` parameter: both have one implementation
+today, and the third corpus (docs, step 4) scopes by nothing at all, so the "shared"
+abstraction would have fitted neither.
+
+Two things the sketch missed. `forget()` has to clear a match's rounds before re-indexing,
+because a re-parse can yield fewer rounds than the last and per-round upserts leave the
+surplus behind. And the card's *vocabulary* is the actual work — a round is only findable
+by words some card says, so `bomb_defused` had to become "defusing the bomb" and a
+1-survivor win "a clutch".
+
+The scan-cost worry didn't materialize: 611 rounds, exact sequential scan, **2.15ms**. No
+ivfflat. Re-measure again if kill-level cards ever land (~30x more).
 
 ---
 

@@ -73,6 +73,21 @@ class EmbedParsedMatchTest extends TestCase
         $this->assertSame([], $this->semanticRetriever->indexed);
     }
 
+    // Rounds ride the same event as the match card, at the grain below it.
+    public function test_rounds_are_cleared_before_re_embedding_so_a_shorter_reparse_leaves_no_orphans(): void
+    {
+        $match = GameMatch::factory()->create(['status' => 'queued']);
+
+        // A previous, longer parse left cards behind (this match has no round_events rows
+        // in the test DB, so nothing re-indexes them — exactly the orphan case).
+        $this->roundRetriever->index($match->id, 30, 'stale round from a longer parse');
+
+        $this->deliver($match);
+
+        $this->assertContains($match->id, $this->roundRetriever->forgotten);
+        $this->assertSame([], $this->roundRetriever->indexed);
+    }
+
     public function test_re_embedding_replaces_the_card_rather_than_duplicating_it(): void
     {
         $match = GameMatch::factory()->create(['status' => 'queued']);

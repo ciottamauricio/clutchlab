@@ -22,6 +22,8 @@ question ──▶ RETRIEVE  Postgres: newest 15 parsed visible matches + scoreb
          │             scoped to those same matches (degrades to [] if down)
          │             pgvector `match_embeddings`: 5 nearest match cards by MEANING,
          │             over the whole visible set (degrades to [] if down)
+         │             pgvector `round_embeddings`: 3 nearest ROUND cards, same scope —
+         │             which round, not just which game (degrades to [] if down)
          │             Postgres: the caller's teams' 10 most recent trainings —
          │             tactics drilled, roster + RSVPs, nade homework
          ├──▶ AUGMENT  compact JSON evidence + the question in one user message
@@ -32,6 +34,37 @@ Matches and kills are **outcomes**; trainings are **intent**. The system prompt 
 the split, so the analyst can connect "what we practiced" to "what happened" —
 a question no single page in the app can answer. Trainings need no keyword
 retrieval: the corpus is small and recency IS relevance for practice questions.
+
+### Two grains of semantic recall (match and round)
+
+Match cards answer *which game*; they cannot answer *which round*, because a whole match
+compressed into one vector has no room for one round's shape. `round_embeddings` is the
+same projection one level down — one card per round, retrieved by `RoundRetriever` and
+handed over as `semantically_related_rounds` (3 per question, against the matches' 5:
+round cards are the narrowest evidence, and every card lengthens the prompt that
+generation is slow over).
+
+**The card is the retrieval surface.** `BuildRoundCardAction` writes prose, not columns,
+because a round is only findable by words some card actually says: `bomb_defused` becomes
+"defusing the bomb", a 1-survivor win becomes "a clutch", and an eco beating a full buy
+becomes "an upset". Those phrasings are why "eco rounds where we upset a full buy" scores
+0.750 against the right rounds. Adding vocabulary to the card adds questions the analyst
+can answer — and inventing drama for ordinary rounds would spend that vocabulary on
+nothing, so only the genuinely notable shapes get named.
+
+**A deliberately separate contract.** `RoundRetriever` is its own interface rather than a
+`corpus` parameter on `SemanticRetriever`. Both have one pgvector implementation today,
+and a shared abstraction invented for two similar cases tends to fit neither once a third
+arrives — embedded docs, for instance, have no match to scope by at all. Merge them when a
+real third corpus shows what they actually share.
+
+**`forget()` before re-indexing.** A re-parse can produce fewer rounds than the previous
+one; per-round upserts alone would leave the surplus behind as cards for rounds that no
+longer exist. Match cards need no such thing — one match is always exactly one card.
+
+**Scan cost, re-measured.** 611 rounds against 25 matches is ~24x the corpus, which is the
+scale the "no ANN index" note said to re-check. An exact sequential scan is **2.15ms**, so
+the decision stands: still no ivfflat. Embedding all 611 cards takes ~14s on the GPU.
 
 ### Two retrievers, two jobs (keyword vs. semantic)
 
@@ -189,9 +222,10 @@ that session's stderr, not the container's, so only real requests appear in Loki
 - **Crude embeddings, when the hash stand-in is selected.** `EMBED_PROVIDER=hash` captures
   word overlap with light stemming, not meaning — "duel" won't find "fight". It exists so
   the architecture runs with no external anything; `ollama` is the real embedder.
-- **Match-level semantics only.** Cards summarize matches, so semantic search finds
-  relevant *games*, not relevant *rounds*. Round-level meaning would need embedded
-  round/kill cards — more vectors, same pattern.
+- **Round-level semantics stop at the round.** Rounds are embedded (see below), but kills
+  are not: a question about a specific duel still resolves only to the round it happened
+  in. Kill cards would be the next grain down — ~30x again, and the point where the
+  no-ANN-index decision would finally need revisiting.
 - **No conversation memory.** Each question is independent; there is no chat history.
 - **Recency window.** Evidence is the newest 15 matches — "last season" questions
   silently see only that window. The model is told to admit gaps, but the window

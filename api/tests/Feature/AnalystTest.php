@@ -126,6 +126,61 @@ class AnalystTest extends TestCase
         $this->assertSame(0.82, $related[0]['similarity']);
     }
 
+    // Round cards answer what match cards can't: which ROUND, not just which game.
+    public function test_related_rounds_are_evidence_alongside_matches(): void
+    {
+        $me = $this->asMember();
+        $match = GameMatch::factory()->create(['user_id' => $me->id]);
+
+        $this->roundRetriever->hits = [
+            ['match_id' => $match->id, 'round' => 12, 'document' => 'Round 12 ... clutch', 'similarity' => 0.77],
+        ];
+
+        $this->postJson('/api/analyst/ask', ['question' => 'clutches we won'])->assertOk();
+
+        $rounds = $this->analystLlm->evidence['semantically_related_rounds'];
+        $this->assertSame(12, $rounds[0]['round']);
+        $this->assertSame($match->id, $rounds[0]['match_id']);
+    }
+
+    public function test_round_retrieval_is_scoped_to_visible_matches(): void
+    {
+        $me = $this->asMember();
+        $mine = GameMatch::factory()->create(['user_id' => $me->id]);
+        $strangers = GameMatch::factory()->create();
+
+        // A round is visible exactly when its match is — the scope is the same set.
+        $this->roundRetriever->hits = [
+            ['match_id' => $strangers->id, 'round' => 3, 'document' => 'secret', 'similarity' => 0.99],
+            ['match_id' => $mine->id, 'round' => 5, 'document' => 'mine', 'similarity' => 0.4],
+        ];
+
+        $this->postJson('/api/analyst/ask', ['question' => 'eco rounds we stole'])->assertOk();
+
+        $this->assertNotContains($strangers->id, $this->roundRetriever->lastScope);
+        $ids = array_column($this->analystLlm->evidence['semantically_related_rounds'], 'match_id');
+        $this->assertSame([$mine->id], $ids);
+    }
+
+    public function test_a_round_store_failure_does_not_fail_the_answer(): void
+    {
+        $me = $this->asMember();
+        GameMatch::factory()->create(['user_id' => $me->id]);
+
+        // Round detail is a bonus; losing it must never cost the whole answer.
+        $this->app->instance(\App\Contracts\RoundRetriever::class, new class extends \Tests\Fakes\FakeRoundRetriever
+        {
+            public function related(string $query, array $matchIds, int $limit = 3): array
+            {
+                throw new \RuntimeException('vector store down');
+            }
+        });
+
+        $this->postJson('/api/analyst/ask', ['question' => 'clutches we won'])->assertOk();
+
+        $this->assertSame([], $this->analystLlm->evidence['semantically_related_rounds']);
+    }
+
     public function test_semantic_retrieval_is_scoped_to_visible_matches(): void
     {
         $me = $this->asMember();

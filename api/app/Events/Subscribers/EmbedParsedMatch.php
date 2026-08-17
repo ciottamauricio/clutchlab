@@ -3,6 +3,8 @@
 namespace App\Events\Subscribers;
 
 use App\Actions\Analysis\BuildMatchCardAction;
+use App\Actions\Analysis\BuildRoundCardAction;
+use App\Contracts\RoundRetriever;
 use App\Contracts\SemanticRetriever;
 use App\Models\GameMatch;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +20,8 @@ class EmbedParsedMatch implements EventHandler
     public function __construct(
         private SemanticRetriever $retriever,
         private BuildMatchCardAction $card,
+        private RoundRetriever $rounds,
+        private BuildRoundCardAction $roundCard,
     ) {}
 
     public function handles(): string
@@ -52,5 +56,13 @@ class EmbedParsedMatch implements EventHandler
         }
 
         $this->retriever->index($match->id, $this->card->execute($match));
+
+        // Rounds too, at the grain below the match card. forget() first because a re-parse
+        // can produce fewer rounds than the previous one — indexing alone would leave the
+        // surplus behind as cards for rounds that no longer exist.
+        $this->rounds->forget($match->id);
+        foreach ($this->roundCard->forMatch($match->id) as $round) {
+            $this->rounds->index($match->id, (int) $round->round, $this->roundCard->execute($round));
+        }
     }
 }

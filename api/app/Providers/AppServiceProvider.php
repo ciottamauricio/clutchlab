@@ -11,6 +11,7 @@ use App\Contracts\EventBus;
 use App\Contracts\EventSubscriber;
 use App\Contracts\ParseQueue;
 use App\Contracts\PermissionService;
+use App\Contracts\RoundRetriever;
 use App\Contracts\SearchIndex;
 use App\Contracts\SemanticRetriever;
 use App\Events\Subscribers\ApplyMatchFailed;
@@ -28,6 +29,7 @@ use App\Queue\RedisEventSubscriber;
 use App\Queue\RedisParseQueue;
 use App\Search\MeilisearchIndex;
 use App\Search\PgVectorRetriever;
+use App\Search\PgVectorRoundRetriever;
 use App\Services\DbPermissionService;
 use App\Storage\S3DemoStorage;
 use App\Telemetry\Tracing;
@@ -92,6 +94,7 @@ class AppServiceProvider extends ServiceProvider
             default => new HashEmbeddings((int) config('clutch.embed.dimensions')),
         });
         $this->app->bind(SemanticRetriever::class, PgVectorRetriever::class);
+        $this->app->bind(RoundRetriever::class, PgVectorRoundRetriever::class);
 
         // Singleton so the per-request grant cache is shared across every check in a request.
         $this->app->singleton(PermissionService::class, DbPermissionService::class);

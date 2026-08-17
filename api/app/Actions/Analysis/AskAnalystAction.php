@@ -3,6 +3,7 @@
 namespace App\Actions\Analysis;
 
 use App\Contracts\AnalystLlm;
+use App\Contracts\RoundRetriever;
 use App\Contracts\SearchIndex;
 use App\Contracts\SemanticRetriever;
 use App\Models\GameMatch;
@@ -30,9 +31,16 @@ class AskAnalystAction
 
     private const RELATED_LIMIT = 5;
 
+    // Deliberately smaller than the match limit: round cards are the narrowest evidence
+    // here, and every one added lengthens the prompt — which is the slow part when the
+    // generator is a local model. Three is enough to answer "which rounds" without
+    // paying for detail most questions never use.
+    private const RELATED_ROUND_LIMIT = 3;
+
     public function __construct(
         private SearchIndex $search,
         private SemanticRetriever $semantic,
+        private RoundRetriever $rounds,
         private AnalystLlm $llm,
     ) {}
 
@@ -64,6 +72,10 @@ class AskAnalystAction
             // Semantic recall over the WHOLE visible set — can surface a relevant match
             // older than the recency window, the gap keyword+recency alone leaves.
             'semantically_related_matches' => $this->relatedMatches($question, $visibleIds),
+            // Same idea one level down: match cards can only answer "which game", so a
+            // question about a *situation* ("rounds we lost after winning the pistol")
+            // needs the round itself to be the retrievable unit.
+            'semantically_related_rounds' => $this->relatedRounds($question, $visibleIds),
             'recent_trainings' => $this->recentTrainings($user),
         ];
 
@@ -81,6 +93,7 @@ class AskAnalystAction
             'matches' => count($evidence['recent_matches']),
             'kills' => count($evidence['kills_matching_question']),
             'related' => count($evidence['semantically_related_matches']),
+            'rounds' => count($evidence['semantically_related_rounds']),
             'trainings' => count($evidence['recent_trainings']),
             'answer_chars' => mb_strlen($answer),
             'seconds' => round(microtime(true) - $started, 1),
@@ -93,6 +106,19 @@ class AskAnalystAction
     // finds exact words in kill rows; this finds matches whose *summary* means something
     // like the question ("our comeback games", "close matches on Nuke"). Degrades to []
     // if the vector store is unavailable — the answer still stands on the other evidence.
+    // Nearest ROUND cards — the same retrieval one level down, so a question about a
+    // situation ("eco rounds we stole", "clutches we lost") can land on the rounds
+    // themselves instead of only the games they happened in. Degrades to [] like its
+    // match-level twin: round detail is a bonus, never the reason an answer fails.
+    private function relatedRounds(string $question, array $visibleIds): array
+    {
+        try {
+            return $this->rounds->related($question, $visibleIds, self::RELATED_ROUND_LIMIT);
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
     private function relatedMatches(string $question, array $visibleIds): array
     {
         try {
