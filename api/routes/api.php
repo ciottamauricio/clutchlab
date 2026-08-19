@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\AnalystController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AwardsController;
+use App\Http\Controllers\DocsController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\ProfileController;
@@ -69,6 +70,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/tactics/{tactic}', [TacticController::class, 'updateTeam']);
         Route::delete('/tactics/{tactic}', [TacticController::class, 'destroy']);
     });
+
+    // The engineering study's docs Q&A. Deliberately outside every can: group: unlike the
+    // analyst, this corpus is the repository's own markdown — identical for every caller,
+    // scoped by nothing, and already readable by anyone who can read the repo. There is no
+    // per-user data to gate, so authentication alone is the honest boundary. Still
+    // throttled: each call spends local GPU time.
+    Route::post('/docs/ask', [DocsController::class, 'ask'])->middleware('throttle:10,1');
 
     Route::middleware('can:awards.view')->group(function () {
         Route::get('/awards', [AwardsController::class, 'index']);

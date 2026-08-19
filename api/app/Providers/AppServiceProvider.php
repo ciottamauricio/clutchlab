@@ -6,9 +6,10 @@ use Anthropic\Client as AnthropicClient;
 use App\Authorization\PermissionCatalog;
 use App\Contracts\AnalystLlm;
 use App\Contracts\DemoStorage;
+use App\Contracts\DocRetriever;
+use App\Contracts\DocsLlm;
 use App\Contracts\EmbeddingClient;
 use App\Contracts\EventBus;
-use App\Contracts\DocRetriever;
 use App\Contracts\EventSubscriber;
 use App\Contracts\ParseQueue;
 use App\Contracts\PermissionService;
@@ -21,8 +22,10 @@ use App\Events\Subscribers\EmailTrainingRoster;
 use App\Events\Subscribers\EmbedParsedMatch;
 use App\Events\Subscribers\EventHandler;
 use App\Llm\AnthropicAnalyst;
+use App\Llm\AnthropicDocsExplainer;
 use App\Llm\HashEmbeddings;
 use App\Llm\OllamaAnalyst;
+use App\Llm\OllamaDocsExplainer;
 use App\Llm\OllamaEmbeddings;
 use App\Models\User;
 use App\Queue\RedisEventBus;
@@ -96,6 +99,23 @@ class AppServiceProvider extends ServiceProvider
             ),
             default => new HashEmbeddings((int) config('clutch.embed.dimensions')),
         });
+        // The docs explainer, chosen by the SAME config as the analyst: one switch for
+        // "local or hosted", not two, so a study of the two providers can't drift into
+        // comparing a local answer against a hosted one. Different contract, different
+        // prompt — see DocsLlm for why this isn't a flag on AnalystLlm.
+        $this->app->bind(DocsLlm::class, fn () => match (config('clutch.analyst_provider')) {
+            'ollama' => new OllamaDocsExplainer(
+                $this->app->make(Http::class),
+                config('clutch.ollama.host'),
+                config('clutch.ollama.model'),
+                (int) config('clutch.ollama.timeout'),
+            ),
+            default => new AnthropicDocsExplainer(
+                new AnthropicClient(apiKey: config('clutch.anthropic.key')),
+                config('clutch.anthropic.model'),
+            ),
+        });
+
         $this->app->bind(SemanticRetriever::class, PgVectorRetriever::class);
         $this->app->bind(RoundRetriever::class, PgVectorRoundRetriever::class);
         $this->app->bind(DocRetriever::class, PgVectorDocRetriever::class);

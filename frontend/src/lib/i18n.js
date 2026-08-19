@@ -82,6 +82,12 @@ const MESSAGES = {
   'analyst.question_too_short': 'Ask a fuller question (at least 5 characters)',
   'analyst.question_too_long': 'Keep the question under 500 characters',
 
+  'docs.unavailable': 'The docs assistant is temporarily unavailable',
+  'docs.not_indexed': 'The documentation index is empty — run docs:embed to build it',
+  'docs.question_required': 'Type a question first',
+  'docs.question_too_short': 'Ask a fuller question (at least 5 characters)',
+  'docs.question_too_long': 'Keep the question under 500 characters',
+
   'error.unknown': 'Something went wrong',
 }
 

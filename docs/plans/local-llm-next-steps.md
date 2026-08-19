@@ -129,7 +129,7 @@ ivfflat. Re-measure again if kill-level cards ever land (~30x more).
 
 ---
 
-## 4. RAG over the project's own docs — DONE (retrieval only)
+## 4. RAG over the project's own docs — DONE
 
 **Why:** `ARCHITECTURE.md`, four `CLAUDE.md` files and nine domain docs are a corpus of
 *design rationale*. It answers "why is the parse queue a plain Redis list?" — a question
@@ -151,10 +151,23 @@ to. That's a real test of the abstraction, and the same mechanics as any
 
 **Cost:** ~3 hours. **Risk:** low, but least payoff per hour.
 
-**Built as `DocRetriever` + `doc_embeddings`, 224 chunks over 29 files.** Deliberately
-stops short of `AskAnalystAction`: the retriever and `docs:embed` are verified standalone,
-but no `semantically_related_docs` reaches the prompt yet. Letting an untuned corpus into
-every answer is how you make the analyst worse without noticing.
+**Built as `DocRetriever` + `doc_embeddings`, 224 chunks over 29 files.** It stopped short
+of `AskAnalystAction` on purpose, and it still does — letting an untuned corpus into every
+answer is how you make the analyst worse without noticing.
+
+**Since finished as its own endpoint** (`POST /docs/ask` → `AskDocsAction` + `DocsLlm`),
+surfaced as an ask-box on the engineering study page. Not a flag on the analyst: the two
+corpora scope by different things and cite different things, so they got separate contracts
+and separate prompts. Full write-up in `api/docs/domains/analyst.md`.
+
+The wiring taught one thing the retrieval work hadn't, and it was not a prompt lesson.
+**Answer quality collapsed on evidence VOLUME, not instructions.** Six excerpts (~8.5KB) and
+the 7B model abandoned the corpus for a generic essay about Redis; four (~4KB) and it gave
+the project's actual reason — identical prompt, identical retrieval, identical top score.
+Two prompt rewrites moved nothing. The related discovery: `[doc:path#heading]` citations
+never appeared at all, at any size, and numbered `[1]` markers appeared immediately — so
+the number-to-path mapping happens server-side. Both belong to step 5's risk profile too:
+the failures were invisible from the retrieval scores, which looked good throughout.
 
 **The abstraction question got its answer, and it was "stay separate".** This corpus scopes
 by nothing — no `match_id`, no per-user visibility — so `related()` takes no scope argument

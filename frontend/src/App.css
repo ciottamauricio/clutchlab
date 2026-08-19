@@ -4916,3 +4916,203 @@ a.brand:hover .brand-mark {
 
 .tr-next-player.rsvp-in { border-color: var(--win); color: var(--win); }
 .tr-next-player.rsvp-out { border-color: var(--danger); color: #8b98a9; text-decoration: line-through; }
+
+/* Ask the documentation — RAG over the repo's own markdown, sitting between the study's
+   hero and its diagram. Styled as an instrument rather than a chat window: the retrieval
+   scores are content here, because a weak score is the thing worth seeing. */
+.docs-ask {
+  margin: 0 0 30px;
+  padding: 20px 22px 22px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.docs-ask-head { margin-bottom: 16px; }
+
+.docs-ask-title {
+  font: 600 20px var(--display);
+  letter-spacing: 0.02em;
+  color: var(--text-h);
+  margin: 0 0 8px;
+}
+
+.docs-ask-sub {
+  max-width: 74ch;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 0;
+}
+
+.docs-ask-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.docs-ask-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text-h);
+  font-size: 14px;
+}
+
+.docs-ask-form input:focus {
+  outline: none;
+  border-color: var(--ct);
+}
+
+.docs-ask-form button {
+  padding: 9px 18px;
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border: none;
+  border-radius: 6px;
+  font: 600 12px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.docs-ask-form button:hover:not(:disabled) { background: var(--btn-bg-hover); }
+.docs-ask-form button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.docs-ask-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0 0 4px;
+}
+
+.docs-hint {
+  padding: 5px 10px;
+  background: none;
+  border: 1px dashed var(--border-strong);
+  border-radius: 20px;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.docs-hint:hover:not(:disabled) {
+  border-style: solid;
+  border-color: var(--ct);
+  color: var(--text-h);
+  background: var(--hover);
+}
+
+.docs-hint:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.docs-ask-wait {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.docs-answer {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.docs-q {
+  font: 500 12px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin: 0 0 10px;
+}
+
+.docs-a {
+  max-width: 74ch;
+  font-size: 15px;
+  line-height: 1.68;
+  color: var(--text-h);
+  margin: 0 0 18px;
+}
+
+/* Not a link: the markdown isn't served to the browser, so this marks the source
+   rather than navigating to it. */
+.docs-cite {
+  display: inline;
+  padding: 1px 6px;
+  margin: 0 1px;
+  background: var(--ct-bg);
+  border-radius: 4px;
+  color: var(--ct);
+  font: 500 11.5px var(--mono);
+  cursor: help;
+}
+
+.docs-sources {
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.docs-sources-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  font: 500 10.5px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.docs-score-note {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: var(--win);
+}
+
+.docs-score-note.weak { color: var(--t); }
+
+.docs-sources ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.docs-sources li {
+  display: grid;
+  grid-template-columns: 52px minmax(0, auto) minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+
+.docs-source-score {
+  font: 500 11.5px var(--mono);
+  color: var(--ct);
+}
+
+.docs-source-path {
+  font: 400 11.5px var(--mono);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.docs-source-heading {
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .docs-ask { padding: 16px; }
+  .docs-ask-form { flex-direction: column; }
+  .docs-sources li { grid-template-columns: 46px minmax(0, 1fr); }
+  .docs-source-heading { grid-column: 2; }
+}

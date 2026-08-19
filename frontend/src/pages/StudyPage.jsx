@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { TOPICS, GROUPS, groupedTopics } from '../features/study/tradeoffs'
 import Topology from '../features/study/Topology'
+import AskDocs from '../features/docs/AskDocs'
 
 // The engineering study: every architectural decision as a ledger of what it bought and what
 // it cost. Topics collapse; clicking a header toggles its explanation. Grounded in the repo's
@@ -48,6 +49,8 @@ export default function StudyPage() {
           <Link to="/present" className="study-present-link">Present mode →</Link>
         </div>
       </header>
+
+      <AskDocs />
 
       <Topology />
 

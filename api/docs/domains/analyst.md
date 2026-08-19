@@ -214,9 +214,56 @@ follow (`--dry` lists what would be chunked without calling the embedder).
 | Method & path | Auth | Notes |
 |---|---|---|
 | POST `/api/analyst/ask` | sanctum + `can:search.use`, throttle 10/min | body `{question: string 5..500}` → `{data: {answer}}`; 503 `analyst.unavailable` when degraded |
+| POST `/api/docs/ask` | sanctum only, throttle 10/min | body `{question: string 5..500}` → `{data: {answer, sources[]}}`; 503 `docs.unavailable` / `docs.not_indexed` |
 
 Error codes: `analyst.question_required`, `analyst.question_too_short`,
-`analyst.question_too_long`, `analyst.unavailable`.
+`analyst.question_too_long`, `analyst.unavailable`; `docs.question_required`,
+`docs.question_too_short`, `docs.question_too_long`, `docs.unavailable`,
+`docs.not_indexed`.
+
+### Why `/docs/ask` is gated by authentication alone
+
+Every other retrieval route sits behind an ability because it reads *the caller's* data,
+and the ability names which slice. This corpus is the repository's own markdown: identical
+for every caller, scoped by nothing, and already readable by anyone who can read the repo.
+There is no slice to name. Authentication still applies, because each call spends local GPU
+time — the boundary being protected is the machine, not the content.
+
+## The docs loop (`POST /docs/ask`)
+
+A second, shorter RAG loop over `doc_embeddings`: retrieve the nearest chunks of the
+project's own markdown → generate. It shares `EmbeddingClient` with the analyst and shares
+nothing else — separate action (`AskDocsAction`), separate contract (`DocsLlm`), separate
+prompt, separate endpoint. `AnalystLlm` mandates `[match:N]` citations, which a design
+document cannot satisfy; asking a small model to cite ids absent from its evidence is an
+invitation to invent them.
+
+Two numbers in this loop were measured rather than chosen, and both contradict the
+intuition that a better prompt is the lever:
+
+- **`CHUNK_LIMIT = 4`.** At six excerpts (~8.5KB) the 7B model stopped answering from the
+  corpus and produced a fluent, generic essay about Redis — seven advantages, none of them
+  this project's reason. At four (~4KB) the same question, same retrieval and same top
+  score (0.684) produced the actual reason: Laravel's queue serializes PHP job objects Go
+  cannot read. Rewriting the prompt twice changed nothing; cutting the evidence changed
+  everything. **More retrieval is not more grounding** — past some volume a small model
+  treats the excerpts as background and falls back on what it already knows.
+- **Numbered citations.** `[doc:path#heading]` produced *zero* citations at every evidence
+  size; a 7B model will not reproduce a long punctuated path mid-sentence. Numbered
+  excerpts cited as `[1]` worked immediately, and `AskDocsAction::resolveCitations()`
+  expands them back into paths — so the model's limitation stays server-side and the
+  frontend still sees stable `[doc:…]` markers. A number with no matching excerpt is
+  dropped rather than rendered: that is an invented citation.
+
+`sources[]` carries `path`, `heading` and `similarity` but never the chunk text — the text
+is already the prompt, and echoing it would send the page kilobytes of markdown it never
+renders. The score is returned because it is the honest part: it separates "the docs
+answered this" from "the model improvised over weak matches", and the study page shows it.
+
+**Known ceiling.** Conceptual questions retrieve well (~0.63–0.76). Questions naming a
+*symbol* do not — "what does `DocRetriever` do" tops out at ~0.52 and misses sections that
+answer it directly. The embedder knows prose; an identifier is not a word to it. The study
+page deliberately keeps one such question among its suggestions.
 
 ## Config
 
@@ -277,11 +324,11 @@ that session's stderr, not the container's, so only real requests appear in Loki
 - **Crude embeddings, when the hash stand-in is selected.** `EMBED_PROVIDER=hash` captures
   word overlap with light stemming, not meaning — "duel" won't find "fight". It exists so
   the architecture runs with no external anything; `ollama` is the real embedder.
-- **The docs corpus is retrievable but not consulted.** `doc_embeddings` is built and
-  queryable, and the analyst never sees it: no `semantically_related_docs` is in the
-  evidence payload. Wiring it in is a deliberate second decision, because a corpus that
-  answers "why is it built this way?" competes for prompt space with the evidence that
-  answers "what happened in our matches?" — and the second is what the analyst is for.
+- **The docs corpus is never consulted BY THE ANALYST.** `doc_embeddings` has its own
+  endpoint now (`POST /docs/ask`, see below), but no `semantically_related_docs` is in the
+  analyst's evidence payload and none is planned: a corpus answering "why is it built this
+  way?" would compete for prompt space with the evidence answering "what happened in our
+  matches?", and the second is what the analyst is for. The two loops stay apart.
 - **The docs index goes stale silently.** It projects the working tree, not Postgres, and
   nothing publishes a "docs changed" event. Edit a doc and the index describes the old one
   until `docs:embed` runs again. The match and round indexes don't have this problem —
