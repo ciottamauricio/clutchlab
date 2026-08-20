@@ -33,5 +33,11 @@ func main() {
 	})
 
 	log.Printf("listening on %s", cfg.HTTPAddr)
+	// Plain HTTP is correct here, and the reason lives in files a static analyser
+	// cannot see: this service publishes no ports (docker-compose.yml), so it is
+	// reachable only on clutchnet, and TLS terminates at nginx, which proxies
+	// /realtime/ and upgrades the websocket. Serving TLS on this hop would mean
+	// certs on an internal bridge network that never leaves the host.
+	// nosemgrep: go.lang.security.audit.net.use-tls.use-tls
 	log.Fatal(http.ListenAndServe(cfg.HTTPAddr, mux))
 }

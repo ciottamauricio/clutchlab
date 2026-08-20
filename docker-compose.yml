@@ -218,6 +218,40 @@ services:
     depends_on: [loki]
     networks: [clutchnet]
 
+  # Static analysis, on demand. Behind a profile so `docker compose up` never starts it:
+  # this is a tool that runs and exits, not a service. Invoke it explicitly —
+  #
+  #   docker compose run --rm semgrep
+  #
+  # Baseline for step 5 of docs/plans/local-llm-next-steps.md: 221 rules over 435 files
+  # found nothing real, so the LLM triage layer sketched there was NOT built — one false
+  # positive is not a corpus to rank. Pinned and deterministic; the repo scans clean, so
+  # a new finding means new code, not a new ruleset.
+  #
+  # The repo is mounted read-only: a scanner has no business writing to the tree it scans.
+  # Rules are cached in a named volume so repeat runs don't re-fetch the registry, and
+  # SEMGREP_SEND_METRICS=off keeps findings metadata on this machine (the default
+  # --config=auto would phone home).
+  semgrep:
+    image: semgrep/semgrep:1.86.0
+    profiles: [tools]
+    environment:
+      SEMGREP_SEND_METRICS: "off"
+    volumes:
+      - .:/src:ro
+      - semgrepcache:/root/.semgrep
+    working_dir: /src
+    # Overridable: `docker compose run --rm semgrep semgrep --config=p/php api/app`
+    command: >
+      semgrep scan
+        --config=p/security-audit
+        --config=p/php
+        --config=p/javascript
+        --config=p/golang
+        --metrics=off
+        --error
+    networks: [clutchnet]
+
 volumes:
   pgdata:
   miniodata:
@@ -225,6 +259,7 @@ volumes:
   lokidata:
   grafanadata:
   ollamadata:
+  semgrepcache:
 
 networks:
   clutchnet:

@@ -202,27 +202,123 @@ ranking at the bottom of this list was right.
 
 ---
 
-## 5. Security review over the codebase
+## 5. Security review: analysers find, the model triages — MEASURED, NOT BUILT
 
-**Why:** the bug-bounty workflow from the class — embed the code, ask where user input
-reaches a sink.
+**Why:** the bug-bounty workflow from the class, with the halves swapped. The obvious
+build — embed the code, ask the model where user input reaches a sink — is the one this
+step deliberately does *not* do, because step 4 already measured why it fails.
 
-**Shape:** same as step 4 with a different corpus and prompt, chunked by class or method.
+**The evidence against the naive version, all of it already collected here:**
 
-**Ranked last, deliberately.** A 7B model produces confident false positives on real code,
-and verifying them costs more than the tool saves. Treat this as a study of *why*
-RAG-over-code is hard — chunking loses call-graph context, and a model that can't follow a
-value across files can't tell a sanitized path from an unsanitized one. Your Laravel
-conventions (Form Requests validating at the boundary, actions never trusting input) are a
-good test set precisely because a naive reviewer flags them constantly.
+- **Retrieval breaks on exactly this query shape.** Step 4's ceiling: conceptual questions
+  land at 0.682, but a question naming a symbol scores 0.523 and misses the section that
+  answers it. Every security question names a symbol — which sink, which call, which
+  variable. This is the corpus the embedder is worst at, asked the way it is worst at.
+- **The failure would be fluent.** Topic 22's `Redis list` answer was seven confident,
+  generically true statements that never reached the real reason. Pointed at security that
+  produces confident, generically true vulnerabilities that are not in the code — and a
+  false positive costs more to disprove than a finding saves.
+- **Chunking loses the thing that matters.** Splitting by class or method breaks the
+  cross-file flow that separates a sanitized path from an unsanitized one.
+
+**Shape:** deterministic analysers produce the findings; the model only explains and ranks
+them. Three layers:
+
+1. **Find candidates** — `semgrep` (PHP + JS), `gosec` (three Go services), `npm audit`,
+   optionally Larastan. No hallucination possible: each finding cites a real file and line.
+2. **Enrich** — `DocRetriever`, unchanged, pulls the design rationale for the touched
+   boundary. This is the query shape that *does* retrieve well: prose about why a seam
+   exists, not the identifier at the callsite.
+3. **Triage** — `qwen2.5-coder:7b` behind `AnalystLlm`, answering one bounded question per
+   finding: given this rule fired here, and this is how the boundary is meant to work, does
+   it matter and why?
+
+The model is never asked whether a vulnerability *exists* — the analyser settled that. It
+is asked whether one matters. That bound is what makes a 7B model usable here at all.
+
+**Teaches:**
+- A fourth corpus with a different lifetime: findings are regenerated every run, where
+  matches, rounds and docs are indexed once and updated. A projection that is disposable
+  by the run rather than by the rebuild.
+- A third `AnalystLlm` consumer after the analyst and `DocsLlm` — the first real evidence
+  of whether that contract generalizes or has merely bent twice.
+- One normalized finding contract across five toolchains in three languages. Same problem
+  as the parse queue: a JSON shape two ecosystems must agree on, changed on both sides in
+  one commit.
 
 **Watch out for:**
-- Chunking code by class breaks exactly the cross-file flow that matters.
-- No ground truth. Without known-bad samples you can't tell a good run from a bad one —
-  seeding a deliberate flaw is the only honest way to measure.
+- **No ground truth.** Without a known-bad sample you cannot tell a good run from a bad
+  one. Seed a deliberate flaw — an unvalidated route, a raw `DB::select` with an
+  interpolated id — and confirm the pipeline surfaces it before trusting a clean report.
+- **The evidence budget applies here too.** Step 4 measured the cliff between four and six
+  excerpts. A triage prompt carries a finding, a code window and doc context; assume the
+  same ceiling and measure rather than assuming a bigger window helps.
+- **The house conventions will generate the noise.** Form Requests validating at the
+  boundary and actions trusting internal input mean a naive reviewer flags the codebase
+  constantly. That is the point of the test set: the useful output is a *short* list.
+- **Findings are worth less than the count suggests** on code you wrote yourself. Same
+  honest limit as the docs corpus — the lesson is architectural.
+- Keep it out of `AskAnalystAction`, for the reason step 4 stopped short of the same wiring.
 
-**Cost:** ~4 hours. **Risk:** low technically, high in wasted effort if treated as a
-real scanner.
+**The measurable question, which is the write-up:** does 7B triage beat sorting by the
+analyser's own severity field? That is a real baseline, and a negative result is worth as
+much as a positive one — exactly like the local-vs-hosted generation split in topic 22.
+
+**First move, before any of the above:** run one analyser over `api/app` and `worker/`,
+read the raw findings by hand, and count the true positives. If a deterministic tool finds
+nothing interesting across 17.5k lines, the triage layer has nothing to rank and the step
+ends there having cost an hour. Same discipline as the placeholder embedder — run the
+cheap, dumb version first and let it tell you whether the real one is worth building.
+
+**Cost:** ~1 hour for the baseline; ~4-5 hours for the full pipeline. **Risk:** low
+technically. The real risk is treating the output as a scanner rather than a study.
+
+**Baseline run — the step stopped here, which was the plan working.** `semgrep` pinned at
+1.86.0 as a Compose service behind a `tools` profile (`docker compose run --rm semgrep`),
+so it never starts with `up` and the repo is mounted read-only.
+
+| Scan | Rules | Files | Findings |
+| --- | --- | --- | --- |
+| `api/app`, PHP rules | 25 | 141 | 0 |
+| Whole repo, 5 rulesets | 221 | 435 | 1 |
+
+**The one finding was a false positive**, and an unusually instructive one:
+`use-tls` on `http.ListenAndServe` in `realtime/cmd/realtime/main.go`. Plain HTTP is
+correct there — the service publishes no ports, so it is reachable only on `clutchnet`,
+and TLS terminates at nginx, which already proxies `/realtime/` and upgrades the socket.
+
+**The mitigation is invisible to the analyser, which is the whole finding.** Semgrep
+pattern-matches one call; it cannot read `docker-compose.yml` for the absent `ports:`, or
+the nginx conf for where TLS ends. Static analysis evaluates a callsite, not a deployment.
+Making it "pass" honestly would mean certs on an internal bridge network that never leaves
+the host — a worse architecture chosen to satisfy a tool.
+
+So the trigger condition fired: **one false positive is not a corpus to triage.** A
+ranking layer built on it would have nothing to rank, and no way to tell a good run from a
+bad one — the no-ground-truth risk above, arriving immediately. The pipeline is not built.
+
+Two results worth keeping, because 0 findings is not the same as nothing learned:
+
+- **The conventions are load-bearing, measurably.** Form Requests at the boundary and
+  actions that don't re-validate mean the taint patterns these rules hunt — raw superglobals
+  into a query, interpolated SQL, `eval` — structurally do not occur. This step predicted the
+  house style would generate *noise*; it generated silence, which is the better surprise.
+- **The false positive is the test case for the triage layer**, if it is ever built. A
+  correct triage must reject it, and can only get there from three files the finding never
+  mentions. That is exactly the context `DocRetriever` holds. Honest caveat: a corpus of one
+  proves nothing — a layer that agrees with everything also "passes". It needs the seeded
+  flaw as a counterweight, so it has to say *yes* to one and *no* to the other.
+
+**What was kept.** The suppression, as documentation: an explanation of the boundary above
+the call, with `nosemgrep` on the line directly beneath it. Placement is load-bearing — the
+marker one line further up is silently ignored and the finding stays live, which is worse
+than no suppression, because it looks handled. Repo now scans clean at 221 rules.
+
+**On CI:** deliberately not added. A repo-wide scanner that is green forever, with an
+ignore list nobody reviews, is how a security gate becomes decoration. If it is ever worth
+adding, the shape is a diff-scoped step (`--baseline-commit`) inside each existing
+per-service workflow, next to `pint --test` and `go vet` — not a sixth always-on workflow,
+which would break the path-filtering every other workflow here is built on.
 
 ---
 
@@ -231,6 +327,11 @@ real scanner.
 **1 → 2 → 3** is the recommended path: fix staleness, make local generation usable, then
 make answers better. 4 and 5 are optional side-quests that reuse the machinery rather
 than extending it.
+
+5 changed shape rather than moving up the list. It stays last because the payoff is still
+a study rather than a tool, but it is no longer ranked last for being unbuildable — the
+analyser-first split is a different design, and step 4 supplied the measurements that
+argued for it.
 
 Steps 1-3 all touch the analyst, so each should land with `analyst.md` updated in the same
 commit — the domain-doc rule in `api/CLAUDE.md`.
