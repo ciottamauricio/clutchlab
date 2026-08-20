@@ -13,6 +13,7 @@ import ProfilePage from './pages/ProfilePage'
 import StudyPage from './pages/StudyPage'
 import PresentPage from './pages/PresentPage'
 import TrainingsPage from './pages/TrainingsPage'
+import OllamaStudyPage from './pages/OllamaStudyPage'
 import './App.css'
 
 function Protected({ children }) {
@@ -41,6 +42,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/ollama-study" element={<OllamaStudyPage />} />
           <Route
             element={
               <Protected>

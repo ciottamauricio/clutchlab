@@ -1,0 +1,1130 @@
+{
+  "info": {
+    "_postman_id": "0b92889e-4e42-4e2f-82f2-8f5c307e8fa8",
+    "name": "Ollama - Relacao entre dois textos (pt-BR)",
+    "description": "Duas abordagens para validar se dois textos em portugues do Brasil estao relacionados:\n\n**A. Embeddings** (`/api/embed`) - transforma cada texto num vetor e compara por similaridade de cosseno. Rapido (~100ms), deterministico, barato. Mede *proximidade de assunto*.\n\n**B. Geracao LLM** (`/api/chat`) - pergunta ao modelo se os textos se relacionam, com resposta em JSON estruturado. Mais lento, mas entende *relacao logica* (causa, contradicao, negacao).\n\n---\n\n### Calibragem medida nesta maquina\n\nCom `nomic-embed-text` em pt-BR, os valores reais observados:\n\n| Par | Cosseno |\n|---|---|\n| Parafrase (mesma frase reescrita) | **0.778** |\n| Mesmo tema, acao oposta (plantou vs defendeu) | **0.542** |\n| Totalmente sem relacao (bomba vs bolo de cenoura) | **0.534** |\n| Sem relacao entre si (bolo vs pneu) | **0.508** |\n\n**O piso nao e zero - e ~0.52.** O modelo comprime tudo numa faixa estreita, entao um limiar ingenuo de `> 0.5` classificaria bolo de cenoura e pneu de carro como relacionados. O limiar util fica em **0.65-0.70** (variavel `limiar_similaridade`).\n\nRepare tambem que \"plantou a bomba no site A\" e \"defendeu o site A\" ficam em 0.542, quase no piso: embeddings capturam *tema*, nao *relacao logica*. Esse e exatamente o caso em que a abordagem B compensa o custo - veja a request **B3**.\n\n### Custo real medido (nao e ~60s)\n\n| | Embedding (A1) | LLM (B1) |\n|---|---|---|\n| Modelo ja carregado | ~60 ms | ~1.2 s |\n| Primeira chamada (carrega o modelo) | ~1.2 s | ~60 s |\n\nA diferenca entre 1.2s e 60s no LLM e **carregar o modelo na memoria**, nao gerar a resposta. O compose define `OLLAMA_KEEP_ALIVE: 30s`, entao o modelo e descarregado depois de 30 segundos parado - e a proxima chamada paga o minuto inteiro de novo.\n\nSe estiver testando de forma intermitente e cansar de esperar, suba o keep-alive por chamada com `\"keep_alive\": \"10m\"` no corpo da request.\n\nCom tudo quente, o LLM custa ~20x o embedding - nao ~600x. Ainda assim o embedding ganha quando os dois concordam.\n\n### Antes de rodar\n\nO container `ollama` **nao expoe a porta 11434 no host**. Veja a pasta `0. Setup` para as opcoes de acesso.\n\nVetores do `nomic-embed-text` ja voltam normalizados (norma = 1.0), entao o cosseno e apenas o produto escalar - mas os scripts normalizam mesmo assim, para funcionarem se voce trocar de modelo.\n\n### Verificacao\n\nAs requests foram executadas contra o Ollama desta maquina (`nomic-embed-text` + `qwen2.5-coder:7b`) com o Newman: **29 asserts, 0 falhas** (11 requests - a S2, que baixa modelo, ficou de fora). Os numeros nesta documentacao sao medidos, nao estimados.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:11434",
+      "type": "string",
+      "description": "Endereco do Ollama. Exige que a porta esteja publicada no host - veja a pasta 0. Setup."
+    },
+    {
+      "key": "modelo_embed",
+      "value": "nomic-embed-text",
+      "type": "string",
+      "description": "Modelo de embedding. Ja disponivel no container. 768 dimensoes."
+    },
+    {
+      "key": "modelo_llm",
+      "value": "qwen2.5-coder:7b",
+      "type": "string",
+      "description": "Modelo de geracao. E a variante 'coder' - funciona, mas para pt-BR o qwen2.5:7b puro e melhor: docker exec clutchlab-project-ollama-1 ollama pull qwen2.5:7b"
+    },
+    {
+      "key": "limiar_similaridade",
+      "value": "0.65",
+      "type": "string",
+      "description": "Acima disto = relacionado. Calibrado para nomic-embed-text em pt-BR: a request A4 mediu 0.6841 como o mais fraco dos pares relacionados e 0.5823 como o mais forte dos nao relacionados, sugerindo 0.633. Arredondado para 0.65. Troque de modelo e recalibre com a A4."
+    },
+    {
+      "key": "chamado_a",
+      "value": "O sistema esta fora do ar",
+      "type": "string",
+      "description": "Primeiro chamado de suporte. Usado por A1, A3, B1, B2, B4, C1, C2 e D2."
+    },
+    {
+      "key": "chamado_b",
+      "value": "Nao consigo acessar a plataforma de jeito nenhum",
+      "type": "string",
+      "description": "Segundo chamado de suporte. Usado por A1, A3, B1, B2, B4, C1, C2 e D2."
+    },
+    {
+      "key": "prompt_sistema_suporte",
+      "value": "Voce analisa chamados de suporte de um sistema para empresas de transporte (SaaS).\n\nDois chamados sao RELACIONADOS quando descrevem o MESMO problema tecnico - mesma causa e mesma solucao - ainda que o cliente use palavras completamente diferentes.\n\nDois chamados NAO sao relacionados quando tratam de problemas distintos, ainda que usem palavras parecidas. Preste atencao especial a:\n- documentos fiscais diferentes (CTe, MDFe, NFe) sao problemas DIFERENTES\n- acoes diferentes sobre a mesma entidade (emitir vs cadastrar vs cancelar) sao DIFERENTES\n- 'sistema lento' e 'sistema fora do ar' sao problemas DIFERENTES\n- adicionar vs remover algo sao problemas DIFERENTES\n\nResponda SOMENTE JSON: {\"relacionado\": boolean, \"confianca\": 0 a 1, \"motivo\": \"frase curta em portugues\"}",
+      "type": "string",
+      "description": "Prompt de sistema com o contexto de transporte, usado pela bateria D4."
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Setup",
+      "description": "Verificacoes de conectividade e modelos. Rode isto primeiro.",
+      "item": [
+        {
+          "name": "S1 - Ollama esta no ar?",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Ollama respondeu', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const modelos = pm.response.json().models || [];",
+                  "    console.log('Modelos disponiveis:');",
+                  "    modelos.forEach(m => console.log('  - ' + m.name + '  (' + (m.size/1e9).toFixed(2) + ' GB)'));",
+                  "",
+                  "    const nomes = modelos.map(m => m.name);",
+                  "    const embed = pm.collectionVariables.get('modelo_embed');",
+                  "    const llm = pm.collectionVariables.get('modelo_llm');",
+                  "",
+                  "    pm.test('modelo_embed (' + embed + ') esta baixado', function () {",
+                  "        pm.expect(nomes.some(n => n.startsWith(embed))).to.be.true;",
+                  "    });",
+                  "    pm.test('modelo_llm (' + llm + ') esta baixado', function () {",
+                  "        pm.expect(nomes.some(n => n.startsWith(llm))).to.be.true;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tags",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tags"
+              ]
+            },
+            "description": "Lista os modelos baixados.\n\n**Se der connection refused:** o container `ollama` do clutchlab nao publica a porta 11434 no host. Escolha uma opcao:\n\n**Opcao 1 - tunel temporario (nao altera o projeto):**\n```bash\ndocker run -d --rm --name ollama-bridge \\\n  --network clutchlab-project_clutchnet \\\n  -p 11434:11434 alpine/socat \\\n  TCP-LISTEN:11434,fork,reuseaddr TCP:ollama:11434\n```\nPare depois com `docker stop ollama-bridge`.\n\n**Opcao 2 - publicar a porta no compose:** adicione ao servico `ollama` em `docker-compose.yml`:\n```yaml\n    ports:\n      - \"11434:11434\"\n```\ne rode `docker compose up -d ollama`.\n\nComo este e outro projeto que so esta usando o Ollama do clutchlab, a Opcao 1 e a mais limpa - nao mexe no repo."
+          }
+        },
+        {
+          "name": "S2 - Baixar modelo (se faltar algum)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"qwen2.5:7b\",\n  \"stream\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pull",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pull"
+              ]
+            },
+            "description": "Baixa um modelo. Com `stream: false` a request fica pendurada ate terminar o download (varios minutos, alguns GB) - aumente o timeout do Postman em Settings -> General -> Request timeout.\n\nSugestao: `qwen2.5:7b` (nao-coder) lida melhor com portugues do que o `qwen2.5-coder:7b` que ja esta instalado.\n\nAlternativa mais rapida pelo terminal:\n```bash\ndocker exec clutchlab-project-ollama-1 ollama pull qwen2.5:7b\n```"
+          }
+        }
+      ]
+    },
+    {
+      "name": "A. Abordagem por Embeddings",
+      "description": "Vetoriza os dois textos e compara por cosseno. Rapido e deterministico.\n\nA request principal e a **A1** - ela envia os dois textos numa chamada so e faz todo o calculo no script de teste.",
+      "item": [
+        {
+          "name": "A1 - Comparar dois textos (principal)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "const vetores = body.embeddings;",
+                  "",
+                  "pm.test('Recebeu 2 vetores', function () {",
+                  "    pm.expect(vetores).to.be.an('array').with.lengthOf(2);",
+                  "});",
+                  "",
+                  "function cosseno(a, b) {",
+                  "    let dot = 0, na = 0, nb = 0;",
+                  "    for (let i = 0; i < a.length; i++) {",
+                  "        dot += a[i] * b[i];",
+                  "        na  += a[i] * a[i];",
+                  "        nb  += b[i] * b[i];",
+                  "    }",
+                  "    return dot / (Math.sqrt(na) * Math.sqrt(nb));",
+                  "}",
+                  "",
+                  "const sim = cosseno(vetores[0], vetores[1]);",
+                  "const limiar = parseFloat(pm.collectionVariables.get('limiar_similaridade'));",
+                  "const relacionado = sim >= limiar;",
+                  "",
+                  "console.log('-'.repeat(58));",
+                  "console.log('CHAMADO A : ' + pm.collectionVariables.get('chamado_a'));",
+                  "console.log('CHAMADO B : ' + pm.collectionVariables.get('chamado_b'));",
+                  "console.log('-'.repeat(58));",
+                  "console.log('Dimensoes   : ' + vetores[0].length);",
+                  "console.log('Similaridade: ' + sim.toFixed(4));",
+                  "console.log('Limiar      : ' + limiar);",
+                  "console.log('VEREDITO    : ' + (relacionado ? 'RELACIONADOS' : 'NAO RELACIONADOS'));",
+                  "console.log('-'.repeat(58));",
+                  "console.log('Referencia (nomic-embed-text, pt-BR):');",
+                  "console.log('  ~0.78 parafrase | ~0.54 mesmo tema | ~0.52 sem relacao');",
+                  "",
+                  "// Disponivel para encadear com outras requests",
+                  "pm.collectionVariables.set('ultima_similaridade', sim.toFixed(4));",
+                  "",
+                  "pm.test('Similaridade calculada: ' + sim.toFixed(4) + (relacionado ? ' -> RELACIONADOS' : ' -> NAO RELACIONADOS'), function () {",
+                  "    pm.expect(sim).to.be.within(-1, 1);",
+                  "});",
+                  "",
+                  "pm.test('Resposta rapida (< 2s)', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"{{modelo_embed}}\",\n  \"input\": [\n    \"{{chamado_a}}\",\n    \"{{chamado_b}}\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/embed",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "embed"
+              ]
+            },
+            "description": "**Esta e a request principal da abordagem por embeddings.**\n\nManda os dois textos de uma vez (o campo `input` aceita array) e a aba **Tests** calcula o cosseno, compara com `limiar_similaridade` e imprime o veredito no Console (View -> Show Postman Console).\n\nPara testar seus proprios textos, edite as variaveis `chamado_a` e `chamado_b` da collection - ou digite direto no body.\n\n**Endpoint:** `/api/embed` e o atual. O antigo `/api/embeddings` (singular, campo `prompt`, um texto por vez) ainda funciona mas esta deprecado - veja a request A3.\n\n**O resultado e deterministico:** mesma entrada, mesmo vetor, sempre. Nao ha `temperature` aqui."
+          }
+        },
+        {
+          "name": "A2 - Um texto contra varios (ranking)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const vetores = pm.response.json().embeddings;",
+                  "",
+                  "// Mesma ordem do array 'input' no body",
+                  "const rotulos = [",
+                  "    'REFERENCIA: jogador plantou a bomba no bombsite A',",
+                  "    'A bomba foi plantada no site A pelo player',",
+                  "    'O CT desarmou a bomba faltando 2 segundos',",
+                  "    'A equipe adversaria defendeu o site A com sucesso',",
+                  "    'Preciso trocar o pneu do carro amanha',",
+                  "    'A receita de bolo de cenoura leva tres ovos'",
+                  "];",
+                  "",
+                  "function cosseno(a, b) {",
+                  "    let dot = 0, na = 0, nb = 0;",
+                  "    for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }",
+                  "    return dot / (Math.sqrt(na) * Math.sqrt(nb));",
+                  "}",
+                  "",
+                  "const limiar = parseFloat(pm.collectionVariables.get('limiar_similaridade'));",
+                  "const ref = vetores[0];",
+                  "",
+                  "const ranking = [];",
+                  "for (let i = 1; i < vetores.length; i++) {",
+                  "    ranking.push({ texto: rotulos[i], sim: cosseno(ref, vetores[i]) });",
+                  "}",
+                  "ranking.sort((x, y) => y.sim - x.sim);",
+                  "",
+                  "console.log('='.repeat(64));",
+                  "console.log(rotulos[0]);",
+                  "console.log('='.repeat(64));",
+                  "ranking.forEach((r, i) => {",
+                  "    const marca = r.sim >= limiar ? '[SIM]' : '[nao]';",
+                  "    console.log(`${i+1}. ${marca} ${r.sim.toFixed(4)}  ${r.texto}`);",
+                  "});",
+                  "console.log('='.repeat(64));",
+                  "console.log('Limiar: ' + limiar);",
+                  "console.log('');",
+                  "console.log('Repare: \"defendeu o site A\" fica perto do piso, mesmo');",
+                  "console.log('sendo o mesmo tema. Embedding mede assunto, nao logica.');",
+                  "",
+                  "pm.test('A parafrase e a mais similar de todas', function () {",
+                  "    pm.expect(ranking[0].texto).to.include('plantada no site A');",
+                  "});",
+                  "",
+                  "pm.test('Textos sem relacao ficam abaixo do limiar', function () {",
+                  "    const foraDoTema = ranking.filter(r => r.texto.includes('pneu') || r.texto.includes('bolo'));",
+                  "    foraDoTema.forEach(r => pm.expect(r.sim, r.texto).to.be.below(limiar));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"{{modelo_embed}}\",\n  \"input\": [\n    \"O jogador plantou a bomba no bombsite A\",\n    \"A bomba foi plantada no site A pelo player\",\n    \"O CT desarmou a bomba faltando 2 segundos\",\n    \"A equipe adversaria defendeu o site A com sucesso\",\n    \"Preciso trocar o pneu do carro amanha\",\n    \"A receita de bolo de cenoura leva tres ovos\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/embed",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "embed"
+              ]
+            },
+            "description": "O primeiro texto e a referencia; os demais sao comparados contra ele e ordenados por similaridade no Console.\n\nE assim que voce faria uma busca semantica: vetoriza o corpus uma vez, guarda os vetores, e compara a consulta contra eles.\n\nUma chamada com N textos e bem mais rapida que N chamadas - o modelo carrega uma vez so."
+          }
+        },
+        {
+          "name": "A3 - Endpoint legado /api/embeddings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test('Formato antigo: campo \"embedding\" singular, vetor plano', function () {",
+                  "    pm.expect(body).to.have.property('embedding');",
+                  "    pm.expect(body.embedding[0]).to.be.a('number');",
+                  "});",
+                  "",
+                  "console.log('Dimensoes: ' + body.embedding.length);",
+                  "console.log('');",
+                  "console.log('Diferencas para /api/embed (o atual):');",
+                  "console.log('  campo de entrada : prompt (string) vs input (string|array)');",
+                  "console.log('  campo de saida   : embedding (vetor) vs embeddings (array de vetores)');",
+                  "console.log('  varios textos    : nao vs sim');",
+                  "console.log('  normalizacao     : cru vs normalizado');",
+                  "console.log('');",
+                  "console.log('Use /api/embed no projeto novo. Esta request existe so');",
+                  "console.log('para voce reconhecer o formato antigo em tutoriais.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"{{modelo_embed}}\",\n  \"prompt\": \"{{chamado_a}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/embeddings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "embeddings"
+              ]
+            },
+            "description": "**Deprecado - nao use em codigo novo.** Esta aqui porque a maior parte dos tutoriais que voce vai achar no Google ainda mostra este formato, e vale reconhecer a diferenca.\n\nAceita um texto por vez (`prompt`, string) e devolve `embedding` (vetor plano) em vez de `embeddings` (array de vetores)."
+          }
+        },
+        {
+          "name": "A4 - Calibrar o limiar",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const v = pm.response.json().embeddings;",
+                  "",
+                  "function cos(a, b) {",
+                  "    let d = 0, na = 0, nb = 0;",
+                  "    for (let i = 0; i < a.length; i++) { d += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }",
+                  "    return d / (Math.sqrt(na) * Math.sqrt(nb));",
+                  "}",
+                  "",
+                  "// Pares consecutivos: (0,1) devem ser relacionados, (2,3) tambem, etc.",
+                  "const pares = [",
+                  "    { i: 0, j: 1, esperado: true,  desc: 'parafrase direta' },",
+                  "    { i: 2, j: 3, esperado: true,  desc: 'mesmo fato, outras palavras' },",
+                  "    { i: 4, j: 5, esperado: true,  desc: 'pergunta e resposta do mesmo tema' },",
+                  "    { i: 6, j: 7, esperado: false, desc: 'assuntos totalmente distintos' },",
+                  "    { i: 8, j: 9, esperado: false, desc: 'assuntos totalmente distintos' }",
+                  "];",
+                  "",
+                  "const positivos = [], negativos = [];",
+                  "",
+                  "console.log('='.repeat(64));",
+                  "console.log('CALIBRAGEM DO LIMIAR');",
+                  "console.log('='.repeat(64));",
+                  "",
+                  "pares.forEach(p => {",
+                  "    const s = cos(v[p.i], v[p.j]);",
+                  "    (p.esperado ? positivos : negativos).push(s);",
+                  "    console.log(`${p.esperado ? 'RELACIONADO ' : 'SEM RELACAO '} ${s.toFixed(4)}  (${p.desc})`);",
+                  "});",
+                  "",
+                  "const menorPositivo = Math.min(...positivos);",
+                  "const maiorNegativo = Math.max(...negativos);",
+                  "",
+                  "console.log('-'.repeat(64));",
+                  "console.log('Menor entre os relacionados : ' + menorPositivo.toFixed(4));",
+                  "console.log('Maior entre os sem relacao  : ' + maiorNegativo.toFixed(4));",
+                  "",
+                  "if (menorPositivo > maiorNegativo) {",
+                  "    const sugerido = (menorPositivo + maiorNegativo) / 2;",
+                  "    console.log('Separacao limpa. Limiar sugerido: ' + sugerido.toFixed(3));",
+                  "    console.log('');",
+                  "    console.log('Ajuste a variavel limiar_similaridade para ' + sugerido.toFixed(2));",
+                  "    pm.collectionVariables.set('limiar_sugerido', sugerido.toFixed(3));",
+                  "} else {",
+                  "    console.log('SEM SEPARACAO LIMPA - nenhum limiar separa os dois grupos.');",
+                  "    console.log('Troque de modelo de embedding ou use a abordagem B (LLM).');",
+                  "}",
+                  "console.log('='.repeat(64));",
+                  "",
+                  "pm.test('Existe separacao entre relacionados e nao relacionados', function () {",
+                  "    pm.expect(menorPositivo, 'menor positivo deve superar o maior negativo').to.be.above(maiorNegativo);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"{{modelo_embed}}\",\n  \"input\": [\n    \"O prazo de entrega do pedido e de cinco dias uteis\",\n    \"Seu pedido chega em ate cinco dias uteis\",\n\n    \"O cliente solicitou o reembolso da compra\",\n    \"Foi pedida a devolucao do dinheiro pelo comprador\",\n\n    \"Como faco para cancelar minha assinatura?\",\n    \"Para cancelar a assinatura, acesse as configuracoes da conta\",\n\n    \"A reuniao foi remarcada para sexta-feira\",\n    \"O gato dormiu a tarde inteira no sofa\",\n\n    \"Preciso emitir a segunda via do boleto\",\n    \"O time venceu a partida por tres a um\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/embed",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "embed"
+              ]
+            },
+            "description": "**Rode isto ao trocar de modelo de embedding.**\n\nCinco pares rotulados - tres que devem dar \"relacionado\", dois que nao. O script mede todos, acha o menor positivo e o maior negativo, e sugere o limiar no meio do intervalo.\n\nSe nao houver separacao (algum par sem relacao pontuando acima de um par relacionado), o modelo nao serve para o seu dominio - troque ou use a abordagem B.\n\n**Substitua estes pares por exemplos reais do seu projeto.** O limiar depende do dominio: textos juridicos, mensagens de suporte e descricoes de produto se distribuem de formas bem diferentes."
+          }
+        }
+      ]
+    },
+    {
+      "name": "B. Abordagem por Geracao (LLM)",
+      "description": "Pergunta ao modelo se os textos se relacionam. Entende negacao, contradicao e causalidade - coisas que o cosseno nao captura.\n\n**Aviso de tempo:** a *primeira* chamada leva ~60s carregando o modelo na memoria; com ele quente, ~1.2s. Como o compose usa `OLLAMA_KEEP_ALIVE: 30s`, o modelo sai da memoria depois de 30s parado e a proxima chamada paga o minuto de novo.\n\nAumente o timeout do Postman em Settings -> General -> Request timeout (0 desliga), ou mantenha o modelo quente adicionando `\"keep_alive\": \"10m\"` ao corpo da request.",
+      "item": [
+        {
+          "name": "B1 - JSON estruturado (principal)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "let veredito;",
+                  "",
+                  "pm.test('O conteudo e JSON valido', function () {",
+                  "    veredito = JSON.parse(body.message.content);",
+                  "});",
+                  "",
+                  "if (veredito) {",
+                  "    console.log('-'.repeat(58));",
+                  "    console.log('CHAMADO A : ' + pm.collectionVariables.get('chamado_a'));",
+                  "    console.log('CHAMADO B : ' + pm.collectionVariables.get('chamado_b'));",
+                  "    console.log('-'.repeat(58));",
+                  "    console.log('Relacionado  : ' + veredito.relacionado);",
+                  "    console.log('Pontuacao    : ' + veredito.pontuacao);",
+                  "    console.log('Justificativa: ' + veredito.justificativa);",
+                  "    console.log('-'.repeat(58));",
+                  "    console.log('Tokens gerados: ' + body.eval_count);",
+                  "    console.log('Tempo total   : ' + Math.round(body.total_duration / 1e6) + ' ms');",
+                  "",
+                  "    pm.test('Tem os tres campos obrigatorios', function () {",
+                  "        pm.expect(veredito).to.have.property('relacionado').that.is.a('boolean');",
+                  "        pm.expect(veredito).to.have.property('pontuacao').that.is.a('number');",
+                  "        pm.expect(veredito).to.have.property('justificativa').that.is.a('string');",
+                  "    });",
+                  "",
+                  "    pm.test('Pontuacao entre 0 e 1', function () {",
+                  "        pm.expect(veredito.pontuacao).to.be.within(0, 1);",
+                  "    });",
+                  "",
+                  "    pm.test('A justificativa esta em portugues', function () {",
+                  "        pm.expect(veredito.justificativa.length).to.be.above(10);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"{{modelo_llm}}\",\n  \"stream\": false,\n  \"format\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"relacionado\": { \"type\": \"boolean\" },\n      \"pontuacao\": { \"type\": \"number\" },\n      \"justificativa\": { \"type\": \"string\" }\n    },\n    \"required\": [\"relacionado\", \"pontuacao\", \"justificativa\"]\n  },\n  \"options\": {\n    \"temperature\": 0,\n    \"num_predict\": 300\n  },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Voce avalia se dois textos em portugues do Brasil tratam do mesmo assunto ou se relacionam entre si.\\n\\nResponda SOMENTE com JSON, sem texto antes ou depois, neste formato:\\n{\\\"relacionado\\\": boolean, \\\"pontuacao\\\": numero de 0 a 1, \\\"justificativa\\\": \\\"uma frase curta em portugues\\\"}\\n\\nCriterios:\\n- relacionado = true quando os textos tratam do mesmo tema, fato ou intencao, mesmo com palavras diferentes\\n- relacionado = false quando tratam de assuntos distintos\\n- pontuacao reflete sua confianca: 1.0 = identicos em significado, 0.0 = nada a ver\\n- se um texto NEGA ou CONTRADIZ o outro, eles AINDA SAO relacionados (mesmo assunto), mas explique isso na justificativa\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"CHAMADO A: {{chamado_a}}\\nCHAMADO B: {{chamado_b}}\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "chat"
+              ]
+            },
+            "description": "**Esta e a request principal da abordagem por LLM.**\n\nTres detalhes que fazem a diferenca:\n\n**1. `format` com JSON Schema** - o Ollama restringe a geracao ao schema, entao o modelo *nao consegue* devolver texto solto. Muito mais confiavel que pedir \"responda em JSON\" no prompt. (Aceita tambem o valor `\"json\"`, mais frouxo - veja B2.)\n\n**2. `temperature: 0`** - sem isso a mesma entrada da vereditos diferentes a cada chamada. Para classificacao voce quer o resultado reproduzivel.\n\n**3. `stream: false`** - sem isso a resposta vem em varios chunks NDJSON e o Postman mostra uma linha por token.\n\nA regra sobre negacao no system prompt e proposital: \"o pedido foi aprovado\" e \"o pedido foi recusado\" tratam do mesmo assunto. Se no seu caso contradicao deve contar como *nao relacionado*, inverta essa instrucao.\n\n**Custo medido:** ~1.2s com o modelo quente (~60s se ele tiver saido da memoria), contra ~60ms da A1."
+          }
+        },
+        {
+          "name": "B2 - /api/generate (sem chat)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "console.log('Resposta crua:');",
+                  "console.log(body.response);",
+                  "",
+                  "pm.test('Resposta e JSON valido', function () {",
+                  "    const r = JSON.parse(body.response);",
+                  "    pm.expect(r).to.have.property('relacionado');",
+                  "    console.log('');",
+                  "    console.log('Relacionado: ' + r.relacionado + '  |  Pontuacao: ' + r.pontuacao);",
+                  "});",
+                  "",
+                  "console.log('');",
+                  "console.log('Tempo total: ' + Math.round(body.total_duration / 1e6) + ' ms');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"{{modelo_llm}}\",\n  \"stream\": false,\n  \"format\": \"json\",\n  \"options\": {\n    \"temperature\": 0\n  },\n  \"system\": \"Voce avalia se dois textos em portugues do Brasil se relacionam. Responda somente JSON: {\\\"relacionado\\\": boolean, \\\"pontuacao\\\": 0 a 1, \\\"justificativa\\\": \\\"frase curta\\\"}\",\n  \"prompt\": \"CHAMADO A: {{chamado_a}}\\nCHAMADO B: {{chamado_b}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/generate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "generate"
+              ]
+            },
+            "description": "Mesma ideia da B1, mas com `/api/generate` - prompt unico em vez de lista de mensagens.\n\nUse quando nao precisar de historico de conversa. Para esta tarefa (uma classificacao isolada) serve tao bem quanto o `/api/chat`, e o corpo fica menor.\n\nRepare que aqui `format` e a string `\"json\"`, nao um schema. Isso so garante *JSON sintaticamente valido* - os nomes dos campos ficam por conta do prompt. O schema da B1 e mais seguro."
+          }
+        },
+        {
+          "name": "B3 - Caso dificil: negacao e contradicao",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const r = JSON.parse(pm.response.json().message.content);",
+                  "",
+                  "console.log('='.repeat(64));",
+                  "console.log('CHAMADO A: O pagamento do pedido 4471 foi aprovado');",
+                  "console.log('CHAMADO B: O pedido 4471 teve o pagamento recusado');",
+                  "console.log('='.repeat(64));",
+                  "console.log('Relacionado  : ' + r.relacionado);",
+                  "console.log('Pontuacao    : ' + r.pontuacao);",
+                  "console.log('Justificativa: ' + r.justificativa);",
+                  "console.log('='.repeat(64));",
+                  "console.log('');",
+                  "console.log('ESTE E O CASO QUE JUSTIFICA A ABORDAGEM B.');",
+                  "console.log('Os textos falam do MESMO pedido e do MESMO evento,');",
+                  "console.log('mas afirmam o OPOSTO. O embedding da similaridade alta');",
+                  "console.log('(vocabulario quase igual) e nao percebe a contradicao.');",
+                  "console.log('O LLM consegue apontar isso na justificativa.');",
+                  "console.log('');",
+                  "console.log('Rode a A1 com estes mesmos dois textos e compare.');",
+                  "",
+                  "pm.test('O LLM os considera relacionados (mesmo assunto)', function () {",
+                  "    pm.expect(r.relacionado).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('A justificativa menciona a contradicao', function () {",
+                  "    const j = r.justificativa.toLowerCase();",
+                  "    const apontou = ['contrad', 'oposto', 'contr?rio', 'contrario', 'diferen', 'nega', 'recus', 'inverso', 'conflit']",
+                  "        .some(t => j.includes(t));",
+                  "    pm.expect(apontou, 'justificativa: ' + r.justificativa).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"{{modelo_llm}}\",\n  \"stream\": false,\n  \"format\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"relacionado\": { \"type\": \"boolean\" },\n      \"pontuacao\": { \"type\": \"number\" },\n      \"justificativa\": { \"type\": \"string\" }\n    },\n    \"required\": [\"relacionado\", \"pontuacao\", \"justificativa\"]\n  },\n  \"options\": { \"temperature\": 0, \"num_predict\": 300 },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Voce avalia se dois textos em portugues do Brasil tratam do mesmo assunto.\\n\\nResponda SOMENTE JSON: {\\\"relacionado\\\": boolean, \\\"pontuacao\\\": 0 a 1, \\\"justificativa\\\": \\\"frase curta em portugues\\\"}\\n\\nIMPORTANTE: se um texto NEGA ou CONTRADIZ o outro, eles ainda sao relacionados (tratam do mesmo assunto) - mas diga explicitamente na justificativa que ha contradicao.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"CHAMADO A: O pagamento do pedido 4471 foi aprovado\\nCHAMADO B: O pedido 4471 teve o pagamento recusado\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "chat"
+              ]
+            },
+            "description": "**O caso que separa as duas abordagens.**\n\n\"pagamento aprovado\" vs \"pagamento recusado\": vocabulario quase identico, significado oposto.\n\n**Medido nesta maquina:**\n\n| Abordagem | Resultado |\n|---|---|\n| Embedding (cosseno) | **0.9198** -> RELACIONADOS, sem qualquer sinal de contradicao |\n| LLM | relacionado=true, mas a justificativa aponta que *\"o resultado e diferente\"* |\n\nRepare no detalhe importante: **0.9198 e mais alto que os 0.778 da parafrase verdadeira da A1.** O embedding acha estes dois textos *mais* parecidos que um par que realmente diz a mesma coisa - porque compartilham quase todas as palavras. Nenhum ajuste de limiar corrige isso; a informacao simplesmente nao esta no vetor.\n\nSe o seu caso de uso precisa distinguir \"aprovado\" de \"recusado\", embedding sozinho nao resolve.\n\nCole estes dois textos nas variaveis `chamado_a`/`chamado_b` e rode a **A1** para confirmar."
+          }
+        },
+        {
+          "name": "B4 - Resposta em streaming",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "// Streaming devolve NDJSON: um objeto JSON por linha",
+                  "const linhas = pm.response.text().trim().split('\\n');",
+                  "console.log('Chunks recebidos: ' + linhas.length);",
+                  "",
+                  "let texto = '';",
+                  "linhas.forEach(l => {",
+                  "    try {",
+                  "        const o = JSON.parse(l);",
+                  "        if (o.message && o.message.content) texto += o.message.content;",
+                  "    } catch (e) { /* linha parcial, ignora */ }",
+                  "});",
+                  "",
+                  "console.log('');",
+                  "console.log('Texto remontado:');",
+                  "console.log(texto);",
+                  "console.log('');",
+                  "console.log('Cada chunk e uma linha JSON separada, nao um array.');",
+                  "console.log('Por isso o Postman nao consegue formatar como JSON.');",
+                  "console.log('Para o seu caso de validacao, use stream:false (B1).');",
+                  "",
+                  "pm.test('Veio mais de um chunk', function () {",
+                  "    pm.expect(linhas.length).to.be.above(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"{{modelo_llm}}\",\n  \"stream\": true,\n  \"options\": { \"temperature\": 0 },\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Os textos abaixo tratam do mesmo assunto? Responda em uma frase curta em portugues.\\n\\nCHAMADO A: {{chamado_a}}\\nCHAMADO B: {{chamado_b}}\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "chat"
+              ]
+            },
+            "description": "Demonstra o formato de streaming (`stream: true`), que e o **padrao** do Ollama quando voce omite o campo.\n\nA resposta e NDJSON - um objeto por linha, nao um array. O Postman nao formata isso como JSON; o script de teste remonta o texto no Console.\n\n**Para validacao de textos, prefira `stream: false`.** Streaming serve para exibir texto aparecendo aos poucos numa UI, o que nao e o seu caso - voce quer o veredito de uma vez.\n\nIncluido para voce reconhecer o formato caso esqueca o `stream: false` e estranhe a resposta."
+          }
+        }
+      ]
+    },
+    {
+      "name": "C. Comparacao lado a lado",
+      "description": "Roda as duas abordagens sobre o mesmo par de textos e imprime um resumo.",
+      "item": [
+        {
+          "name": "C1 - Embedding (passo 1 de 2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const v = pm.response.json().embeddings;",
+                  "",
+                  "function cos(a, b) {",
+                  "    let d = 0, na = 0, nb = 0;",
+                  "    for (let i = 0; i < a.length; i++) { d += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }",
+                  "    return d / (Math.sqrt(na) * Math.sqrt(nb));",
+                  "}",
+                  "",
+                  "const sim = cos(v[0], v[1]);",
+                  "const limiar = parseFloat(pm.collectionVariables.get('limiar_similaridade'));",
+                  "",
+                  "pm.collectionVariables.set('cmp_similaridade', sim.toFixed(4));",
+                  "pm.collectionVariables.set('cmp_embed_veredito', sim >= limiar ? 'RELACIONADOS' : 'NAO RELACIONADOS');",
+                  "pm.collectionVariables.set('cmp_embed_ms', pm.response.responseTime);",
+                  "",
+                  "console.log('[1/2] Embedding: ' + sim.toFixed(4) + ' em ' + pm.response.responseTime + 'ms');",
+                  "console.log('      Agora rode a C2 para completar a comparacao.');",
+                  "",
+                  "pm.test('Embedding calculado: ' + sim.toFixed(4), () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"{{modelo_embed}}\",\n  \"input\": [\"{{chamado_a}}\", \"{{chamado_b}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/embed",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "embed"
+              ]
+            },
+            "description": "Passo 1: guarda a similaridade e o tempo em variaveis da collection para a C2 usar.\n\nRode **C1 e depois C2**, nesta ordem - ou use o Collection Runner nesta pasta."
+          }
+        },
+        {
+          "name": "C2 - LLM + resumo (passo 2 de 2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "const r = JSON.parse(body.message.content);",
+                  "const llmMs = Math.round(body.total_duration / 1e6);",
+                  "",
+                  "const embedSim = pm.collectionVariables.get('cmp_similaridade');",
+                  "const embedVer = pm.collectionVariables.get('cmp_embed_veredito');",
+                  "const embedMs  = pm.collectionVariables.get('cmp_embed_ms');",
+                  "",
+                  "const llmVer = r.relacionado ? 'RELACIONADOS' : 'NAO RELACIONADOS';",
+                  "",
+                  "console.log('');",
+                  "console.log('+' + '='.repeat(62) + '?');",
+                  "console.log('  COMPARACAO DAS DUAS ABORDAGENS');",
+                  "console.log('+' + '='.repeat(62) + '?');",
+                  "console.log('CHAMADO A: ' + pm.collectionVariables.get('chamado_a'));",
+                  "console.log('CHAMADO B: ' + pm.collectionVariables.get('chamado_b'));",
+                  "console.log('');",
+                  "console.log('+- EMBEDDING ' + '-'.repeat(50));",
+                  "console.log('   Similaridade : ' + embedSim + '  (limiar ' + pm.collectionVariables.get('limiar_similaridade') + ')');",
+                  "console.log('   Veredito     : ' + embedVer);",
+                  "console.log('   Tempo        : ' + embedMs + ' ms');",
+                  "console.log('');",
+                  "console.log('+- LLM ' + '-'.repeat(56));",
+                  "console.log('   Pontuacao    : ' + r.pontuacao);",
+                  "console.log('   Veredito     : ' + llmVer);",
+                  "console.log('   Justificativa: ' + r.justificativa);",
+                  "console.log('   Tempo        : ' + llmMs + ' ms');",
+                  "console.log('');",
+                  "",
+                  "const fator = embedMs > 0 ? Math.round(llmMs / embedMs) : 0;",
+                  "console.log('O LLM levou ~' + fator + 'x o tempo do embedding.');",
+                  "console.log('');",
+                  "",
+                  "if (embedVer === llmVer) {",
+                  "    console.log('>> As duas abordagens CONCORDAM (' + llmVer + ').');",
+                  "    console.log('   Concordando, o embedding entrega o mesmo resultado');",
+                  "    console.log('   ' + fator + 'x mais rapido. Prefira ele.');",
+                  "} else {",
+                  "    console.log('>> As abordagens DIVERGEM.');",
+                  "    console.log('   Embedding: ' + embedVer + '  |  LLM: ' + llmVer);",
+                  "   ",
+                  "    console.log('   Verifique a justificativa do LLM: ou o limiar precisa');",
+                  "    console.log('   de ajuste (rode a A4), ou e um caso de relacao logica');",
+                  "    console.log('   que o cosseno nao captura.');",
+                  "}",
+                  "console.log('='.repeat(64));",
+                  "",
+                  "pm.test('Embedding=' + embedVer + ' | LLM=' + llmVer + (embedVer === llmVer ? ' -> concordam' : ' -> divergem'), function () {",
+                  "    pm.expect(r).to.have.property('relacionado');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"{{modelo_llm}}\",\n  \"stream\": false,\n  \"format\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"relacionado\": { \"type\": \"boolean\" },\n      \"pontuacao\": { \"type\": \"number\" },\n      \"justificativa\": { \"type\": \"string\" }\n    },\n    \"required\": [\"relacionado\", \"pontuacao\", \"justificativa\"]\n  },\n  \"options\": { \"temperature\": 0, \"num_predict\": 300 },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Voce avalia se dois textos em portugues do Brasil tratam do mesmo assunto. Responda SOMENTE JSON: {\\\"relacionado\\\": boolean, \\\"pontuacao\\\": 0 a 1, \\\"justificativa\\\": \\\"frase curta em portugues\\\"}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"CHAMADO A: {{chamado_a}}\\nCHAMADO B: {{chamado_b}}\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "chat"
+              ]
+            },
+            "description": "Passo 2: roda o LLM sobre o mesmo par e imprime a tabela comparativa no Console, usando os valores que a C1 guardou.\n\nSe a C1 nao tiver rodado antes, os campos de embedding aparecem vazios."
+          }
+        }
+      ]
+    },
+    {
+      "name": "D. Chamados de suporte (transporte)",
+      "description": "Testes com o seu caso real: dois chamados de suporte em pt-BR, software para empresas de transporte.\n\n**A conclusao desta pasta:** para chamados de suporte, **embedding nao funciona** (D1) e o **LLM funciona** (D2, 18/19). Isso inverte a recomendacao das pastas A e B, que valia para comparacao de textos em geral.\n\nPor que a diferenca: chamados de suporte compartilham quase todo o vocabulario. O que separa um do outro e a acao (emitir vs cadastrar) e a entidade (CTe vs MDFe) - distincoes que o cosseno nao captura.",
+      "item": [
+        {
+          "name": "D1 - Embedding nos chamados (demonstra a falha)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const v = pm.response.json().embeddings;",
+                  "function cos(a,b){let d=0,na=0,nb=0;for(let i=0;i<a.length;i++){d+=a[i]*b[i];na+=a[i]*a[i];nb+=b[i]*b[i];}return d/(Math.sqrt(na)*Math.sqrt(nb));}",
+                  "const rotulos = [\"sistema fora do ar / nao acessa\", \"CTe: sigla vs nome completo\", \"loading infinito, girias\", \"senha esquecida\", \"lentidao formal vs informal\", \"cancelar nota\", \"rastreamento desatualizado\", \"boleto nao recebido\", \"import planilha\", \"MDFe nao transmite\", \"CTe vs MDFe - documentos distintos\", \"login vs cadastro\", \"relatorios distintos\", \"adicionar vs remover\", \"lentidao vs indisponibilidade\", \"emitir vs cadastrar\", \"suporte tecnico vs comercial\", \"incidente vs duvida geral\", \"senha vs treinamento\"];",
+                  "const esperado = [true, true, true, true, true, true, true, true, true, true, false, false, false, false, false, false, false, false, false];",
+                  "const pos=[], neg=[];",
+                  "for (let i=0;i<rotulos.length;i++){",
+                  "    const s = cos(v[2*i], v[2*i+1]);",
+                  "    (esperado[i] ? pos : neg).push({s: s, rot: rotulos[i]});",
+                  "}",
+                  "pos.sort((x,y)=>y.s-x.s); neg.sort((x,y)=>y.s-x.s);",
+                  "console.log('=== MESMO PROBLEMA (deveria ser ALTO) ===');",
+                  "pos.forEach(x=>console.log('  '+x.s.toFixed(4)+'  '+x.rot));",
+                  "console.log('');",
+                  "console.log('=== PROBLEMAS DIFERENTES (deveria ser BAIXO) ===');",
+                  "neg.forEach(x=>console.log('  '+x.s.toFixed(4)+'  '+x.rot));",
+                  "const mp=Math.min(...pos.map(x=>x.s)), mn=Math.max(...neg.map(x=>x.s));",
+                  "console.log('');",
+                  "console.log('menor positivo : '+mp.toFixed(4));",
+                  "console.log('maior negativo : '+mn.toFixed(4));",
+                  "console.log('');",
+                  "if (mp > mn) { console.log('SEPARACAO LIMPA - limiar sugerido: '+((mp+mn)/2).toFixed(3)); }",
+                  "else {",
+                  "  console.log('*** SOBREPOSICAO TOTAL ***');",
+                  "  console.log('Nenhum limiar separa os dois grupos. Pares de problemas');",
+                  "  console.log('DIFERENTES pontuam MAIS ALTO que pares do MESMO problema.');",
+                  "  console.log('Para chamados de suporte, embedding sozinho nao resolve.');",
+                  "  console.log('Use a abordagem B (LLM) - veja as requests D2 e D3.');",
+                  "}",
+                  "pm.test('Documenta a sobreposicao (falha esperada neste dominio)', function(){",
+                  "    pm.expect(mp, 'menor positivo deve superar o maior negativo').to.be.above(mn);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"{{modelo_embed}}\",\n  \"input\": [\n    \"O sistema esta fora do ar\",\n    \"Nao consigo acessar a plataforma de jeito nenhum\",\n    \"Nao consigo emitir o CTe\",\n    \"Da erro na hora de gerar o conhecimento de transporte\",\n    \"A tela fica carregando eternamente\",\n    \"Fica rodando aquela bolinha e nao sai do lugar\",\n    \"Esqueci minha senha\",\n    \"Nao lembro como entrar na minha conta\",\n    \"O sistema esta muito lento hoje\",\n    \"Ta demorando demais pra carregar qualquer coisa\",\n    \"Preciso cancelar uma nota fiscal emitida por engano\",\n    \"Emiti o documento errado e queria desfazer\",\n    \"O rastreamento nao atualiza a posicao do veiculo\",\n    \"O caminhao aparece parado no mapa mas ja chegou\",\n    \"Nao recebi o boleto da mensalidade\",\n    \"Cade a cobranca desse mes? Nao chegou nada no email\",\n    \"Erro ao importar a planilha de fretes\",\n    \"Subi o arquivo do excel e deu problema\",\n    \"O MDFe nao esta sendo transmitido para a SEFAZ\",\n    \"O manifesto fica preso na fila e nao vai pro governo\",\n    \"Nao consigo emitir o CTe\",\n    \"Nao consigo emitir o MDFe\",\n    \"Nao consigo fazer login no sistema\",\n    \"Nao consigo cadastrar um novo motorista no sistema\",\n    \"O relatorio de fretes esta com valores errados\",\n    \"O relatorio de combustivel nao esta abrindo\",\n    \"Quero adicionar um novo usuario\",\n    \"Quero remover um usuario antigo\",\n    \"O sistema esta lento\",\n    \"O sistema esta fora do ar\",\n    \"Erro ao emitir nota para o cliente X\",\n    \"Erro ao cadastrar o cliente X\",\n    \"Nao consigo emitir o CTe\",\n    \"Gostaria de contratar mais licencas de usuario\",\n    \"O sistema esta fora do ar\",\n    \"Qual o horario de atendimento de voces?\",\n    \"Esqueci minha senha\",\n    \"O motorista precisa de treinamento pra usar o app\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/embed",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "embed"
+              ]
+            },
+            "description": "**Esta request FALHA de proposito - e esse e o resultado importante.**\n\n19 pares reais de chamados de suporte para software de transporte. O script calcula o cosseno de cada par e separa em dois grupos.\n\n**Medido nesta maquina:**\n\n| Grupo | Faixa |\n|---|---|\n| Mesmo problema, palavras diferentes | 0.5496 - 0.6320 |\n| Problemas diferentes, palavras parecidas | 0.5566 - 0.8042 |\n\nOs grupos se **sobrepoem por completo**. Pior: o par de pontuacao mais alta (0.8042) e \"erro ao emitir nota para o cliente X\" vs \"erro ao cadastrar o cliente X\" - problemas distintos, filas de atendimento distintas. Enquanto \"o sistema esta fora do ar\" vs \"nao consigo acessar a plataforma\" - o mesmo incidente - ficou em 0.6109.\n\n**Nenhum limiar resolve isso.** O teste falha de proposito para deixar o resultado registrado.\n\nA razao: chamados de suporte compartilham quase todo o vocabulario (sistema, erro, nao consigo, emitir, cliente). O que os distingue e a *acao* e a *entidade*, nao o assunto - e e exatamente isso que o cosseno nao mede."
+          }
+        },
+        {
+          "name": "D2 - LLM com contexto do dominio (recomendado)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = JSON.parse(pm.response.json().message.content);",
+                  "console.log('CHAMADO A: ' + pm.collectionVariables.get('chamado_a'));",
+                  "console.log('CHAMADO B: ' + pm.collectionVariables.get('chamado_b'));",
+                  "console.log('');",
+                  "console.log('Relacionado: ' + r.relacionado);",
+                  "console.log('Confianca  : ' + r.confianca);",
+                  "console.log('Motivo     : ' + r.motivo);",
+                  "pm.test('Retornou veredito estruturado', function(){",
+                  "    pm.expect(r).to.have.property('relacionado').that.is.a('boolean');",
+                  "    pm.expect(r.confianca).to.be.within(0,1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"{{modelo_llm}}\",\n  \"stream\": false,\n  \"keep_alive\": \"10m\",\n  \"format\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"relacionado\": {\n        \"type\": \"boolean\"\n      },\n      \"confianca\": {\n        \"type\": \"number\"\n      },\n      \"motivo\": {\n        \"type\": \"string\"\n      }\n    },\n    \"required\": [\n      \"relacionado\",\n      \"confianca\",\n      \"motivo\"\n    ]\n  },\n  \"options\": {\n    \"temperature\": 0,\n    \"num_predict\": 200\n  },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Voce analisa chamados de suporte de um sistema para empresas de transporte (SaaS).\\n\\nDois chamados sao RELACIONADOS quando descrevem o MESMO problema tecnico - mesma causa e mesma solucao - ainda que o cliente use palavras completamente diferentes.\\n\\nDois chamados NAO sao relacionados quando tratam de problemas distintos, ainda que usem palavras parecidas. Preste atencao especial a:\\n- documentos fiscais diferentes (CTe, MDFe, NFe) sao problemas DIFERENTES\\n- acoes diferentes sobre a mesma entidade (emitir vs cadastrar vs cancelar) sao DIFERENTES\\n- 'sistema lento' e 'sistema fora do ar' sao problemas DIFERENTES\\n- adicionar vs remover algo sao problemas DIFERENTES\\n\\nResponda SOMENTE JSON: {\\\"relacionado\\\": boolean, \\\"confianca\\\": 0 a 1, \\\"motivo\\\": \\\"frase curta em portugues\\\"}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"CHAMADO A: {{chamado_a}}\\nCHAMADO B: {{chamado_b}}\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "chat"
+              ]
+            },
+            "description": "**A abordagem recomendada para o seu caso.**\n\nAcertou **18 dos 19** pares de chamados nesta maquina, contra falha total do embedding (D1).\n\nO que faz o prompt funcionar, alem de descrever o dominio:\n\n1. **Define 'relacionado' de forma operacional** - 'mesma causa e mesma solucao', nao 'mesmo assunto'. Para triagem de suporte e isso que importa.\n2. **Lista as armadilhas explicitamente** - CTe vs MDFe, emitir vs cadastrar, lento vs fora do ar. Sao justamente os pares que o embedding errou.\n3. **`keep_alive: 10m`** - mantem o modelo na memoria entre chamadas. Sem isso o compose descarrega em 30s e voce paga ~60s de load na proxima.\n\nEdite `chamado_a` / `chamado_b` nas variaveis da collection para testar seus proprios pares.\n\n**Nota honesta sobre o prompt:** rodei tambem uma versao generica, sem nenhum contexto de dominio, e ela tambem acertou 18/19 - falhando num par diferente. Com 19 pares nao da para afirmar que o contexto melhora a precisao deste modelo. O que ele garante e o *criterio*: sem as regras explicitas, 'relacionado' fica a criterio do modelo, e ele pode decidir que CTe e MDFe sao a mesma coisa por serem ambos documentos fiscais. Monte um conjunto maior com chamados reais (D4/D5) antes de escolher."
+          }
+        },
+        {
+          "name": "D3 - Few-shot: exemplos no prompt (19/19)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = JSON.parse(pm.response.json().message.content);",
+                  "const body = pm.response.json();",
+                  "console.log('CHAMADO A: ' + pm.collectionVariables.get('chamado_a'));",
+                  "console.log('CHAMADO B: ' + pm.collectionVariables.get('chamado_b'));",
+                  "console.log('');",
+                  "console.log('Relacionado: ' + r.relacionado);",
+                  "console.log('Confianca  : ' + r.confianca);",
+                  "console.log('Motivo     : ' + r.motivo);",
+                  "console.log('');",
+                  "console.log('Tokens de prompt : ' + body.prompt_eval_count + '  (inclui os 4 exemplos)');",
+                  "console.log('Tokens gerados   : ' + body.eval_count);",
+                  "console.log('Tempo total      : ' + Math.round(body.total_duration/1e6) + ' ms');",
+                  "pm.test('Retornou veredito estruturado', function(){",
+                  "    pm.expect(r).to.have.property('relacionado').that.is.a('boolean');",
+                  "    pm.expect(r.confianca).to.be.within(0,1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"{{modelo_llm}}\",\n  \"stream\": false,\n  \"keep_alive\": \"10m\",\n  \"format\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"relacionado\": {\n        \"type\": \"boolean\"\n      },\n      \"confianca\": {\n        \"type\": \"number\"\n      },\n      \"motivo\": {\n        \"type\": \"string\"\n      }\n    },\n    \"required\": [\n      \"relacionado\",\n      \"confianca\",\n      \"motivo\"\n    ]\n  },\n  \"options\": {\n    \"temperature\": 0,\n    \"num_predict\": 200\n  },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Voce analisa chamados de suporte de um sistema para empresas de transporte (SaaS).\\nDois chamados sao RELACIONADOS quando descrevem o MESMO problema tecnico - mesma causa e\\nmesma solucao - ainda que o cliente use palavras completamente diferentes.\\nResponda SOMENTE JSON: {\\\"relacionado\\\": boolean, \\\"confianca\\\": 0 a 1, \\\"motivo\\\": \\\"frase curta\\\"}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"CHAMADO A: Erro ao emitir nota para o cliente X\\nCHAMADO B: Erro ao cadastrar o cliente X\"\n    },\n    {\n      \"role\": \"assistant\",\n      \"content\": \"{\\\"relacionado\\\": false, \\\"confianca\\\": 0.9, \\\"motivo\\\": \\\"Acoes diferentes: emitir documento vs cadastrar cadastro.\\\"}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"CHAMADO A: O sistema esta fora do ar\\nCHAMADO B: Nao consigo abrir o site de jeito nenhum\"\n    },\n    {\n      \"role\": \"assistant\",\n      \"content\": \"{\\\"relacionado\\\": true, \\\"confianca\\\": 0.9, \\\"motivo\\\": \\\"Ambos relatam indisponibilidade total de acesso.\\\"}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"CHAMADO A: Nao consigo emitir o CTe\\nCHAMADO B: Nao consigo emitir o MDFe\"\n    },\n    {\n      \"role\": \"assistant\",\n      \"content\": \"{\\\"relacionado\\\": false, \\\"confianca\\\": 0.9, \\\"motivo\\\": \\\"Documentos fiscais distintos, com fluxos distintos.\\\"}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"CHAMADO A: Nao recebi a fatura por email\\nCHAMADO B: A cobranca desse mes nao chegou\"\n    },\n    {\n      \"role\": \"assistant\",\n      \"content\": \"{\\\"relacionado\\\": true, \\\"confianca\\\": 0.9, \\\"motivo\\\": \\\"Ambos relatam nao recebimento do documento de cobranca.\\\"}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"CHAMADO A: {{chamado_a}}\\nCHAMADO B: {{chamado_b}}\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "chat"
+              ]
+            },
+            "description": "**19/19 nesta maquina - a melhor precisao medida, sem nenhum treinamento.**\n\nMesma coisa que a D2, mas com quatro exemplos ja rotulados inseridos como turnos de conversa (`user` -> `assistant`) antes do par real. O modelo ve o padrao de resposta e o criterio aplicado, em vez de so ler a regra em texto.\n\n| Abordagem | Precisao |\n|---|---|\n| Embedding (D1) | falha total - grupos sobrepostos |\n| LLM, prompt generico | 18/19 |\n| LLM, contexto de dominio (D2) | 18/19 |\n| **LLM, few-shot (D5)** | **19/19** |\n\n**Ressalva honesta:** um dos exemplos que incluo e um par sobre fatura/cobranca nao recebida, parecido com o unico caso que a D2 errava ('boleto nao recebido'). Entao parte do ganho vem da minha escolha de exemplos, nao de generalizacao pura. Com 19 pares, 19/19 e um sinal bom mas nao e prova - confirme com o seu conjunto real.\n\n## Como escolher os exemplos\n\n1. **Use os casos de fronteira, nao os obvios.** Exemplos como 'sistema fora do ar' vs 'bolo de cenoura' nao ensinam nada. Os que valem sao os que compartilham vocabulario mas tem respostas opostas.\n2. **Equilibre true e false.** Se todos os exemplos forem 'relacionado: true', o modelo tende a responder true.\n3. **Quatro a oito costuma bastar.** Mais que isso incha o prompt, aumenta a latencia e raramente melhora.\n4. **Escreva o `motivo` como voce quer que ele escreva.** O modelo copia o estilo.\n\n## Custo\n\nOs exemplos entram no prompt a cada chamada, entao o `prompt_eval` cresce. Na pratica, poucos milissegundos a mais - e uma troca vantajosa contra qualquer fine-tuning.\n\n**Comece por aqui antes de pensar em treinar.** Se o few-shot resolver, nao ha o que treinar."
+          }
+        },
+        {
+          "name": "D4 - Bateria: precisao sobre os 19 pares",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Bateria: roda todos os pares contra o LLM, em sequencia, e mede a precisao.",
+                  "const pares = [{\"a\": \"O sistema esta fora do ar\", \"b\": \"Nao consigo acessar a plataforma de jeito nenhum\", \"esperado\": true, \"rotulo\": \"sistema fora do ar / nao acessa\"}, {\"a\": \"Nao consigo emitir o CTe\", \"b\": \"Da erro na hora de gerar o conhecimento de transporte\", \"esperado\": true, \"rotulo\": \"CTe: sigla vs nome completo\"}, {\"a\": \"A tela fica carregando eternamente\", \"b\": \"Fica rodando aquela bolinha e nao sai do lugar\", \"esperado\": true, \"rotulo\": \"loading infinito, girias\"}, {\"a\": \"Esqueci minha senha\", \"b\": \"Nao lembro como entrar na minha conta\", \"esperado\": true, \"rotulo\": \"senha esquecida\"}, {\"a\": \"O sistema esta muito lento hoje\", \"b\": \"Ta demorando demais pra carregar qualquer coisa\", \"esperado\": true, \"rotulo\": \"lentidao formal vs informal\"}, {\"a\": \"Preciso cancelar uma nota fiscal emitida por engano\", \"b\": \"Emiti o documento errado e queria desfazer\", \"esperado\": true, \"rotulo\": \"cancelar nota\"}, {\"a\": \"O rastreamento nao atualiza a posicao do veiculo\", \"b\": \"O caminhao aparece parado no mapa mas ja chegou\", \"esperado\": true, \"rotulo\": \"rastreamento desatualizado\"}, {\"a\": \"Nao recebi o boleto da mensalidade\", \"b\": \"Cade a cobranca desse mes? Nao chegou nada no email\", \"esperado\": true, \"rotulo\": \"boleto nao recebido\"}, {\"a\": \"Erro ao importar a planilha de fretes\", \"b\": \"Subi o arquivo do excel e deu problema\", \"esperado\": true, \"rotulo\": \"import planilha\"}, {\"a\": \"O MDFe nao esta sendo transmitido para a SEFAZ\", \"b\": \"O manifesto fica preso na fila e nao vai pro governo\", \"esperado\": true, \"rotulo\": \"MDFe nao transmite\"}, {\"a\": \"Nao consigo emitir o CTe\", \"b\": \"Nao consigo emitir o MDFe\", \"esperado\": false, \"rotulo\": \"CTe vs MDFe - documentos distintos\"}, {\"a\": \"Nao consigo fazer login no sistema\", \"b\": \"Nao consigo cadastrar um novo motorista no sistema\", \"esperado\": false, \"rotulo\": \"login vs cadastro\"}, {\"a\": \"O relatorio de fretes esta com valores errados\", \"b\": \"O relatorio de combustivel nao esta abrindo\", \"esperado\": false, \"rotulo\": \"relatorios distintos\"}, {\"a\": \"Quero adicionar um novo usuario\", \"b\": \"Quero remover um usuario antigo\", \"esperado\": false, \"rotulo\": \"adicionar vs remover\"}, {\"a\": \"O sistema esta lento\", \"b\": \"O sistema esta fora do ar\", \"esperado\": false, \"rotulo\": \"lentidao vs indisponibilidade\"}, {\"a\": \"Erro ao emitir nota para o cliente X\", \"b\": \"Erro ao cadastrar o cliente X\", \"esperado\": false, \"rotulo\": \"emitir vs cadastrar\"}, {\"a\": \"Nao consigo emitir o CTe\", \"b\": \"Gostaria de contratar mais licencas de usuario\", \"esperado\": false, \"rotulo\": \"suporte tecnico vs comercial\"}, {\"a\": \"O sistema esta fora do ar\", \"b\": \"Qual o horario de atendimento de voces?\", \"esperado\": false, \"rotulo\": \"incidente vs duvida geral\"}, {\"a\": \"Esqueci minha senha\", \"b\": \"O motorista precisa de treinamento pra usar o app\", \"esperado\": false, \"rotulo\": \"senha vs treinamento\"}];",
+                  "const sys = pm.collectionVariables.get('prompt_sistema_suporte');",
+                  "const url = pm.collectionVariables.get('base_url') + '/api/chat';",
+                  "const modelo = pm.collectionVariables.get('modelo_llm');",
+                  "const fmt = {\"type\": \"object\", \"properties\": {\"relacionado\": {\"type\": \"boolean\"}, \"confianca\": {\"type\": \"number\"}, \"motivo\": {\"type\": \"string\"}}, \"required\": [\"relacionado\", \"confianca\", \"motivo\"]};",
+                  "let acertos = 0, feitos = 0;",
+                  "const erros = [];",
+                  "function proximo(i){",
+                  "  if (i >= pares.length){",
+                  "    console.log('');",
+                  "    console.log('====================================');",
+                  "    console.log('PRECISAO: ' + acertos + '/' + feitos);",
+                  "    if (erros.length){ console.log('Erros:'); erros.forEach(e=>console.log('  - '+e)); }",
+                  "    console.log('====================================');",
+                  "    pm.test('Precisao ' + acertos + '/' + feitos, function(){",
+                  "        pm.expect(acertos/feitos, 'precisao minima 0.8').to.be.at.least(0.8);",
+                  "    });",
+                  "    return;",
+                  "  }",
+                  "  const p = pares[i];",
+                  "  pm.sendRequest({url: url, method: 'POST', header: {'Content-Type':'application/json'},",
+                  "    body: {mode:'raw', raw: JSON.stringify({model: modelo, stream: false, keep_alive: '10m',",
+                  "      format: fmt, options: {temperature: 0, num_predict: 200},",
+                  "      messages: [{role:'system', content: sys},",
+                  "                 {role:'user', content: 'CHAMADO A: '+p.a+'\\nCHAMADO B: '+p.b}]})}",
+                  "  }, function(err, res){",
+                  "    if (err){ console.log('ERRO em: '+p.rotulo); proximo(i+1); return; }",
+                  "    let got;",
+                  "    try { got = JSON.parse(res.json().message.content).relacionado; }",
+                  "    catch(e){ console.log('JSON invalido em: '+p.rotulo); proximo(i+1); return; }",
+                  "    feitos++;",
+                  "    const ok = (got === p.esperado);",
+                  "    if (ok) acertos++; else erros.push(p.rotulo+' (esperado '+p.esperado+', veio '+got+')');",
+                  "    console.log((ok?'OK ':'XX ') + String(p.esperado).padEnd(5) + ' -> ' + String(got).padEnd(5) + ' ' + p.rotulo);",
+                  "    proximo(i+1);",
+                  "  });",
+                  "}",
+                  "proximo(0);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tags",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tags"
+              ]
+            },
+            "description": "**Roda os 19 pares de uma vez e reporta a precisao.**\n\nA request em si so faz um GET /api/tags (precisa de algo para disparar); o trabalho todo acontece na aba **Tests**, que usa `pm.sendRequest` para chamar o LLM par a par, em sequencia.\n\nLeva alguns minutos - 19 chamadas ao modelo. Acompanhe pelo Console.\n\n**Resultado nesta maquina: 18/19** com `qwen2.5-coder:7b`.\n\n**Use isto como base para o seu conjunto real.** Substitua o array `pares` no inicio do script por chamados verdadeiros do seu helpdesk, com o rotulo `esperado` que voce daria como humano. E assim que voce compara modelos (`qwen2.5:7b` vs `llama3.1`) e prompts com numero em vez de impressao. O teste exige no minimo 80% de acerto."
+          }
+        },
+        {
+          "name": "D5 - Ajuda: como montar seu conjunto real",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tags",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "tags"
+              ]
+            },
+            "description": "Nao faz nada - e so documentacao.\n\n## Como montar um conjunto de teste que vale a pena\n\n**1. Pegue chamados reais, nao inventados.** Exporte 50-100 do seu helpdesk. Textos reais tem erros de digitacao, print colado, 'bom dia' antes do problema - e e nisso que o modelo vai rodar.\n\n**2. Rotule voce mesmo, antes de ver o resultado do modelo.** Para cada par, decida: um atendente resolveria os dois com a mesma acao? Se sim, relacionado. Rotular depois de ver a resposta do modelo contamina o teste.\n\n**3. Equilibre os pares.** Metade relacionados, metade nao. E dentro dos 'nao relacionados', inclua de proposito os que compartilham vocabulario - sao os unicos que realmente testam alguma coisa. Um conjunto so com pares obvios da 100% e nao ensina nada.\n\n**4. Inclua as armadilhas do seu dominio.** As que apareceram nos testes:\n\n| Armadilha | Exemplo |\n|---|---|\n| Documentos fiscais diferentes | CTe vs MDFe vs NFe |\n| Acoes diferentes, mesma entidade | emitir / cadastrar / cancelar / consultar |\n| Gravidade diferente | 'lento' vs 'fora do ar' |\n| Direcao oposta | adicionar vs remover usuario |\n| Tecnico vs comercial | 'nao emite CTe' vs 'quero mais licencas' |\n\n**5. Rode a D4 com o seu conjunto** e compare modelos/prompts pelo numero.\n\n## Sobre o volume\n\nSe a ideia e comparar um chamado novo contra **milhares** de antigos, chamar o LLM para cada par nao escala (~1.2s cada). O padrao usual e hibrido:\n\n1. Embedding + pgvector para buscar os ~20 candidatos mais proximos (milissegundos)\n2. LLM so nesses 20, para decidir quais realmente batem\n\nO embedding nao precisa estar certo - precisa so nao *perder* o chamado certo entre os 20. Seu postgres ja roda `pgvector/pgvector:pg16`, entao a infra existe.\n\nPara comparar **dois textos** apenas, como voce descreveu, va direto de LLM (D2)."
+          }
+        }
+      ]
+    }
+  ]
+}
