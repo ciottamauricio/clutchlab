@@ -503,4 +503,30 @@ export const TOPICS = [
     code: "ANALYST_PROVIDER=ollama   # or claude — same contract, same action, different bill",
     codeLabel: 'one variable picks the generator; the RAG loop never learns which one answered',
   },
+  {
+    id: 'static-analysis',
+    group: 'Cybersecurity',
+    n: '23',
+    title: 'A scanner that found nothing',
+    tag: 'security, gates vs. decoration',
+    summary: 'A security gate that is green forever teaches nothing; the only honest question is whether it can still fail.',
+    gained: [
+      'A measured baseline instead of an assumption: 221 rules over 435 files, one finding, and that one a false positive. The conventions the rest of this ledger argues for — Form Requests at the boundary, actions that never re-validate — mean the taint patterns these rules hunt structurally do not occur. The house style was predicted to generate noise; it generated silence.',
+      'The false positive is the more useful result. `use-tls` fired on `http.ListenAndServe` in the realtime service, where plain HTTP is correct: the service publishes no ports, so it is reachable only on the Docker network, and TLS terminates at nginx. Semgrep pattern-matches one call — it cannot read docker-compose.yml for the absent `ports:` or the nginx conf for where TLS ends. Static analysis evaluates a callsite, not a deployment.',
+      'In CI the scan is diff-scoped (`--baseline-commit`), living inside each per-service workflow next to `pint --test` and `go vet` — so it inherits the path-filter graph of topic 16 rather than bypassing it.',
+    ],
+    paid: [
+      'Suppression placement is load-bearing and silently unforgiving: a `nosemgrep` marker one line off is ignored and the finding stays live — which is worse than no suppression, because it looks handled. The one kept in this repo is an explanation above the call with the marker directly beneath it.',
+      'Diff-scoping is not free. `--baseline-commit` checks the base revision out into a git worktree, so the CI mount cannot be read-only like the Compose service\'s — the principle that a scanner has no business writing to the tree it scans survives locally and is conceded in CI.',
+      'The dependency audits are non-blocking, and that is a real compromise. They report 12 advisories in the api and 2 in the frontend today, all transitive, with no targeted bump available — a gate that is red on arrival gets ignored rather than fixed, so it warns until the lockfiles are clean.',
+      'A planned LLM triage layer over the findings was cancelled by this measurement: one false positive is not a corpus to rank, and a ranking layer with nothing to rank cannot tell a good run from a bad one.',
+    ],
+    body: [
+      'The instinct on adding a scanner is to point it at everything and admire the green check. That check is the failure mode. A repo-wide scan that passes forever, guarded by an ignore list nobody reviews, is indistinguishable from no scan at all — it converts a security control into decoration while feeling like diligence. The useful question is not "does it pass" but "under what new code would it fail, and has that been demonstrated?"',
+      'So the gate was verified the way a test is: by seeding a flaw. A file with a weak hash and a shell-injected exec, committed on a scratch branch, must exit non-zero and must narrow the scan to the one changed file — and it does. A gate nobody has watched fail is a hypothesis, not a control. The clean baseline only means something once the failing case is known to work.',
+      'This is the same discipline the rest of the ledger uses, applied to tooling: run the cheap, dumb version first and let it tell you whether the expensive one is worth building. The measurement here returned zero findings, cancelled a feature, and left two things worth keeping — evidence that the conventions are load-bearing, and one false positive that documents exactly where static analysis stops seeing.',
+    ],
+    code: 'semgrep scan --config=p/security-audit --error --baseline-commit $BASE api/',
+    codeLabel: 'the whole repo scans clean, so the gate is scoped to what the diff introduces — the only part that can still fail',
+  },
 ]

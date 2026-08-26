@@ -42,6 +42,7 @@ what it **cost**.
 - 09. [Authentication & authorization](#09--authentication-authorization) — *sanctum + data-driven permissions*
 - 19. [The trust boundary is the network](#19--the-trust-boundary-is-the-network) — *security, threat model*
 - 20. [Sandboxing the untrusted parser](#20--sandboxing-the-untrusted-parser) — *security, defense-in-depth*
+- 23. [A scanner that found nothing](#23--a-scanner-that-found-nothing) — *security, gates vs. decoration*
 
 **Frontend & UX**
 
@@ -641,6 +642,41 @@ exec.CommandContext(ctx, self, "--parse-child")  // parse in a throwaway process
 *the worker re-execs itself to parse one demo in isolation — a crash or exploit dies with the child, and it inherits no secrets*
 
 > **In plain English.** The riskiest thing this app does is parse a demo file, because that file came from a stranger and it's read by a big, complex library that was never built to be safe against a deliberately evil file. So I defend it in layers, each catching what the last one misses. First, if the parser crashes on a broken file, I catch it and just mark the upload failed. Second, if a file is crafted to run forever or eat all the memory, a time limit and a memory limit stop it. Third — and this is the new part — the actual parsing runs in a separate throwaway process: I hand it only the file's bytes, nothing else, not even my database passwords, and if that file manages to break or hijack the parser, the damage dies with that little process instead of taking down the whole worker. The point isn't one perfect defense; it's a stack of them, so no single trick gets through. The last rung — fully jailing that process from the network and disk — is the next thing I'd add.
+
+---
+
+## 23 · A scanner that found nothing
+
+*security, gates vs. decoration*
+
+**A security gate that is green forever teaches nothing; the only honest question is whether it can still fail.**
+
+**Gained**
+
+- A measured baseline instead of an assumption: 221 rules over 435 files, one finding, and that one a false positive. The conventions the rest of this ledger argues for — Form Requests at the boundary, actions that never re-validate — mean the taint patterns these rules hunt structurally do not occur. The house style was predicted to generate noise; it generated silence.
+- The false positive is the more useful result. `use-tls` fired on `http.ListenAndServe` in the realtime service, where plain HTTP is correct: the service publishes no ports, so it is reachable only on the Docker network, and TLS terminates at nginx. Semgrep pattern-matches one call — it cannot read docker-compose.yml for the absent `ports:` or the nginx conf for where TLS ends. Static analysis evaluates a callsite, not a deployment.
+- In CI the scan is diff-scoped (`--baseline-commit`), living inside each per-service workflow next to `pint --test` and `go vet` — so it inherits the path-filter graph of topic 16 rather than bypassing it.
+
+**Paid**
+
+- Suppression placement is load-bearing and silently unforgiving: a `nosemgrep` marker one line off is ignored and the finding stays live — which is worse than no suppression, because it looks handled. The one kept in this repo is an explanation above the call with the marker directly beneath it.
+- Diff-scoping is not free. `--baseline-commit` checks the base revision out into a git worktree, so the CI mount cannot be read-only like the Compose service's — the principle that a scanner has no business writing to the tree it scans survives locally and is conceded in CI.
+- The dependency audits are non-blocking, and that is a real compromise. They report 12 advisories in the api and 2 in the frontend today, all transitive, with no targeted bump available — a gate that is red on arrival gets ignored rather than fixed, so it warns until the lockfiles are clean.
+- A planned LLM triage layer over the findings was cancelled by this measurement: one false positive is not a corpus to rank, and a ranking layer with nothing to rank cannot tell a good run from a bad one.
+
+The instinct on adding a scanner is to point it at everything and admire the green check. That check is the failure mode. A repo-wide scan that passes forever, guarded by an ignore list nobody reviews, is indistinguishable from no scan at all — it converts a security control into decoration while feeling like diligence. The useful question is not "does it pass" but "under what new code would it fail, and has that been demonstrated?"
+
+So the gate was verified the way a test is: by seeding a flaw. A file with a weak hash and a shell-injected exec, committed on a scratch branch, must exit non-zero and must narrow the scan to the one changed file — and it does. A gate nobody has watched fail is a hypothesis, not a control. The clean baseline only means something once the failing case is known to work.
+
+This is the same discipline the rest of the ledger uses, applied to tooling: run the cheap, dumb version first and let it tell you whether the expensive one is worth building. The measurement here returned zero findings, cancelled a feature, and left two things worth keeping — evidence that the conventions are load-bearing, and one false positive that documents exactly where static analysis stops seeing.
+
+```
+semgrep scan --config=p/security-audit --error --baseline-commit $BASE api/
+```
+
+*the whole repo scans clean, so the gate is scoped to what the diff introduces — the only part that can still fail*
+
+> **In plain English.** I added a security scanner that reads all the code looking for known-dangerous patterns — things like building a database query out of raw user input. It found nothing. Two hundred and twenty-one rules across the whole project, and the single thing it flagged turned out to be wrong: it complained that one internal service talks plain HTTP instead of encrypted HTTPS, but that service isn't reachable from the internet at all, and the encryption is handled by the front door before anything reaches it. The scanner reads one line of code at a time — it can't know how the thing is actually deployed. That's the honest limit of this kind of tool, and it's worth knowing precisely. The zero findings I'd argue is the conventions working: because every request is validated at one specific place by design, the dangerous patterns it hunts for mostly can't occur. But here's the part I care about most — a scanner that says "all clear" forever is worthless, because you can't tell it apart from one that's broken or switched off. So I deliberately wrote a file with a security flaw in it and checked that the scanner caught it and stopped the build. It did. Now I know the green check means something. And rather than rescanning everything on every change, it only inspects what a change actually touches — the part that could genuinely introduce something new.
 
 ---
 
