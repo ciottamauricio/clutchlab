@@ -16,6 +16,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # semgrep --baseline-commit needs the PR base in history
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -36,3 +38,37 @@ jobs:
           ' | xargs -r npm i --no-save
       - run: npm run lint
       - run: npm run build
+
+      # Runtime deps only: a vulnerable build-time package cannot reach production.
+      # Reports without failing, same reasoning as api.yml's composer audit — react-router
+      # is flagged today. Flip to a hard gate once the tree is clean.
+      - run: npm audit --omit=dev || true
+
+      # Diff-scoped static analysis, same image and rulesets as the `semgrep` Compose
+      # service (docker-compose.yml) so local and CI cannot drift. The repo scans clean
+      # at 221 rules (docs/plans/local-llm-next-steps.md), so this gate fires only on new
+      # code — a full-repo scan that stays green forever is how a gate becomes decoration.
+      # On pull_request, --baseline-commit reports only findings the diff introduces (it
+      # needs the base commit in history, hence fetch-depth 0 above); on push there is no
+      # base SHA, so it scans this service's tree.
+      # Unlike the Compose service the mount is writable: --baseline-commit checks the
+      # base revision out into a temporary git worktree, which a :ro mount refuses. The
+      # container runs as root against a runner-owned checkout, hence safe.directory.
+      - name: semgrep
+        working-directory: .
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src \
+            -e SEMGREP_SEND_METRICS=off semgrep/semgrep:1.86.0 \
+            sh -c 'git config --global --add safe.directory /src && exec "$@"' -- \
+            semgrep scan \
+              --config=p/security-audit \
+              --config=p/javascript \
+              --metrics=off \
+              --error \
+              $BASELINE \
+              frontend/
+        env:
+          BASELINE: >-
+            ${{ github.event_name == 'pull_request'
+            && format('--baseline-commit {0}', github.event.pull_request.base.sha)
+            || '' }}

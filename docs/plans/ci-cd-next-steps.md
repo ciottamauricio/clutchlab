@@ -68,8 +68,12 @@ Nothing builds the Dockerfiles today (a broken one ships silently), and
 
 - `.github/dependabot.yml`: ecosystems `composer` (api), `npm` (frontend), `gomod`
   (worker, notifier, realtime), `github-actions` — weekly.
-- Audit steps in existing workflows: `composer audit`, `npm audit --omit=dev`
-  (decide: warn vs fail), `govulncheck ./...` in the Go workflows.
+- ~~Audit steps in existing workflows: `composer audit`, `npm audit --omit=dev`
+  (decide: warn vs fail), `govulncheck ./...` in the Go workflows.~~ **Done 2026-08-25**,
+  decided **warn** (`|| true`): 12 advisories in api (guzzle, commonmark) and 2 in
+  frontend (react-router) are all transitive, so a failing gate would be red on arrival.
+  Flip to blocking once the lockfiles are clean. Landed with a diff-scoped `semgrep` step
+  in the same five workflows — that one *does* block.
 
 ### 6. Frontend's first real tests (Vitest)
 

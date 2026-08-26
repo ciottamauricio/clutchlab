@@ -21,6 +21,8 @@ jobs:
       APP_KEY: base64:dGVzdHRlc3R0ZXN0dGVzdHRlc3R0ZXN0dGVzdHRlc3Q=
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # semgrep --baseline-commit needs the PR base in history
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
@@ -29,3 +31,39 @@ jobs:
       - run: composer install --prefer-dist --no-progress --no-interaction
       - run: ./vendor/bin/pint --test    # style gate: fails on anything `pint` would reformat
       - run: ./vendor/bin/phpunit
+
+      # Advisories against the pinned lockfile. Reports without failing: today's 12
+      # findings (guzzle, commonmark) are transitive Laravel deps no targeted bump
+      # resolves, and a gate that is red on arrival gets ignored rather than fixed.
+      # Semgrep is the blocking gate here; this is the reading material next to it.
+      # Flip to a hard gate once the lockfile is clean.
+      - run: composer audit --locked || true
+
+      # Diff-scoped static analysis, same image and rulesets as the `semgrep` Compose
+      # service (docker-compose.yml) so local and CI cannot drift. The repo scans clean
+      # at 221 rules (docs/plans/local-llm-next-steps.md), so this gate fires only on new
+      # code — a full-repo scan that stays green forever is how a gate becomes decoration.
+      # On pull_request, --baseline-commit reports only findings the diff introduces (it
+      # needs the base commit in history, hence fetch-depth 0 above); on push there is no
+      # base SHA, so it scans this service's tree.
+      # Unlike the Compose service the mount is writable: --baseline-commit checks the
+      # base revision out into a temporary git worktree, which a :ro mount refuses. The
+      # container runs as root against a runner-owned checkout, hence safe.directory.
+      - name: semgrep
+        working-directory: .
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src \
+            -e SEMGREP_SEND_METRICS=off semgrep/semgrep:1.86.0 \
+            sh -c 'git config --global --add safe.directory /src && exec "$@"' -- \
+            semgrep scan \
+              --config=p/security-audit \
+              --config=p/php \
+              --metrics=off \
+              --error \
+              $BASELINE \
+              api/
+        env:
+          BASELINE: >-
+            ${{ github.event_name == 'pull_request'
+            && format('--baseline-commit {0}', github.event.pull_request.base.sha)
+            || '' }}

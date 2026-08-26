@@ -314,11 +314,21 @@ the call, with `nosemgrep` on the line directly beneath it. Placement is load-be
 marker one line further up is silently ignored and the finding stays live, which is worse
 than no suppression, because it looks handled. Repo now scans clean at 221 rules.
 
-**On CI:** deliberately not added. A repo-wide scanner that is green forever, with an
-ignore list nobody reviews, is how a security gate becomes decoration. If it is ever worth
-adding, the shape is a diff-scoped step (`--baseline-commit`) inside each existing
-per-service workflow, next to `pint --test` and `go vet` — not a sixth always-on workflow,
-which would break the path-filtering every other workflow here is built on.
+**On CI:** added 2026-08-25, in exactly the shape argued for here — a diff-scoped step
+(`--baseline-commit`) inside each of the five per-service workflows, next to `pint --test`
+and `go vet`, not a sixth always-on workflow that would break the path-filtering. A
+repo-wide scanner that is green forever, with an ignore list nobody reviews, is how a
+security gate becomes decoration; scoping to the diff is what keeps it a gate.
+
+Two things the implementation had to concede to `--baseline-commit`, both verified by
+running it: it checks the base revision out into a temporary **git worktree**, so the CI
+mount cannot be `:ro` like the Compose service's, and it needs full history
+(`fetch-depth: 0`) plus `safe.directory` because the container is root over a
+runner-owned checkout. Verified end to end against a seeded MD5 + shell-injection file:
+clean baseline passes, the seeded flaw exits 1 with the scan narrowed to the one changed
+file. Dependency audits (`composer audit`, `npm audit --omit=dev`, `govulncheck`) landed
+alongside it as **non-blocking** — they report 12 + 2 real advisories today, all
+transitive, and a gate that is red on arrival gets ignored rather than fixed.
 
 ---
 
