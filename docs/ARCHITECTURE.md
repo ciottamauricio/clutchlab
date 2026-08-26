@@ -23,33 +23,35 @@ to ask of every candidate service:
                                   │
                             ┌─────▼──────┐
                             │   nginx    │  (reverse proxy / gateway)
-                            └─┬───┬────┬─┘
-                    /         │   │    │  /api/*      /realtime/* (ws)
-        ┌─────────────────┐   │   │    │        ┌──────────────────┐
-        │    frontend     │◄──┘   │    └───────►│    realtime      │  Go (websockets)
-        │   React/Vite    │       │             │  tactics board   │
-        └─────────────────┘       ▼             └───┬──────────┬───┘
-                          ┌────────────────┐        │ pdo      │ validate token
-                          │      api       │  Laravel (CRUD)    │
-                          │                │        │           │
-                          └──┬────────┬────┘        │           │
-                       rpush │        │ pdo         │           │
-                        ┌────▼───┐  ┌─▼─────────────▼───────────▼──┐
-                        │ redis  │  │           postgres           │
-                        └─▲──▲───┘  └───────────────▲──────────────┘
-               subscribe │  │ blpop · publish       │
-         ┌───────────────┘  │                       │
-    ┌────┴─────┐            │                       │
-    │ notifier │       ┌────┴───────────────────────┴─┐
-    └────┬─────┘       │           worker             │  Go (demo parser)
-         │ webhook     └──────┬────────────────┬──────┘
-         ▼           get/put  │                │ index
-      Discord      ┌──────────▼──┐        ┌────▼─────────┐
-                   │    minio    │        │ meilisearch  │
-                   └─────────────┘        └──────────────┘
+                            └─┬───┬───┬──┴──┐
+                    /         │   │   │     │ /ollama-api/*  (study page)
+        ┌─────────────────┐   │   │   │     └──────────────────────┐
+        │    frontend     │◄──┘   │   │ /realtime/* (ws)           │
+        │   React/Vite    │       │   └──────────┐                 │
+        └─────────────────┘ /api/*▼              ▼                 ▼
+                          ┌────────────────┐  ┌──────────────┐  ┌──────────────┐
+                          │      api       │  │   realtime   │  │    ollama    │
+                          │ Laravel (CRUD) │  │ tactics (Go) │  │ chat + embed │
+                          └─┬───┬───┬───┬──┘  └───┬──────┬───┘  └──────▲───────┘
+                      rpush │   │   │   │ http    │ pdo  │ token       │
+                            │   │   │   └─────────┼──────┼─────────────┘
+                       ┌────▼───┐   │ pdo         │      │
+                       │ redis  │   └─────────────┼──────┼──────┐
+                       └─▲───▲──┘                 │      │      │
+              subscribe │   │ blpop · publish     ▼      ▼      ▼
+        ┌───────────────┘   │              ┌─────────────────────────┐
+   ┌────┴─────┐             │              │        postgres         │
+   │ notifier │        ┌────┴─────────┐    │  + pgvector (vectors)   │
+   └────┬─────┘        │    worker    │    └────────────▲────────────┘
+        │ webhook      │  Go (parser) ├─────────────────┘ pdo
+        ▼              └──┬────────┬──┘
+     Discord     get/put  │        │ index
+                ┌─────────▼──┐  ┌──▼───────────┐
+                │   minio    │  │ meilisearch  │
+                └────────────┘  └──────────────┘
 ```
 
-Three of these services have **no inbound HTTP through nginx**: the `worker` is a pure
+Two of these services have **no inbound HTTP through nginx**: the `worker` is a pure
 background consumer (its only input is the Redis queue), and the `notifier` consumes only
 the events channel (its only output is a Discord webhook). The `realtime` service *is*
 behind nginx but on a separate `/realtime/*` websocket route — it earns its own boundary
@@ -57,8 +59,24 @@ for a different reason than the worker does (see below). Redis carries both cros
 between the web world and the compute world: the **queue** (a command — api → worker) and
 the **events channel** (facts — worker → whoever subscribes).
 
+`ollama` is the newest box and the odd one out: it is **not a service this project wrote**,
+it's a model runtime the api calls over plain HTTP, the way it calls Anthropic — one
+`AnalystLlm`/`EmbeddingClient` contract, two possible implementations, chosen by env var
+(see *Local models* below). Postgres gains a second role alongside CRUD: with the `pgvector`
+extension it also stores the **embedding projection** the analyst retrieves over, so the
+semantic read model needs no new datastore.
+
+The one edge that breaks the rules is deliberate: nginx also exposes `/ollama-api/*`
+straight through to `ollama:11434`, so the `/ollama-study` page can call the model
+**from the browser with no backend in between**. That is a teaching route, not a product
+route — it exists so the study page can show raw embeddings and raw token latency without
+the api's prompt, retrieval, and grounding in the way. It is unauthenticated and would
+have no place in a deployment (see *Local models* for why it is acceptable here).
+
 Also not drawn: the observability containers (Alloy, Loki, Grafana, Jaeger) — they observe
-every service but sit outside the data path (see Observability below).
+every service but sit outside the data path (see Observability below) — and `ollama-init`,
+a one-shot that pulls the embedding model at boot, plus `semgrep`, a `tools`-profile
+scanner that runs on demand and exits.
 
 ## Why each boundary earns its place
 
@@ -114,6 +132,105 @@ free-text + faceted filters at speed is a genuinely different workload from rela
 the same "earn the boundary" test the worker passed, applied to a datastore instead of a
 runtime. The cost you take on in return is the one CQRS always charges: **staleness between
 write and read**, and the operational duty to be able to rebuild the projection.
+
+### The analyst: RAG, and a boundary that is a contract rather than a container
+
+Asking an LLM about your matches is **mostly a retrieval problem**, and the retrieval half
+is infrastructure this project already ran. The analyst is a thin loop — retrieve evidence,
+paste it into the prompt, generate — so the interesting decisions are all about *which
+evidence*, not about the model.
+
+```
+question ─▶ RETRIEVE  Postgres (recent visible matches + scoreboards)
+        │             Meilisearch  — matches the question's WORDS
+        │             pgvector     — matches its MEANING (matches, then rounds)
+        ├─▶ AUGMENT   compact JSON evidence + question in one message
+        └─▶ GENERATE  one call behind AnalystLlm
+```
+
+Keyword and vector search are **complements, not rivals**, projected from one source of
+truth and failing in opposite directions: Meilisearch matches "AWP" exactly, pgvector
+catches "our comeback games". Both are disposable projections of Postgres, the same CQRS
+bargain search already made — and rebuildable for the same reason (`analyst:embed`,
+`docs:embed`).
+
+**No new datastore.** The vectors live in Postgres via `pgvector`, not in a dedicated
+vector database. A vector column next to the rows it describes is one fewer service, one
+fewer consistency problem, and at this corpus size an exact sequential scan is ~2ms. An
+ivfflat index over the tiny corpus actually returned *zero rows* — approximate search lies
+quietly at small scale. This is the "earn the boundary" test applied to a datastore, and
+answered **no** for once: worth recording, because the reflex is to reach for Pinecone.
+
+**Three corpora, one seam.** `match_embeddings` answers *which game*, `round_embeddings`
+*which situation*, `doc_embeddings` *why the system is built this way* — the last a
+question grep cannot answer, because the answer is an argument rather than a string. They
+are three separate retriever contracts (`SemanticRetriever`, `RoundRetriever`,
+`DocRetriever`), deliberately not one interface with a `corpus` parameter: matches and
+rounds scope to what the caller may see, and documentation belongs to no match and no user,
+so a shared parameter would have carried a scope argument meaningless to a third of its
+callers. **The seam that genuinely generalized is `EmbeddingClient` — the one that never
+had to change.**
+
+The docs corpus is also served by a **separate endpoint**, not folded into the analyst:
+`POST /api/docs/ask` (`AskDocsAction`, `DocsLlm`) sits outside every `can:` gate, because
+the repository's own markdown is identical for every caller — there is no ownership to
+check. `AskAnalystAction` never retrieves docs. Two corpora with different scoping rules
+and different prompts turned out to be two loops that share an embedder, not one loop with
+a parameter.
+
+### Local models: the boundary that is a config value
+
+The api talks to two model runtimes and does not know which one answered:
+
+| Contract | Implementations | Chosen by |
+|---|---|---|
+| `AnalystLlm` | `AnthropicAnalyst` (Claude, metered) · `OllamaAnalyst` (`qwen2.5-coder:7b`, local) | `ANALYST_PROVIDER` |
+| `DocsLlm` | `AnthropicDocsExplainer` · `OllamaDocsExplainer` (same models, different prompt) | `ANALYST_PROVIDER` |
+| `EmbeddingClient` | `HashEmbeddings` (keyless stand-in, word overlap only) · `OllamaEmbeddings` (`nomic-embed-text`, 768d) | `EMBED_PROVIDER` |
+
+There is no hosted embedder: embedding is the case where local won outright, so the hosted
+slot was never filled. `HashEmbeddings` is the deliberately dumb placeholder that came
+first — and it earned its keep, because shipping it meant the whole pipeline (column,
+retriever, scoping, prompt) ran for real long before any model existed.
+
+This is a service boundary that **never became a service**. `ollama` is a container, but
+the api reaches it with the same HTTP call it makes to Anthropic, behind the same
+interface — so "run the model locally" is one env var, not a migration. That is the
+argument for interfaces stated precisely: not that you might replace a dependency someday,
+but that you can **run the alternative today and compare**.
+
+What running both actually measured (the full ledger is study topic 22):
+
+- **For embeddings, local wins outright.** Batch work, small model, no per-call bill, no
+  evidence about the team leaving the machine — and the thing it replaced was a
+  deliberately dumb hash stand-in that could not tell "duel" from "fight".
+- **For generation, local is the free and private option, not the good one.** The 7B model
+  held the rules that matter structurally (cited real match ids, copied player names
+  verbatim) and dropped the cosmetic ones. A model that fails the visible rules while
+  keeping the invisible ones is easy to mistake for working correctly.
+- **Whether it obeys a rule depends on the rule's *form*, not its importance.** Asked for
+  `[doc:path#heading]` citations it produced zero; asked for `[1]` it complied immediately,
+  and the numbers are expanded back into paths server-side. Design the output around what
+  the model can emit, then translate.
+- **Performance is a cliff, not a slope.** ~9s with the model resident on the GPU against
+  ~265s on CPU for the same question. Ollama falls back to CPU whenever the model does not
+  fit in VRAM and reports it nowhere except `ollama ps` — hence the deliberately generous
+  600s timeout, which is the honest cost of running this locally rather than a bug.
+
+**The projection is model-shaped.** Vectors from different models are mutually meaningless,
+so switching embedders is three steps, not one: set `EMBED_PROVIDER` **and**
+`EMBED_DIMENSIONS` together (hash is 256, `nomic-embed-text` is fixed at 768), migrate to
+resize the column — which wipes the old vectors — then `analyst:embed` to rebuild.
+Disposable-by-design is what makes a wipe routine rather than frightening.
+
+**The one wire that skips every boundary is a teaching route.** `/ollama-api/*` proxies the
+browser straight to `ollama:11434`, so the `/ollama-study` page can show raw embeddings and
+raw latency with no api, no prompt, and no retrieval in between. nginx normalizes `Host` and
+`Origin` because Ollama refuses non-localhost origins — meaning **nginx is doing the access
+control that Ollama's own check would have done**, and it is doing none. That is fine for a
+local study page and would be indefensible exposed: a model runtime with no auth is an open
+compute endpoint. Recorded here rather than quietly fixed, because the shortcut is only safe
+while the deployment story stays "one laptop".
 
 ### Sync vs async
 

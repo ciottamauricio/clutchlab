@@ -3881,6 +3881,16 @@ a.brand:hover .brand-mark {
 .topo-node-data rect { fill: var(--surface-2); stroke: var(--border); }
 .topo-node-data text { fill: var(--text); font-size: 12px; }
 
+/* ollama: a model runtime, drawn apart from the stores it sits beside — it is a dependency
+   the api calls, interchangeable with the hosted provider, not a service in the seam. The
+   dashed outline says "swappable"; it stays achromatic on purpose, because the palette
+   reserves colour for the two sides, wins, and danger — a model runtime is none of those. */
+.topo-node-model rect { fill: none; stroke: var(--text-dim); stroke-dasharray: 4 3; }
+.topo-node-model text { fill: var(--text); font-size: 12px; }
+.topo-node .topo-sub { fill: var(--text-dim); font: 400 9px var(--mono); }
+.topo-edge-model { stroke: var(--text-dim); stroke-width: 1.5; fill: none; stroke-dasharray: 2 3; }
+.topo-modellabel { font: 600 10px var(--mono); fill: var(--text-dim); }
+
 .topo-legend {
   display: flex;
   align-items: center;
@@ -3914,6 +3924,8 @@ a.brand:hover .brand-mark {
 .topo-key-go { color: var(--t); }
 .topo-key-react { color: var(--text-h); }
 .topo-key-infra { color: var(--text-dim); }
+.topo-key-model { color: var(--text-dim); }
+.topo-key-model::before { border-style: dashed; }
 
 .topo-legend-note {
   margin-left: auto;

@@ -17,17 +17,20 @@ with [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) as the prose companion.
 
 | Service           | Tech                  | Why it exists                                                        |
 |-------------------|-----------------------|----------------------------------------------------------------------|
-| `nginx`           | nginx                 | The only exposed container; routes `/` → frontend, `/api` → api, `/realtime` → realtime |
+| `nginx`           | nginx                 | The only exposed container; routes `/` → frontend, `/api` → api, `/realtime` → realtime, `/ollama-api` → ollama |
 | `frontend`        | React + Vite          | UI; the only place backend codes become human sentences               |
 | `api`             | Laravel (PHP 8.3)     | CRUD heart: auth, teams, matches, trainings; owns Postgres            |
 | `worker`          | Go 1.24               | CPU-bound demo parsing (demoinfocs), consumes the queue               |
 | `realtime`        | Go                    | Tactics-board websockets                                              |
 | `notifier`        | Go                    | Subscribes to events → Discord webhook (log-only without a URL)       |
 | `events-listener` | Laravel (api image)   | Subscribes to the same events → email (log mailer by default)         |
-| `postgres`        | Postgres 16           | Primary datastore                                                     |
+| `postgres`        | Postgres 16           | Primary datastore; `pgvector` also holds the analyst's embeddings     |
 | `redis`           | Redis 7               | Two jobs, two primitives: parse queue (list) + event channel (pub/sub)|
 | `minio`           | MinIO (S3 API)        | Object storage for the `.dem` files (bucket auto-created on boot)     |
 | `meilisearch`     | Meilisearch           | Search read model, synced by the worker                               |
+| `ollama`          | Ollama (local models) | Local chat + embedding models behind the same contracts as Claude     |
+| `ollama-init`     | Ollama                | One-shot: pulls the embedding model on boot, then exits               |
+| `semgrep`         | Semgrep               | Static analysis, on demand (`tools` profile — never starts on `up`)   |
 | `loki` `alloy` `grafana` `jaeger` | —     | Observability: logs + traces across the service boundary              |
 
 Services talk over a private Docker network **by service name, never `localhost`**.
