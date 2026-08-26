@@ -39,19 +39,28 @@ MinIO also publish ports so you can attach a GUI.)
 | `frontend` | React + Vite dev server | (internal 5173) |
 | `api` | Laravel HTTP API | (internal 8000) |
 | `worker` | Go demo parser (no inbound HTTP) | — |
-| `postgres` | Primary datastore | 5432 (dev) |
+| `postgres` | Primary datastore (+ `pgvector` for embeddings) | 5432 (dev) |
 | `redis` | Cross-language job queue | (internal 6379) |
 | `minio` | S3-compatible object storage | 9000 / 9001 (dev) |
 | `minio-init` | One-shot: creates the `demos` bucket, then exits | — |
+| `ollama` | Local model runtime (chat + embeddings) | (internal 11434) |
+| `ollama-init` | One-shot: pulls the embedding model, then exits | — |
+| `semgrep` | Static analysis, on demand (`tools` profile) | — |
 
-Named volumes `pgdata` / `miniodata` persist data across restarts.
+Named volumes `pgdata` / `miniodata` / `ollamadata` persist data across restarts — the
+model weights are pulled once and survive a `down`.
 
 ### Gateway (nginx)
 
 - `/` → `frontend:5173`, forwarding the WebSocket upgrade so Vite HMR works.
 - `/api/` → `api:8000` with **no trailing slash on `proxy_pass`**, so the `/api` prefix is
   preserved (adding a slash rewrites the path and Laravel 404s).
-- `client_max_body_size 512M` — CS2 demos are large.
+- `/ollama-api/` → `ollama:11434` **with** a trailing slash on both sides, stripping the
+  prefix. Only the `/ollama-study` page uses it: it lets the browser call the model
+  directly, same-origin, so no CORS and no bridge on port 11434. nginx rewrites `Host` and
+  `Origin` to `localhost:11434` because Ollama rejects any other origin — which means nginx
+  is the only access control on that route, and there is none. Local study only.
+- `client_max_body_size 1024M` — CS2 demos are large.
 
 ### Containers & the dev loop
 

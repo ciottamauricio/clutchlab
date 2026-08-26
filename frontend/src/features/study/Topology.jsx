@@ -3,6 +3,9 @@
 // (worker, notifier, events-listener) sits below; Redis is drawn on the boundary between
 // them, carrying both crossings: the queue (commands) and the events channel (facts, pub/sub).
 // Nodes are colored by runtime so "three Go services, different reasons" reads at a glance.
+// ollama sits in the bottom tier with the stores rather than in a zone of its own: it is a
+// dependency the api calls over HTTP, not a service this project wrote — the same shape as
+// the hosted Claude it swaps with, which is the whole point of that boundary.
 // Uses the app's tokens via CSS classes, so it inverts cleanly in light mode.
 export default function Topology() {
   return (
@@ -21,7 +24,7 @@ export default function Topology() {
 
           <text className="topo-zonelabel" x="30" y="106">SYNCHRONOUS · WEB</text>
           <text className="topo-zonelabel" x="30" y="350">ASYNC · COMPUTE</text>
-          <text className="topo-zonelabel" x="30" y="444">SHARED DATA</text>
+          <text className="topo-zonelabel" x="30" y="444">SHARED DATA · MODELS</text>
 
           {/* ---- edges (drawn first, under the nodes) ---- */}
           <g className="topo-edges">
@@ -34,6 +37,10 @@ export default function Topology() {
 
             {/* api -> postgres (pdo) */}
             <path className="topo-edge-data" d="M360 184 C 320 300, 300 400, 340 452" />
+            {/* api -> ollama (http) — the same call shape as the hosted provider. Routed
+                down the channel between worker and notifier so it crosses no node. */}
+            <path className="topo-edge-model" d="M460 184 C 512 250, 522 400, 640 442" />
+            <text className="topo-modellabel" x="530" y="300">http ▸</text>
             {/* realtime -> postgres (pdo) + token check */}
             <path className="topo-edge-data" d="M610 184 C 610 320, 470 410, 420 452" />
           </g>
@@ -53,7 +60,7 @@ export default function Topology() {
           {/* worker -> minio / meilisearch */}
           <g className="topo-edges">
             <path className="topo-edge-data" d="M360 400 C 300 414, 240 424, 210 452" />
-            <path className="topo-edge-data" d="M470 400 C 560 414, 600 424, 620 452" />
+            <path className="topo-edge-data" d="M470 400 C 500 414, 512 428, 517 452" />
           </g>
 
           {/* the boundary line — where sync meets async */}
@@ -127,16 +134,23 @@ export default function Topology() {
 
           {/* data stores */}
           <g className="topo-node topo-node-data">
-            <rect x="300" y="452" width="130" height="34" rx="6" />
-            <text x="365" y="473">postgres</text>
+            <rect x="300" y="446" width="130" height="44" rx="6" />
+            <text x="365" y="464">postgres</text>
+            <text className="topo-sub" x="365" y="479">+ pgvector</text>
           </g>
           <g className="topo-node topo-node-data">
             <rect x="150" y="452" width="120" height="34" rx="6" />
             <text x="210" y="473">minio</text>
           </g>
           <g className="topo-node topo-node-data">
-            <rect x="560" y="452" width="130" height="34" rx="6" />
-            <text x="625" y="473">meilisearch</text>
+            <rect x="452" y="452" width="130" height="34" rx="6" />
+            <text x="517" y="473">meilisearch</text>
+          </g>
+          {/* ollama — a model runtime, not a service: swappable with hosted Claude by env var */}
+          <g className="topo-node topo-node-model">
+            <rect x="612" y="446" width="118" height="44" rx="6" />
+            <text x="671" y="464">ollama</text>
+            <text className="topo-sub" x="671" y="479">chat + embed</text>
           </g>
         </svg>
       </div>
@@ -146,7 +160,8 @@ export default function Topology() {
         <span className="topo-key topo-key-go">Go</span>
         <span className="topo-key topo-key-react">React</span>
         <span className="topo-key topo-key-infra">infra</span>
-        <span className="topo-legend-note">the dashed edges cross the seam — the queue (commands) and the events channel (facts)</span>
+        <span className="topo-key topo-key-model">model runtime</span>
+        <span className="topo-legend-note">dashed green crosses the seam — the queue (commands) and the events channel (facts); the dotted edge is the api calling a model, local or hosted, behind one contract</span>
       </div>
     </figure>
   )

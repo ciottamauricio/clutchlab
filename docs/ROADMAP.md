@@ -10,6 +10,12 @@ Suggested order (each step = one new concept):
 3. **Real-time tactics board** — websockets, a *second* Go service. Streaming.
 4. **Search over parsed events** — a synced read model. CQRS / eventual consistency.
 5. **Notifications + Discord bot** — event-driven pub-sub.
+6. **Ask-the-analyst (RAG)** — retrieval over the read models you already built, generation
+   behind an interface. The new concept is that *retrieval*, not the model, is the work.
+7. **Local models** — a second implementation of the same contracts, chosen by env var, so
+   "hosted vs local" becomes a measurement instead of an opinion.
+
+Steps 1–7 are built. What follows is the unbuilt backlog.
 
 ---
 
@@ -65,6 +71,29 @@ CS teams live in Discord. Parser emits an event (`MatchParsed`) rather than know
 Discord; a separate notifier service reacts. Publishers who don't know their subscribers —
 one of the most important distributed-systems patterns.
 
+### Ask-the-analyst  →  RAG over the read models you already have  *(built)*
+
+Free-text questions about your own matches — "how do we usually lose on Mirage?". The
+lesson is the reframing: this is mostly a *retrieval* problem, and the retrieval half was
+already standing (Meilisearch for words, Postgres for rows). Generation is the small new
+part, behind an `AnalystLlm` interface, grounded so every claim cites a real match.
+
+Semantic recall is `pgvector` **inside Postgres** — a deliberate "no" to the earn-the-
+boundary test, since a vector column beside the rows it describes is one fewer service.
+Three corpora came out of it (matches, rounds, the project's own docs), and the third is
+what proved which seam generalized: `EmbeddingClient`, the one that never had to change.
+
+### Local models  →  the same contracts, a different runtime  *(built)*
+
+An `ollama` container implements `AnalystLlm`, `DocsLlm`, and `EmbeddingClient` alongside
+the hosted Claude implementations; `ANALYST_PROVIDER` / `EMBED_PROVIDER` pick which answers.
+No new service boundary — that is the point. Running both is what turned "how much worse is
+local?" into evidence: for embeddings local wins outright, for generation it is the free and
+private option rather than the good one. Full ledger in study topic 22.
+
+Named next rungs: **streaming the analyst's answer** (`docs/plans/stream-the-analyst.md`) so
+a 9s generation feels like progress rather than a hang.
+
 ### Analytics / trends layer  →  separate read/reporting path
 
 "T-side win rate on Inferno over 30 days." Analytical (not transactional) access pattern —
@@ -80,5 +109,5 @@ as the Go parser, different runtime chosen for a real need.
 ---
 
 By the end you'll have touched: batch processing, streaming/websockets, search indexing,
-event-driven messaging, and polyglot services — a full tour of SOA, wrapped in something
-you'd actually use with your team.
+event-driven messaging, retrieval-augmented generation, and polyglot services — a full tour
+of SOA, wrapped in something you'd actually use with your team.
