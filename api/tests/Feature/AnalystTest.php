@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\RoundRetriever;
 use App\Models\GameMatch;
 use App\Models\Tactic;
 use App\Models\Team;
@@ -9,6 +10,7 @@ use App\Models\TrainingSession;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Fakes\FakeRoundRetriever;
 use Tests\TestCase;
 
 // The RAG endpoint: retrieval is scoped to the caller's visible matches, generation is
@@ -168,7 +170,7 @@ class AnalystTest extends TestCase
         GameMatch::factory()->create(['user_id' => $me->id]);
 
         // Round detail is a bonus; losing it must never cost the whole answer.
-        $this->app->instance(\App\Contracts\RoundRetriever::class, new class extends \Tests\Fakes\FakeRoundRetriever
+        $this->app->instance(RoundRetriever::class, new class extends FakeRoundRetriever
         {
             public function related(string $query, array $matchIds, int $limit = 3): array
             {

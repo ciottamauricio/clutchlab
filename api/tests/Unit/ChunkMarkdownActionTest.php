@@ -128,6 +128,6 @@ class ChunkMarkdownActionTest extends TestCase
 
     public function test_a_document_with_no_headings_yields_nothing(): void
     {
-        $this->assertSame([], $this->chunk("Just a paragraph with no structure at all, which gives the chunker no boundary to work with."));
+        $this->assertSame([], $this->chunk('Just a paragraph with no structure at all, which gives the chunker no boundary to work with.'));
     }
 }
