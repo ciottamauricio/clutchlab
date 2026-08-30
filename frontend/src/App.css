@@ -5128,3 +5128,179 @@ a.brand:hover .brand-mark {
   .docs-sources li { grid-template-columns: 46px minmax(0, 1fr); }
   .docs-source-heading { grid-column: 2; }
 }
+
+/* ---- Delivery (DORA) metrics ---- */
+
+.dora-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.dora-windows {
+  display: flex;
+  gap: 6px;
+}
+
+.dora-windows button {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font: 500 12px var(--mono);
+  cursor: pointer;
+}
+
+.dora-windows button.active {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.dora-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.dora-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+/* An unmeasured metric recedes: it is not a zero, and it should not read as one. */
+.dora-card-empty {
+  border-style: dashed;
+}
+
+.dora-card-empty .dora-value {
+  color: var(--text-dim);
+}
+
+.dora-card h3 {
+  margin: 0 0 10px;
+  font: 500 12px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-h);
+}
+
+.dora-value {
+  margin: 0;
+  font: 600 28px var(--display);
+  color: var(--text-h);
+  line-height: 1.1;
+}
+
+.dora-badge {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font: 500 11px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dora-badge-elite {
+  background: var(--win-bg);
+  color: var(--win);
+}
+
+.dora-badge-high {
+  background: var(--ct-bg);
+  color: var(--ct);
+}
+
+.dora-badge-medium {
+  background: var(--t-bg);
+  color: var(--t);
+}
+
+.dora-badge-low {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.dora-note,
+.dora-sample {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.dora-subhead {
+  margin: 32px 0 12px;
+  font: 500 12px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-h);
+}
+
+.dora-trend {
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.dora-trend svg {
+  width: 100%;
+  height: auto;
+}
+
+.dora-axis {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.dora-tick {
+  fill: var(--text-dim);
+  font: 400 10px var(--mono);
+}
+
+.dora-bar-ok {
+  fill: var(--ct);
+}
+
+.dora-bar-bad {
+  fill: var(--danger);
+}
+
+.dora-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.dora-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-left: 8px;
+}
+
+.dora-key-ok {
+  background: var(--ct);
+}
+
+.dora-key-bad {
+  background: var(--danger);
+}
+
+.dora-generated {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--text-dim);
+}

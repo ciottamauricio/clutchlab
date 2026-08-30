@@ -15,6 +15,15 @@ consumer test decodes the fixture and checks every field survives. Containers se
 directory read-only at `../contracts` relative to each module root (compose mounts);
 in CI the checkout provides the same relative path.
 
+## Optional payload fields
+
+`match_parsed.json` pins the **no-duration** shape. The worker also sends an optional
+`duration_ms` (whole-job wall clock, pickup → outcome) which the api records for the
+Reliability SLO; it is additive and omitted when unmeasured, so the canonical bytes above
+are unchanged. Its wire name and omitempty behavior are pinned by a dedicated test in
+`worker/internal/events` rather than by the fixture — the fixture stays the contract for
+what every consumer can rely on being present.
+
 ## Optional trace context
 
 Messages that cross a non-HTTP hop may carry an **optional** `traceparent` (W3C trace

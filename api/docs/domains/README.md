@@ -15,6 +15,7 @@ same change when rules change.
 | Search | Implemented (Step 4) | [search.md](search.md) |
 | Kill heatmap — kill positions on the radar | Implemented | [heatmap.md](heatmap.md) |
 | Notifications | Planned (Step 5) | [notifications.md](notifications.md) |
+| DORA — delivery metrics | Instrumented; awaits a deploy pipeline | [dora.md](dora.md) |
 
 ## What "business rules" means here
 

@@ -81,4 +81,37 @@ return [
             'timeout' => (int) env('OLLAMA_EMBED_TIMEOUT', 120),
         ],
     ],
+
+    // DORA delivery metrics. The ingest token is the only credential CI presents, so an
+    // empty value denies every /api/internal/* call rather than opening the door.
+    'dora' => [
+        'token' => env('DORA_INGEST_TOKEN', ''),
+
+        // Rolling window the dashboard defaults to, in days.
+        'window_days' => (int) env('DORA_WINDOW_DAYS', 30),
+
+        // The Reliability SLO: a demo counts as delivered if it parses successfully
+        // within this budget. 3 minutes is the product promise ("upload, go make coffee"),
+        // not a machine limit — raise it and the metric stops meaning anything to a user.
+        'parse_slo_ms' => (int) env('DORA_PARSE_SLO_MS', 180000),
+        'parse_slo_target' => (float) env('DORA_PARSE_SLO_TARGET', 0.95),
+
+        // Backfill source: deploy history is reconstructed from the GitHub Actions runs
+        // API. A public repo needs no token; one is still worth setting, since the
+        // unauthenticated rate limit (60/hour/IP) is easy to exhaust while iterating.
+        'github' => [
+            'repo' => env('GITHUB_REPO', 'ciottamauricio/clutchlab'),
+            'token' => env('GITHUB_TOKEN', ''),
+            'api' => env('GITHUB_API', 'https://api.github.com'),
+        ],
+
+        // Which workflow files represent a real production deploy, mapped to the service
+        // each one ships. ONLY these are imported: counting the test workflows would make
+        // deployment frequency a measure of how often CI ran, which is not the metric.
+        'deploy_workflows' => [
+            '.github/workflows/deploy.api.yml' => 'api',
+            '.github/workflows/deploy.worker.yml' => 'worker',
+            '.github/workflows/deploy.web.yml' => 'web',
+        ],
+    ],
 ];

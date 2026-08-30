@@ -130,6 +130,11 @@ func (w *worker) handle(ctx context.Context, payload string) {
 	}
 	log.Printf("match %d: parsing %s", job.MatchID, job.DemoKey)
 
+	// Delivery telemetry starts at pickup, not at the parse stage: the SLO the api
+	// computes from this is about how long the uploader waited, and the download is part
+	// of that wait. Every exit path below reports it.
+	started := time.Now()
+
 	// Join the api's upload trace when the job carries one (a missing traceparent just
 	// yields a local root trace). Each stage below is a child span, so Jaeger shows the
 	// parse as a waterfall (download → parse → save → index) under the api's span.
@@ -149,7 +154,7 @@ func (w *worker) handle(ctx context.Context, payload string) {
 	})
 	if err != nil {
 		log.Printf("match %d: download failed: %v", job.MatchID, err)
-		w.fail(ctx, span, job.MatchID, "parse_failed_download")
+		w.fail(ctx, span, job.MatchID, "parse_failed_download", started)
 		return
 	}
 	defer obj.Close()
@@ -164,7 +169,7 @@ func (w *worker) handle(ctx context.Context, payload string) {
 	})
 	if err != nil {
 		log.Printf("match %d: parse failed: %v", job.MatchID, err)
-		w.fail(ctx, span, job.MatchID, parseFailCode(err))
+		w.fail(ctx, span, job.MatchID, parseFailCode(err), started)
 		return
 	}
 
@@ -174,7 +179,7 @@ func (w *worker) handle(ctx context.Context, payload string) {
 		return struct{}{}, w.store.SaveStats(job.MatchID, res)
 	}); err != nil {
 		log.Printf("match %d: save failed: %v", job.MatchID, err)
-		w.fail(ctx, span, job.MatchID, "parse_failed_internal")
+		w.fail(ctx, span, job.MatchID, "parse_failed_internal", started)
 		return
 	}
 	log.Printf("match %d: parsed %s %d-%d (%d players)", job.MatchID, res.MapName, res.ScoreCT, res.ScoreT, len(res.Players))
@@ -196,6 +201,7 @@ func (w *worker) handle(ctx context.Context, payload string) {
 		CTName: res.CTName, TName: res.TName,
 		TotalRounds: int(res.TotalRounds), TickRate: res.TickRate,
 		DurationSeconds: res.DurationSeconds, KnifeRoundWinner: res.KnifeRoundWinner,
+		DurationMs: time.Since(started).Milliseconds(),
 	})
 }
 
@@ -229,9 +235,12 @@ func stageSpan[T any](ctx context.Context, name string, fn func(context.Context)
 // fail announces the failure as an event the api applies to the matches row — the worker
 // can't write `matches` itself since the DB split. (At-most-once: a dropped match.failed
 // leaves the row in 'parsing'; see the reconcile note in docs/plans/split-the-database.md.)
-func (w *worker) fail(ctx context.Context, span trace.Span, matchID int64, code string) {
+func (w *worker) fail(ctx context.Context, span trace.Span, matchID int64, code string, started time.Time) {
 	span.SetStatus(codes.Error, code)
-	w.publish(ctx, events.Event{Event: "match.failed", V: 1, MatchID: matchID, ErrorCode: code})
+	w.publish(ctx, events.Event{
+		Event: "match.failed", V: 1, MatchID: matchID, ErrorCode: code,
+		DurationMs: time.Since(started).Milliseconds(),
+	})
 }
 
 // publish is fire-and-forget by design: notifications must never hold a parse hostage,

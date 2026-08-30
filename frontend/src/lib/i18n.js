@@ -88,6 +88,8 @@ const MESSAGES = {
   'docs.question_too_short': 'Ask a fuller question (at least 5 characters)',
   'docs.question_too_long': 'Keep the question under 500 characters',
 
+  'internal.unauthorized': 'That ingestion token is not valid',
+
   'error.unknown': 'Something went wrong',
 }
 

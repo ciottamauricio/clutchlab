@@ -26,6 +26,7 @@ changes.** The code follows the doc, not the other way around.
 | Notifications | Implemented (Step 5) — pub/sub; Go notifier + Laravel events-listener | `docs/domains/notifications.md` |
 | Trainings — scheduled practice (time + tactics + roster) | API implemented; UI + event next | `docs/domains/trainings.md` |
 | Analyst — RAG Q&A over the caller's matches (keyword + semantic retrieval) | Implemented | `docs/domains/analyst.md` |
+| DORA — delivery metrics (deploys, lead time, CFR, MTTR, parse SLO) | Instrumented; 3 of 5 metrics await a deploy pipeline | `docs/domains/dora.md` |
 
 ## API conventions (non-negotiable)
 
