@@ -193,6 +193,13 @@ are test-only. That means:
 - **Deployment frequency, lead time, and CFR** have no data source until something
   actually deploys. They will read "not measured yet", which is the correct answer.
 
+**The three `deploy-*` workflows therefore fail on every push to main, by design.** They
+run, capture the commit metadata, attempt the (unimplemented) deploy, and exit non-zero.
+That red X is the honest state of a project with no production environment; it turns green
+when the deploy step is filled in. The reporting step is `continue-on-error`, so the job's
+verdict always comes from the deploy itself and never from whether the metric could be
+recorded — measurement must not be able to fail the build it measures.
+
 `.github/workflows/deploy.reusable.yml` carries the two measurement points and the
 `always()` reporting step, with the deploy step itself left **failing rather than
 stubbed**. A stub that "succeeded" would post a stream of successful-deploy rows describing
