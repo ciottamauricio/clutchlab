@@ -9,6 +9,7 @@ import TacticsPage from './pages/TacticsPage'
 import SearchPage from './pages/SearchPage'
 import AwardsPage from './pages/AwardsPage'
 import AdminPage from './pages/AdminPage'
+import DoraPage from './pages/DoraPage'
 import ProfilePage from './pages/ProfilePage'
 import StudyPage from './pages/StudyPage'
 import PresentPage from './pages/PresentPage'
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="/search" element={<RequireCan ability="search.use"><SearchPage /></RequireCan>} />
             <Route path="/awards" element={<RequireCan ability="awards.view"><AwardsPage /></RequireCan>} />
             <Route path="/admin" element={<AdminOnly><AdminPage /></AdminOnly>} />
+            <Route path="/dora" element={<AdminOnly><DoraPage /></AdminOnly>} />
             <Route path="/study" element={<StudyPage />} />
             <Route path="/present" element={<PresentPage />} />
           </Route>

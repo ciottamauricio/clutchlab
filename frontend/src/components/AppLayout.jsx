@@ -26,6 +26,7 @@ export default function AppLayout() {
             {canSearch && <NavLink to="/search">Search</NavLink>}
             {canAwards && <NavLink to="/awards">Awards</NavLink>}
             {user?.is_admin && <NavLink to="/admin">Admin</NavLink>}
+            {user?.is_admin && <NavLink to="/dora">Delivery</NavLink>}
           </nav>
           <div className="user">
             <UserMenu />
