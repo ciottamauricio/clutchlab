@@ -36,6 +36,10 @@ type Event struct {
 	DurationSeconds  float64 `json:"duration_seconds"`
 	KnifeRoundWinner string  `json:"knife_round_winner,omitempty"`
 	ErrorCode        string  `json:"error_code,omitempty"`
+	// Wall-clock time for the whole job (pickup → outcome), which is what the uploader
+	// actually waits through — not just the parse stage. Feeds the api's Reliability SLO.
+	// Additive and optional: a subscriber that doesn't care simply ignores it.
+	DurationMs int64 `json:"duration_ms,omitempty"`
 	// W3C trace context — non-HTTP hops carry it in the payload instead of a header,
 	// so a subscriber's span joins the publisher's trace. Additive; optional.
 	Traceparent string `json:"traceparent,omitempty"`

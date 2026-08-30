@@ -42,3 +42,18 @@ func TestOptionalFieldsAreOmittedWhenEmpty(t *testing.T) {
 		}
 	}
 }
+
+// duration_ms crosses into the api (it is the Reliability SLO's only input), so pin its
+// wire name and its omitempty behavior here: absent when the worker didn't measure,
+// present as a plain integer when it did.
+func TestDurationMsIsOptionalAndNamed(t *testing.T) {
+	got, _ := json.Marshal(Event{Event: "match.parsed", V: 1, MatchID: 7})
+	if bytes.Contains(got, []byte(`"duration_ms"`)) {
+		t.Errorf("duration_ms should be omitted when unmeasured: %s", got)
+	}
+
+	got, _ = json.Marshal(Event{Event: "match.parsed", V: 1, MatchID: 7, DurationMs: 4200})
+	if !bytes.Contains(got, []byte(`"duration_ms":4200`)) {
+		t.Errorf("duration_ms missing or misnamed: %s", got)
+	}
+}
