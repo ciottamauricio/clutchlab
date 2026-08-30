@@ -1,11 +1,14 @@
 # Deploy + DORA instrumentation for the worker service. Separate from worker.yml (which
 # tests): a deploy is main-only and must not run on a pull request.
+#
+# deploy.reusable.yml is in the filter for the same reason contracts/** is: all three
+# services share it, so a change there affects this deploy even when worker/ is untouched.
 name: deploy-worker
 
 on:
   push:
     branches: [main]
-    paths: ["worker/**", "contracts/**", ".github/workflows/deploy.worker.yml"]
+    paths: ["worker/**", "contracts/**", ".github/workflows/deploy.worker.yml", ".github/workflows/deploy.reusable.yml"]
 
 jobs:
   deploy:

@@ -1,11 +1,14 @@
 # Deploy + DORA instrumentation for the frontend. The directory is frontend/ but the
 # metric records it as "web" — the name the deployments table and the dashboard use.
+#
+# deploy.reusable.yml is in the filter because all three services share it: a change
+# there affects this deploy even when frontend/ is untouched.
 name: deploy-web
 
 on:
   push:
     branches: [main]
-    paths: ["frontend/**", ".github/workflows/deploy.web.yml"]
+    paths: ["frontend/**", ".github/workflows/deploy.web.yml", ".github/workflows/deploy.reusable.yml"]
 
 jobs:
   deploy:
