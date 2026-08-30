@@ -1,0 +1,19 @@
+# Deploy + DORA instrumentation for the api service. Separate from api.yml (which
+# tests): a deploy is main-only and must not run on a pull request.
+name: deploy-api
+
+on:
+  push:
+    branches: [main]
+    paths: ["api/**", "contracts/**", ".github/workflows/deploy.api.yml"]
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy.reusable.yml
+    with:
+      service: api
+    secrets:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+      DORA_INGEST_TOKEN: ${{ secrets.DORA_INGEST_TOKEN }}
+      DORA_API_URL: ${{ secrets.DORA_API_URL }}

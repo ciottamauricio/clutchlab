@@ -94,6 +94,17 @@ private option rather than the good one. Full ledger in study topic 22.
 Named next rungs: **streaming the analyst's answer** (`docs/plans/stream-the-analyst.md`) so
 a 9s generation feels like progress rather than a hang.
 
+### Delivery metrics (DORA)  →  measuring the pipeline, not the product  *(built)*
+
+The four DORA metrics plus a parse-reliability SLO, computed from rows the system records
+about itself: `deployments` (written by CI), `incidents` (the one manual input), and
+`parse_events`. The lesson turned out to be about **seams, not metrics** — parse telemetry
+needed no new transport at all, because the worker was already publishing every parse
+outcome on `clutch_events`; the metric became one more subscriber to a fact already in
+flight. The second lesson is negative space: three of the five metrics read "not measured"
+because nothing deploys yet, and making them render honestly was more work (and more
+valuable) than making them render a number. Details in `api/docs/domains/dora.md`.
+
 ### Analytics / trends layer  →  separate read/reporting path
 
 "T-side win rate on Inferno over 30 days." Analytical (not transactional) access pattern —

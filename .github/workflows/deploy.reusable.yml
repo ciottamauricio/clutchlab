@@ -1,0 +1,78 @@
+# The DORA measurement points, in one place so all three services report identically.
+#
+# Two steps make the metrics work: `meta` captures the commit's authored time and the
+# deploy start (lead time is measured from when the work was written, not when CI woke
+# up), and `Record deployment` runs under `if: always()` so a FAILED deploy is reported
+# too — a change-failure rate fed only by successes is blind to exactly the events it
+# exists to count.
+#
+# The deploy step itself is not implemented: ClutchLab has no production environment yet
+# (see docs/plans/dora-metrics.md). It is left failing rather than stubbed with a
+# no-op, deliberately — a stub that "succeeds" would post a stream of successful-deploy
+# rows describing nothing, and a dashboard reading Elite off invented data is worse than
+# one that admits it has nothing to measure. Fill in the deploy, and the instrumentation
+# around it starts recording real rows with no further change.
+name: deploy-service
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string # api | worker | web
+    secrets:
+      DEPLOY_HOST: { required: true }
+      DEPLOY_KEY: { required: true }
+      DORA_INGEST_TOKEN: { required: true }
+      DORA_API_URL: { required: true }
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # commit_authored_at needs real history, not a shallow clone
+
+      - name: Capture commit + start time
+        id: meta
+        run: |
+          {
+            echo "sha=$(git rev-parse HEAD)"
+            echo "authored=$(git show -s --format=%cI HEAD)"
+            echo "started=$(date -u +%FT%TZ)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Deploy over SSH
+        id: deploy
+        continue-on-error: true # the outcome is data; the job's verdict comes later
+        run: |
+          echo "No production environment is configured for ${{ inputs.service }}." >&2
+          echo "Implement the deploy here; the steps around it already measure it." >&2
+          exit 1
+
+      # Fires on success AND failure — that is the point.
+      - name: Record deployment (DORA)
+        if: always()
+        env:
+          STATUS: ${{ steps.deploy.outcome == 'success' && 'success' || 'failed' }}
+        run: |
+          curl -sf -X POST "${{ secrets.DORA_API_URL }}/api/internal/deployments" \
+            -H "X-Internal-Token: ${{ secrets.DORA_INGEST_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d @- <<JSON
+          {
+            "service": "${{ inputs.service }}",
+            "environment": "production",
+            "commit_sha": "${{ steps.meta.outputs.sha }}",
+            "commit_authored_at": "${{ steps.meta.outputs.authored }}",
+            "deploy_started_at": "${{ steps.meta.outputs.started }}",
+            "deploy_finished_at": "$(date -u +%FT%TZ)",
+            "status": "$STATUS",
+            "actions_run_id": "${{ github.run_id }}"
+          }
+          JSON
+
+      - name: Fail job if deploy failed
+        if: steps.deploy.outcome != 'success'
+        run: exit 1
