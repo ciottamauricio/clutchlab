@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureInternalToken;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -17,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // API-only backend: never redirect guests to a web login route (there isn't
         // one). Returning null lets the handler answer 401 instead of 500.
         $middleware->redirectGuestsTo(fn () => null);
+
+        $middleware->alias([
+            'internal.token' => EnsureInternalToken::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -6,6 +6,8 @@ use App\Http\Controllers\AnalystController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AwardsController;
 use App\Http\Controllers\DocsController;
+use App\Http\Controllers\Dora\DoraMetricsController;
+use App\Http\Controllers\Dora\InternalDeploymentController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\ProfileController;
@@ -19,6 +21,14 @@ use Illuminate\Support\Facades\Route;
 // Public — auth endpoints are rate-limited.
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+
+// Machine-to-machine ingestion: called by CI, which has no user and no session, so a
+// shared secret is the identity instead of a bearer token. Deliberately outside the
+// auth:sanctum group for that reason — and throttled, since it is the one unauthenticated
+// write path in the API.
+Route::middleware(['internal.token', 'throttle:60,1'])->prefix('internal')->group(function () {
+    Route::post('/deployments', [InternalDeploymentController::class, 'store']);
+});
 
 // Everything else requires a valid bearer token.
 Route::middleware('auth:sanctum')->group(function () {
@@ -100,5 +110,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/admin/players', [AdminUserController::class, 'players']);
         Route::get('/admin/permissions', [AdminPermissionController::class, 'index']);
         Route::put('/admin/permissions', [AdminPermissionController::class, 'update']);
+
+        // Delivery metrics — read-only, and admin-gated because it describes the
+        // project's engineering, not any user's data.
+        Route::get('/dora/metrics', [DoraMetricsController::class, 'index']);
     });
 });

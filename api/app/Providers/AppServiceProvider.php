@@ -6,6 +6,7 @@ use Anthropic\Client as AnthropicClient;
 use App\Authorization\PermissionCatalog;
 use App\Contracts\AnalystLlm;
 use App\Contracts\DemoStorage;
+use App\Contracts\DeploymentHistory;
 use App\Contracts\DocRetriever;
 use App\Contracts\DocsLlm;
 use App\Contracts\EmbeddingClient;
@@ -21,6 +22,8 @@ use App\Events\Subscribers\ApplyMatchParsed;
 use App\Events\Subscribers\EmailTrainingRoster;
 use App\Events\Subscribers\EmbedParsedMatch;
 use App\Events\Subscribers\EventHandler;
+use App\Events\Subscribers\RecordParseFailed;
+use App\Events\Subscribers\RecordParseSucceeded;
 use App\Llm\AnthropicAnalyst;
 use App\Llm\AnthropicDocsExplainer;
 use App\Llm\HashEmbeddings;
@@ -36,6 +39,8 @@ use App\Search\PgVectorDocRetriever;
 use App\Search\PgVectorRetriever;
 use App\Search\PgVectorRoundRetriever;
 use App\Services\DbPermissionService;
+use App\Services\Dora\GithubDeploymentHistory;
+use App\Services\Dora\MetricsCalculator;
 use App\Storage\S3DemoStorage;
 use App\Telemetry\Tracing;
 use Illuminate\Http\Client\Factory as Http;
@@ -61,11 +66,15 @@ class AppServiceProvider extends ServiceProvider
         // Order matters within one event: EmbedParsedMatch builds its card from the row
         // ApplyMatchParsed writes, so it is listed after it (and re-checks the status
         // itself, rather than trusting this array to stay in order).
+        // Telemetry is tagged last on purpose: recording a metric must never sit in front
+        // of the write that makes the match visible to its owner.
         $this->app->tag([
             EmailTrainingRoster::class,
             ApplyMatchParsed::class,
             EmbedParsedMatch::class,
             ApplyMatchFailed::class,
+            RecordParseSucceeded::class,
+            RecordParseFailed::class,
         ], EventHandler::class);
         $this->app->bind(SearchIndex::class, fn () => new MeilisearchIndex(
             new MeilisearchClient(config('clutch.meili.host'), config('clutch.meili.key'))
@@ -115,6 +124,22 @@ class AppServiceProvider extends ServiceProvider
                 config('clutch.anthropic.model'),
             ),
         });
+
+        // The SLO budget is configuration, not a constant in the calculator: what counts
+        // as "delivered fast enough" is a product decision, and the metric has to move
+        // when that decision does.
+        $this->app->bind(DeploymentHistory::class, fn () => new GithubDeploymentHistory(
+            $this->app->make(Http::class),
+            config('clutch.dora.github.repo'),
+            config('clutch.dora.github.token'),
+            config('clutch.dora.github.api'),
+            config('clutch.dora.deploy_workflows'),
+        ));
+
+        $this->app->bind(MetricsCalculator::class, fn () => new MetricsCalculator(
+            (int) config('clutch.dora.parse_slo_ms'),
+            (float) config('clutch.dora.parse_slo_target'),
+        ));
 
         $this->app->bind(SemanticRetriever::class, PgVectorRetriever::class);
         $this->app->bind(RoundRetriever::class, PgVectorRoundRetriever::class);
