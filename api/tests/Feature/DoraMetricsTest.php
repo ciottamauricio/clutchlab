@@ -177,6 +177,22 @@ class DoraMetricsTest extends TestCase
             ]);
     }
 
+    // The state this project is actually in, and the one the tests kept skipping: no
+    // deploys at all. The trend must come back as an empty array rather than null or a
+    // run of zero-filled days -- the chart renders "no deploys recorded" from emptiness,
+    // and zero-filled days would draw an axis implying days that were measured and idle.
+    public function test_the_trend_is_empty_when_nothing_deployed(): void
+    {
+        ParseEvent::factory()->count(3)->create();
+
+        Sanctum::actingAs(User::factory()->create(['role' => UserRole::Admin]));
+
+        $this->getJson('/api/dora/metrics')
+            ->assertOk()
+            ->assertJsonPath('trend', [])
+            ->assertJsonPath('metrics.deployment_frequency.value', null);
+    }
+
     // The dashboard reads metrics/trend off the response ROOT. If this ever grows a
     // Laravel Resource envelope, the frontend's unwrap silently yields undefined and the
     // page renders blank with no error — which is exactly how this broke once.
