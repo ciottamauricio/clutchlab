@@ -1,14 +1,23 @@
 # Deploy + DORA instrumentation for the frontend. The directory is frontend/ but the
 # metric records it as "web" — the name the deployments table and the dashboard use.
 #
-# deploy.reusable.yml is in the filter because all three services share it: a change
-# there affects this deploy even when frontend/ is untouched.
+# The commented push filter includes deploy.reusable.yml because all three services share
+# that file: a change there affects this deploy even when frontend/ is untouched.
 name: deploy-web
 
+# Manual until a production environment exists. The deploy step is unimplemented and
+# exits non-zero, so on `push` these three ran red on every commit to main -- and a
+# permanently-red check is one people learn to scroll past, which costs more than the
+# signal is worth. Dispatch keeps them runnable on demand without that cost.
+#
+# RESTORE THE PUSH TRIGGER when the deploy is implemented: uncomment the block below.
+# Deployment frequency counts what CI records, so a deploy nobody remembered to click
+# is a deploy the metric never sees.
 on:
-  push:
-    branches: [main]
-    paths: ["frontend/**", ".github/workflows/deploy.web.yml", ".github/workflows/deploy.reusable.yml"]
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  #   paths: ["frontend/**", ".github/workflows/deploy.web.yml", ".github/workflows/deploy.reusable.yml"]
 
 jobs:
   deploy:

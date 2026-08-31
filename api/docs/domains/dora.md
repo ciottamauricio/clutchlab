@@ -193,12 +193,22 @@ are test-only. That means:
 - **Deployment frequency, lead time, and CFR** have no data source until something
   actually deploys. They will read "not measured yet", which is the correct answer.
 
-**The three `deploy-*` workflows therefore fail on every push to main, by design.** They
-run, capture the commit metadata, attempt the (unimplemented) deploy, and exit non-zero.
-That red X is the honest state of a project with no production environment; it turns green
-when the deploy step is filled in. The reporting step is `continue-on-error`, so the job's
-verdict always comes from the deploy itself and never from whether the metric could be
-recorded — measurement must not be able to fail the build it measures.
+**The three `deploy-*` workflows are `workflow_dispatch` only.** Run one and it captures
+the commit metadata, attempts the (unimplemented) deploy, and exits non-zero — the honest
+result for a project with no production environment. They were on `push` initially and went
+red on every commit to main; a permanently-red check is one people learn to scroll past,
+which costs more than the signal is worth. The `push` block is kept commented in each file
+so restoring automatic deploys is an uncomment, not a reconstruction.
+
+**Restore the push trigger when the deploy is implemented.** Deployment frequency counts
+what CI records, so a deploy nobody remembered to click is a deploy the metric never sees —
+manual dispatch would quietly under-report the first metric this whole feature exists to
+measure.
+
+The reporting step is `continue-on-error`, so the job's verdict always comes from the deploy
+itself and never from whether the metric could be recorded — measurement must not be able to
+fail the build it measures. (It could, at first: the ingestion `curl` aborted the job and the
+verdict step never ran, so all three services failed for the wrong reason.)
 
 `.github/workflows/deploy.reusable.yml` carries the two measurement points and the
 `always()` reporting step, with the deploy step itself left **failing rather than
