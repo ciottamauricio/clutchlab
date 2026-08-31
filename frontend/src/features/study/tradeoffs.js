@@ -529,4 +529,31 @@ export const TOPICS = [
     code: 'semgrep scan --config=p/security-audit --error --baseline-commit $BASE api/',
     codeLabel: 'the whole repo scans clean, so the gate is scoped to what the diff introduces — the only part that can still fail',
   },
+  {
+    id: 'delivery-metrics',
+    group: 'DevOps & Delivery',
+    n: '24',
+    title: 'Measuring delivery, and the missing deploy',
+    tag: 'DORA, honest instruments',
+    summary: 'Three of the five metrics have no data, and making them say so was harder — and worth more — than making them show a number.',
+    gained: [
+      'The four DORA metrics plus a parse-reliability SLO, computed on read from three tables the pipeline fills itself: deployments (written by CI), incidents (the one manual input), parse_events. Resolving an incident moves MTTR and CFR immediately — no redeploy, no recomputation step to forget.',
+      'Parse telemetry needed no new transport. The worker already publishes match.parsed / match.failed on clutch_events at exactly the moments the SLO cares about, so recording it is one more subscriber to a fact already crossing the boundary (topic 15) — no HTTP client in Go, no second queue, no extra secret. The spec proposed both of those; the seam that already existed beat them.',
+      'Every metric returns null, not zero, when its window is empty — value and bucket together. A 0% change failure rate over zero deploys is an absence of evidence, and a green badge on it would be the instrument lying in the one direction nobody audits.',
+    ],
+    paid: [
+      'Three of the five metrics measure nothing, because nothing deploys. Deployment frequency, lead time, and CFR are all defined in terms of production deploys, and this project has never had a production environment — the instrumentation is complete and idle.',
+      'The deploy step in the reusable workflow is left failing rather than stubbed. A no-op that "succeeded" would post a stream of successful-deploy rows describing nothing, and an Elite badge computed from invented events is worse than an empty panel, because nobody re-checks a green number.',
+      'Those workflows are now workflow_dispatch, not push. A permanently-red check trains people to scroll past red — but manual dispatch under-reports deployment frequency the moment a real deploy exists, so the push trigger is kept commented with the reason it must come back. Both states are wrong; the honest move was picking the one whose failure mode is visible.',
+      'Two bugs shipped in the part that had no way to be tested before merging. The ingestion curl had no continue-on-error, so it killed the job and the real verdict step never ran — the instrument decided the build\'s verdict instead of reporting on it. Then the fix reached only one of three services, because the path filters omitted the reusable workflow they all share: exactly the drift topic 16 warns about, in the file that warns about it.',
+    ],
+    body: [
+      'The reflex when adding metrics is to get the dashboard populated — seed something, backfill something, show a number. That reflex is the failure mode, and it is the same one topic 23 found in a scanner that is green forever: an instrument nobody has watched fail is a hypothesis. Here the question was narrower and sharper, because the data genuinely was not there. What may this thing claim? The answer had to be "nothing, and visibly so" for three of five, which meant the null path, the empty trend, and the dashed "not measured yet" card carried more design than the populated ones.',
+      'The same rule decided the backfill. Deploy history can be reconstructed from the GitHub Actions runs API, but only the deploy workflows count — this repo\'s api.yml and worker.yml are test workflows, and importing them would turn deployment frequency into a measure of how often CI ran: a number that looks like delivery and measures nothing of the kind. It imports zero today, correctly, and says why rather than printing a bare "0 imported".',
+      'The seeder exists so the UI could be built before the pipeline, and it marks every synthetic deploy with a seed- prefix. That marker enforces the rule that keeps the two apart: a fabricated incident may only ever blame a fabricated deploy. Randomly marking real backfilled deploys as failures would make CFR a fiction while still looking entirely reasonable — which is the specific way measurement systems rot.',
+      'The bugs are the honest ending. Both were in CI, the one surface with no local test path, and both passed the check that was actually run: the YAML parsed. Parsing is not behaviour. A feature about not trusting green numbers shipped with two of them, and the first real run is what found them — which is the argument for the feature, made at its own expense.',
+    ],
+    code: 'if: always()   # a failed deploy must report too, or CFR is blind to what it exists to count',
+    codeLabel: 'the measurement point that matters most is the one on the failure path',
+  },
 ]
