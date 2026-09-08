@@ -10,9 +10,10 @@ truth for frontend structure and conventions, and it deliberately supersedes the
 ## The essentials
 
 - **Feature folders.** Domain code lives in `src/features/<domain>/` (mirrors
-  `api/docs/domains/`); `src/components/` is for domain-agnostic **primitives** only
-  (empty until repetition justifies extracting them); `src/pages/` are thin route
-  compositions; `src/lib/` is cross-cutting (`api.js`, `i18n.js`).
+  `api/docs/domains/`), with `src/features/shared/` for domain code no single feature owns;
+  `src/components/` is for domain-agnostic **primitives** only; `src/layout/` is the app
+  shell (the one layer allowed to import `features/auth`); `src/pages/` are thin route
+  compositions; `src/lib/` is cross-cutting (`api.js`, `i18n.js`, `theme.js`).
 - **Hooks fetch, components render.** All data access is in a feature's `api.js` hooks —
   never `fetch` inline in a component. Plain hooks for now; TanStack Query is the target.
 - **Codes, not sentences.** `lib/api.js` throws `ApiError(code)`; components render

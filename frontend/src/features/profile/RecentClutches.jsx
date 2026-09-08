@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import BodyHitgroups from '../../components/BodyHitgroups'
+import BodyHitgroups from '../shared/BodyHitgroups'
 import WatchInGame from '../matches/WatchInGame'
 import { formatMatchTime, mapLabel } from '../matches/format'
 

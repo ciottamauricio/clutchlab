@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAwardKills } from './api'
-import BodyHitgroups from '../../components/BodyHitgroups'
+import BodyHitgroups from '../shared/BodyHitgroups'
 import WatchInGame from '../matches/WatchInGame'
 import { WEAPONS } from '../search/weapons'
 import { t } from '../../lib/i18n'

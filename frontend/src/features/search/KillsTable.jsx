@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import BodyHitgroups from '../../components/BodyHitgroups'
+import BodyHitgroups from '../shared/BodyHitgroups'
 import WatchInGame from '../matches/WatchInGame'
 
 export default function KillsTable({ hits }) {
