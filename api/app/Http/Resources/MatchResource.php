@@ -27,6 +27,9 @@ class MatchResource extends JsonResource
             // The team this match is shared with (null = private to the uploader), and who
             // uploaded it — so a teammate viewing the list knows whose match it is.
             'team_id' => $this->team_id,
+            // steam | faceit | gamersclub | other — a code the frontend labels; null for
+            // matches uploaded before the platform was asked for, under an unrecognized name.
+            'platform' => $this->platform,
             'team' => $this->whenLoaded('team', fn () => $this->team?->only('id', 'name')),
             'uploaded_by' => $this->whenLoaded('owner', fn () => $this->owner?->name),
             // When the match was actually played (UTC, from the demo filename); null when the

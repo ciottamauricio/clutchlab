@@ -43,6 +43,7 @@ export default function MatchDashboard({ matchId }) {
           <h2>{parsed ? (match.map_name || 'unknown map') : match.original_filename}</h2>
           <div className="dh-meta">
             {date && <span>{date}</span>}
+            {match.platform && <span>{t(`platform.${match.platform}`)}</span>}
             {parsed && <span>{match.total_rounds} rounds</span>}
             {duration && <span>{duration}</span>}
           </div>

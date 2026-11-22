@@ -26,6 +26,13 @@ const MESSAGES = {
   'match.invalid_month': 'That month filter is invalid',
   'match.invalid_day': 'That day filter is invalid',
   'match.invalid_page': 'That page does not exist',
+  'match.platform_required': 'Please choose where the match was played',
+  'match.invalid_platform': 'That platform is not supported',
+
+  'platform.steam': 'Steam matchmaking',
+  'platform.faceit': 'FACEIT',
+  'platform.gamersclub': 'Gamers Club',
+  'platform.other': 'Other',
   'tactic.invalid_team': "You can only share with a team you belong to",
 
   'training.invalid_team': "You can't schedule trainings for that team",

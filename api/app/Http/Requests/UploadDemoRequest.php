@@ -3,8 +3,10 @@
 namespace App\Http\Requests;
 
 use App\Contracts\PermissionService;
+use App\Models\GameMatch;
 use App\Models\Team;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UploadDemoRequest extends FormRequest
 {
@@ -38,6 +40,7 @@ class UploadDemoRequest extends FormRequest
                     $fail('match.duplicate');
                 }
             }],
+            'platform' => ['required', Rule::in(GameMatch::PLATFORMS)],
             // Optional: file the match under a team so the whole team can see it. Must be a
             // team the caller may upload to; null keeps the match private.
             'team_id' => ['nullable', 'integer', function ($attr, $value, $fail) {
@@ -59,6 +62,8 @@ class UploadDemoRequest extends FormRequest
             'demo.file' => 'demo.invalid',
             'demo.extensions' => 'demo.wrong_extension',
             'demo.max' => 'demo.file_too_large',
+            'platform.required' => 'match.platform_required',
+            'platform.in' => 'match.invalid_platform',
             'team_id.integer' => 'match.invalid_team',
             'match.upload_forbidden' => 'match.upload_forbidden',
             'match.duplicate' => 'match.duplicate',

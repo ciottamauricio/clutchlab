@@ -10,12 +10,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 // "Match" is a reserved word in PHP, so the model is GameMatch on the `matches` table.
-#[Fillable(['original_filename', 'demo_key', 'content_hash', 'status', 'team_id', 'played_at'])]
+#[Fillable(['original_filename', 'demo_key', 'content_hash', 'status', 'team_id', 'played_at', 'platform'])]
 class GameMatch extends Model
 {
     use HasFactory;
 
     protected $table = 'matches';
+
+    // Where the match was played, chosen by the uploader. `steam` is Valve's own matchmaking.
+    public const PLATFORMS = ['steam', 'faceit', 'gamersclub', 'other'];
 
     protected function casts(): array
     {

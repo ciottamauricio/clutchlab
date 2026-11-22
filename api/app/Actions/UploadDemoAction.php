@@ -18,7 +18,7 @@ class UploadDemoAction
         private Tracing $tracing,
     ) {}
 
-    public function execute(UploadedFile $file, User $owner, ?int $teamId = null, ?string $contentHash = null): GameMatch
+    public function execute(UploadedFile $file, User $owner, string $platform, ?int $teamId = null, ?string $contentHash = null): GameMatch
     {
         // The root span for the whole upload → parse → notify flow. Store, create, and
         // enqueue run inside it, and push() injects this span's traceparent into the job
@@ -38,6 +38,7 @@ class UploadDemoAction
                 'content_hash' => $contentHash,
                 'status' => 'queued',
                 'team_id' => $teamId,
+                'platform' => $platform,
                 'played_at' => GameMatch::playedAtFromFilename($filename),
             ]);
 

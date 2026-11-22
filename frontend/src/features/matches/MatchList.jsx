@@ -1,4 +1,5 @@
 import StatusBadge from './StatusBadge'
+import { t } from '../../lib/i18n'
 import { formatMatchDate, formatDuration, matchTeams, matchDate } from './format'
 
 // The viewer's result, when the game was theirs (see matches.md rule 11). The letter
@@ -16,6 +17,11 @@ function MatchCard({ match }) {
     </span>
   ) : null
 
+  const platform = match.platform ? (
+    <span className="mc-platform-tag">{t(`platform.${match.platform}`)}</span>
+  ) : null
+  const tags = platform || team ? <span className="mc-tags">{platform}{team}</span> : null
+
   if (match.status !== 'parsed') {
     return (
       <>
@@ -25,7 +31,7 @@ function MatchCard({ match }) {
         </span>
         <span className="mc-line">
           {date && <span className="mc-date">{date}</span>}
-          {team}
+          {tags}
         </span>
       </>
     )
@@ -53,7 +59,7 @@ function MatchCard({ match }) {
           {duration && <span className="mc-duration"> · {duration}</span>}
         </span>
       </span>
-      {team && <span className="mc-line">{team}</span>}
+      {tags && <span className="mc-line">{tags}</span>}
       <span className="mc-score">
         <span className="mc-team">{a.name}</span>
         <span className="mc-nums">{a.score} <span className="mc-x">×</span> {b.score}</span>

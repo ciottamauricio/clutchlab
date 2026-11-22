@@ -66,6 +66,7 @@ class MatchController extends Controller
         $match = $action->execute(
             $request->file('demo'),
             $request->user(),
+            $request->validated('platform'),
             $request->integer('team_id') ?: null,
             $request->contentHash(),
         );

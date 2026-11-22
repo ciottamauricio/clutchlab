@@ -22,6 +22,8 @@ Authorization & ownership).
 - **Player stat** — one row per player per match in `match_player_stats`.
 - **demo_key** — the S3 object key of the stored demo (`<uuid>.dem`); also the value
   that joins the web tier to the worker via the queue.
+- **Platform** — where the match was played: `steam` (Valve's own matchmaking),
+  `faceit`, `gamersclub`, or `other`. Chosen by the uploader, never read from the demo.
 
 ## Entities
 
@@ -32,6 +34,7 @@ Authorization & ownership).
 | id | bigint | api | |
 | user_id | fk users, nullable | api | the uploader (null for legacy pre-auth rows) |
 | team_id | fk teams, nullable | api | the team the match is shared with; null = private to the uploader |
+| platform | string(20), nullable | api | `steam` / `faceit` / `gamersclub` / `other` (`GameMatch::PLATFORMS`), chosen at upload. Null only for rows that predate the column and whose filename matched no platform's naming pattern in the backfill. |
 | original_filename | string | api | client-provided name; display only |
 | demo_key | string, unique | api | S3 object key `<uuid>.dem` |
 | content_hash | string(64), nullable | api | sha256 of the uploaded demo's bytes; `unique(user_id, content_hash)` so a user can't upload the same demo twice. Null for legacy pre-hash rows. |
@@ -118,6 +121,11 @@ Transition rules:
     stack that queued together — per team, never pooled across teams). `null` otherwise,
     and always `null` off the list endpoint. Computed by
     `app/Actions/Matches/ComputeViewerResultsAction.php`; presentation-only, never stored.
+12. **The uploader states the platform.** It is required on upload and stored as given: the
+    demo itself doesn't say where it was played, and a filename can be renamed. The frontend
+    pre-selects a guess from the filename's shape (`features/matches/platform.js`) — Gamers
+    Club `YYYY-MM-DD__HHMM__…`, Valve `match730_…`, FACEIT `1-<uuid>-…` — but the API never
+    infers it.
 
 ## Validation (boundary) — `app/Http/Requests/UploadDemoRequest.php`
 
@@ -131,6 +139,9 @@ Transition rules:
 Emitted codes (never prose): `demo.required`, `demo.invalid`, `demo.wrong_extension`,
 `demo.file_too_large`. A storage failure surfaces `demo.storage_failed`.
 
+`platform` field: required, one of `GameMatch::PLATFORMS`. Codes: `match.platform_required`,
+`match.invalid_platform`.
+
 Infra limits that must stay **≥** this size: nginx `client_max_body_size` (512M) and
 PHP `upload_max_filesize` / `post_max_size` (512M, set in `api/php.ini`).
 
@@ -143,7 +154,7 @@ upload rights (owner/igl) on the team, or being the uploader.
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
 | GET | `/matches` | list matches the caller can see, most recently **played** first (null `played_at` last, then by upload time) | own uploads + their teams' matches; **paginated 10/page** (`{ data, links, meta }`, `?page=`); optional `?player=` narrows to matches whose scoreboard contains that player name (case-insensitive substring; invalid value → `match.invalid_player_filter`); optional `?month=YYYY-MM` / `?day=YYYY-MM-DD` narrow to matches **played** in that calendar month / day (they intersect; undated matches only appear unfiltered; invalid values → `match.invalid_month` / `match.invalid_day`) |
-| POST | `/matches` | upload a demo | multipart `demo`; optional `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
+| POST | `/matches` | upload a demo | multipart `demo` + required `platform`; optional `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
 | GET | `/matches/{match}` | match detail + players | visible only (403 otherwise); players by kills desc |
 | GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | visible only; see [heatmap.md](heatmap.md) |
 | GET | `/matches/{match}/clutches` | clutches grouped by clutcher/round | visible only; each `{ round, size, killer_name, kills[] }` |
@@ -200,8 +211,9 @@ runaway resource use, isolation handles a crash or exploit. OS-level lockdown of
 
 **Upload / reassignment** (HTTP 422/500): the `demo.*` codes under Validation, plus
 `match.invalid_team` (team the caller can't upload to), `match.upload_forbidden` (caller
-isn't an uploader anywhere), and `match.duplicate` (caller has already uploaded this exact
-demo — dedup is by sha256 of the file content, unique per uploader).
+isn't an uploader anywhere), `match.duplicate` (caller has already uploaded this exact
+demo — dedup is by sha256 of the file content, unique per uploader), and
+`match.platform_required` / `match.invalid_platform`.
 
 ## Authorization & ownership
 
