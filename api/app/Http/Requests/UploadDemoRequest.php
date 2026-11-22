@@ -41,6 +41,9 @@ class UploadDemoRequest extends FormRequest
                 }
             }],
             'platform' => ['required', Rule::in(GameMatch::PLATFORMS)],
+            // Optional: only Gamers Club names carry the date, so other demos need it stated.
+            // Absent, the action falls back to the filename's date.
+            'played_at' => ['nullable', 'date', 'before_or_equal:now'],
             // Optional: file the match under a team so the whole team can see it. Must be a
             // team the caller may upload to; null keeps the match private.
             'team_id' => ['nullable', 'integer', function ($attr, $value, $fail) {
@@ -64,6 +67,8 @@ class UploadDemoRequest extends FormRequest
             'demo.max' => 'demo.file_too_large',
             'platform.required' => 'match.platform_required',
             'platform.in' => 'match.invalid_platform',
+            'played_at.date' => 'match.invalid_played_at',
+            'played_at.before_or_equal' => 'match.invalid_played_at',
             'team_id.integer' => 'match.invalid_team',
             'match.upload_forbidden' => 'match.upload_forbidden',
             'match.duplicate' => 'match.duplicate',

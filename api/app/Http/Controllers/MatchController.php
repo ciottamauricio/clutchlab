@@ -67,6 +67,7 @@ class MatchController extends Controller
             $request->file('demo'),
             $request->user(),
             $request->validated('platform'),
+            $request->date('played_at'),
             $request->integer('team_id') ?: null,
             $request->contentHash(),
         );

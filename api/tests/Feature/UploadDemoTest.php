@@ -11,18 +11,19 @@ use Tests\TestCase;
 
 // Upload rules from api/docs/domains/matches.md: codes not sentences, invariant 1
 // (one upload ⇒ one row + one enqueued job), content-hash dedup scoped per uploader, and
-// the uploader's required platform choice.
+// the uploader's required platform choice and optional played date.
 class UploadDemoTest extends TestCase
 {
     use RefreshDatabase;
 
     protected $seed = true;
 
-    private function upload(string $name = 'game.dem', string $content = 'DEMOBYTES', ?string $platform = 'faceit')
+    private function upload(string $name = 'game.dem', string $content = 'DEMOBYTES', ?string $platform = 'faceit', ?string $playedAt = null)
     {
         return $this->postJson('/api/matches', array_filter([
             'demo' => UploadedFile::fake()->createWithContent($name, $content),
             'platform' => $platform,
+            'played_at' => $playedAt,
         ]));
     }
 
@@ -126,6 +127,49 @@ class UploadDemoTest extends TestCase
         $this->upload(platform: 'esea')
             ->assertUnprocessable()
             ->assertJsonPath('errors.platform.0', 'match.invalid_platform');
+
+        $this->assertDatabaseCount('matches', 0);
+    }
+
+    public function test_a_stated_played_at_is_stored_in_utc(): void
+    {
+        Sanctum::actingAs($this->uploader());
+
+        $this->upload('1-2ada72cc-dce0-458b-a739-df9a7e2898f0-1-1.dem', playedAt: '2026-11-21T21:30:00-03:00')
+            ->assertCreated()
+            ->assertJsonPath('data.played_at', '2026-11-22T00:30:00.000000Z');
+
+        $this->assertDatabaseHas('matches', ['played_at' => '2026-11-22 00:30:00']);
+    }
+
+    public function test_a_stated_played_at_wins_over_the_filename_date(): void
+    {
+        Sanctum::actingAs($this->uploader());
+
+        $this->upload('2026-07-02__0008__x.dem', playedAt: '2026-07-03T10:00:00Z')->assertCreated();
+
+        $this->assertDatabaseHas('matches', ['played_at' => '2026-07-03 10:00:00']);
+    }
+
+    public function test_without_a_stated_played_at_the_filename_date_is_used(): void
+    {
+        Sanctum::actingAs($this->uploader());
+
+        $this->upload('2026-07-02__0008__x.dem')->assertCreated();
+
+        $this->assertDatabaseHas('matches', ['played_at' => '2026-07-02 00:08:00']);
+    }
+
+    public function test_a_future_or_unreadable_played_at_is_rejected_with_a_code(): void
+    {
+        Sanctum::actingAs($this->uploader());
+
+        $this->upload('a.dem', 'A', playedAt: now()->addDay()->toIso8601String())
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.played_at.0', 'match.invalid_played_at');
+        $this->upload('b.dem', 'B', playedAt: 'yesterday-ish')
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.played_at.0', 'match.invalid_played_at');
 
         $this->assertDatabaseCount('matches', 0);
     }

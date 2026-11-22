@@ -2,10 +2,21 @@ import { useRef, useState } from 'react'
 import { useUploadDemo } from './api'
 import { useTeams } from '../teams/api'
 import { t } from '../../lib/i18n'
-import { PLATFORMS, guessPlatform } from './platform'
+import { guessPlatform, guessPlayedAt } from './demoFilename'
 
 // Only these team roles may file a match under a team (mirrors TeamPolicy::uploadMatch).
 const CAN_UPLOAD = new Set(['owner', 'igl'])
+// Where a match can be played (mirrors GameMatch::PLATFORMS); labels via t('platform.<code>').
+const PLATFORMS = ['steam', 'faceit', 'gamersclub', 'other']
+
+// A <input type="datetime-local"> speaks the viewer's local wall clock ("2026-11-21T21:30"),
+// while the API speaks instants. '' stays '' (nothing to convert).
+function toLocalInput(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 export default function UploadDemo({ onUploaded }) {
   const [file, setFile] = useState(null)
@@ -15,23 +26,33 @@ export default function UploadDemo({ onUploaded }) {
   // null = follow the guess from the chosen file's name; picking a new file drops an
   // explicit choice, since the guess (and likely the answer) is per file.
   const [platform, setPlatform] = useState(null)
+  const [playedAt, setPlayedAt] = useState(null)
   const inputRef = useRef(null)
   const { teams } = useTeams()
 
   const uploadable = teams.filter((team) => CAN_UPLOAD.has(team.my_role))
   const effectiveTeamId = teamId ?? (uploadable[0] ? String(uploadable[0].id) : '')
   const effectivePlatform = platform ?? guessPlatform(file?.name)
+  const effectivePlayedAt = playedAt ?? toLocalInput(guessPlayedAt(file?.name))
+  const ready = file && effectivePlatform && effectivePlayedAt
+
+  const resetGuesses = () => {
+    setPlatform(null)
+    setPlayedAt(null)
+  }
 
   const { upload, uploading, error } = useUploadDemo((match) => {
     setFile(null)
-    setPlatform(null)
+    resetGuesses()
     if (inputRef.current) inputRef.current.value = ''
     onUploaded?.(match)
   })
 
   const submit = (e) => {
     e.preventDefault()
-    if (file && effectivePlatform) upload(file, effectiveTeamId || null, effectivePlatform)
+    if (ready) {
+      upload(file, effectiveTeamId || null, effectivePlatform, new Date(effectivePlayedAt).toISOString())
+    }
   }
 
   return (
@@ -42,7 +63,7 @@ export default function UploadDemo({ onUploaded }) {
         accept=".dem"
         onChange={(e) => {
           setFile(e.target.files?.[0] ?? null)
-          setPlatform(null)
+          resetGuesses()
         }}
       />
       <select value={effectivePlatform} onChange={(e) => setPlatform(e.target.value)} aria-label="Platform">
@@ -51,6 +72,15 @@ export default function UploadDemo({ onUploaded }) {
           <option key={code} value={code}>{t(`platform.${code}`)}</option>
         ))}
       </select>
+      <label className="upload-when">
+        Played
+        <input
+          type="datetime-local"
+          value={effectivePlayedAt}
+          max={toLocalInput(new Date())}
+          onChange={(e) => setPlayedAt(e.target.value)}
+        />
+      </label>
       {uploadable.length > 0 && (
         <select value={effectiveTeamId} onChange={(e) => setTeamId(e.target.value)} aria-label="Team">
           {uploadable.map((team) => (
@@ -59,7 +89,7 @@ export default function UploadDemo({ onUploaded }) {
           <option value="">Private — just me</option>
         </select>
       )}
-      <button type="submit" disabled={!file || !effectivePlatform || uploading}>
+      <button type="submit" disabled={!ready || uploading}>
         {uploading ? 'Uploading…' : 'Upload demo'}
       </button>
       {error && <p className="error">{t(error)}</p>}

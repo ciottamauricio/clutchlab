@@ -7,6 +7,7 @@ use App\Contracts\ParseQueue;
 use App\Models\GameMatch;
 use App\Models\User;
 use App\Telemetry\Tracing;
+use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
 use OpenTelemetry\API\Trace\SpanKind;
 
@@ -18,7 +19,7 @@ class UploadDemoAction
         private Tracing $tracing,
     ) {}
 
-    public function execute(UploadedFile $file, User $owner, string $platform, ?int $teamId = null, ?string $contentHash = null): GameMatch
+    public function execute(UploadedFile $file, User $owner, string $platform, ?CarbonInterface $playedAt = null, ?int $teamId = null, ?string $contentHash = null): GameMatch
     {
         // The root span for the whole upload → parse → notify flow. Store, create, and
         // enqueue run inside it, and push() injects this span's traceparent into the job
@@ -39,7 +40,9 @@ class UploadDemoAction
                 'status' => 'queued',
                 'team_id' => $teamId,
                 'platform' => $platform,
-                'played_at' => GameMatch::playedAtFromFilename($filename),
+                // Eloquent writes a datetime's wall clock as-is, so normalize to UTC first —
+                // the browser sends the player's local time with its offset.
+                'played_at' => $playedAt?->toImmutable()->utc() ?? GameMatch::playedAtFromFilename($filename),
             ]);
 
             $span->setAttribute('match_id', $match->id);

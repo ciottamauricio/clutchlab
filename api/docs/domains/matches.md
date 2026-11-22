@@ -48,7 +48,7 @@ Authorization & ownership).
 | duration_seconds | float, nullable | worker | play time only: first round's freezetime-end to the last round's end (excludes warmup/post-game) |
 | knife_round_winner | string(2), nullable | worker | stable side (`CT`/`T`) that won the pre-match knife round; `null` if none |
 | parsed_at | timestamp, nullable | worker | set on success |
-| played_at | timestamp, nullable | api | when the match was played (UTC), parsed from the filename's `YYYY-MM-DD__HHMM` prefix at upload; filterable/sortable |
+| played_at | timestamp, nullable | api | when the match was played (UTC): the uploader's stated time, else the filename's `YYYY-MM-DD__HHMM` prefix (Gamers Club names); filterable/sortable. Null hides a match from every month/day view. |
 | created_at / updated_at | timestamps | api + worker | |
 
 ### `MatchPlayerStat` — table `match_player_stats` (`app/Models/MatchPlayerStat.php`)
@@ -126,6 +126,12 @@ Transition rules:
     pre-selects a guess from the filename's shape (`features/matches/platform.js`) — Gamers
     Club `YYYY-MM-DD__HHMM__…`, Valve `match730_…`, FACEIT `1-<uuid>-…` — but the API never
     infers it.
+13. **The uploader states when it was played, the filename is the fallback.** Only Gamers
+    Club names carry the date; FACEIT and Valve names don't, and an undated match is
+    invisible in the list's default current-month view. So the upload form requires a
+    played time (pre-filled from a Gamers Club name) and sends it as `played_at`; the API
+    keeps it optional, normalizes it to UTC, and falls back to
+    `GameMatch::playedAtFromFilename` when it's absent.
 
 ## Validation (boundary) — `app/Http/Requests/UploadDemoRequest.php`
 
@@ -142,6 +148,9 @@ Emitted codes (never prose): `demo.required`, `demo.invalid`, `demo.wrong_extens
 `platform` field: required, one of `GameMatch::PLATFORMS`. Codes: `match.platform_required`,
 `match.invalid_platform`.
 
+`played_at` field: optional, a date-time (ISO 8601; an offset is honored and stored as UTC),
+not in the future. Code: `match.invalid_played_at`.
+
 Infra limits that must stay **≥** this size: nginx `client_max_body_size` (512M) and
 PHP `upload_max_filesize` / `post_max_size` (512M, set in `api/php.ini`).
 
@@ -154,7 +163,7 @@ upload rights (owner/igl) on the team, or being the uploader.
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
 | GET | `/matches` | list matches the caller can see, most recently **played** first (null `played_at` last, then by upload time) | own uploads + their teams' matches; **paginated 10/page** (`{ data, links, meta }`, `?page=`); optional `?player=` narrows to matches whose scoreboard contains that player name (case-insensitive substring; invalid value → `match.invalid_player_filter`); optional `?month=YYYY-MM` / `?day=YYYY-MM-DD` narrow to matches **played** in that calendar month / day (they intersect; undated matches only appear unfiltered; invalid values → `match.invalid_month` / `match.invalid_day`) |
-| POST | `/matches` | upload a demo | multipart `demo` + required `platform`; optional `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
+| POST | `/matches` | upload a demo | multipart `demo` + required `platform`; optional `played_at`, `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
 | GET | `/matches/{match}` | match detail + players | visible only (403 otherwise); players by kills desc |
 | GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | visible only; see [heatmap.md](heatmap.md) |
 | GET | `/matches/{match}/clutches` | clutches grouped by clutcher/round | visible only; each `{ round, size, killer_name, kills[] }` |
@@ -213,7 +222,7 @@ runaway resource use, isolation handles a crash or exploit. OS-level lockdown of
 `match.invalid_team` (team the caller can't upload to), `match.upload_forbidden` (caller
 isn't an uploader anywhere), `match.duplicate` (caller has already uploaded this exact
 demo — dedup is by sha256 of the file content, unique per uploader), and
-`match.platform_required` / `match.invalid_platform`.
+`match.platform_required` / `match.invalid_platform` / `match.invalid_played_at`.
 
 ## Authorization & ownership
 

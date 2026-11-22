@@ -557,6 +557,15 @@
   margin-bottom: 32px;
 }
 
+/* "Played [date-time]" — labelled inline, since a date-time input has no placeholder. */
+.upload-when {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
 /* ---------- Ask the analyst (RAG panel on the matches page) ---------- */
 
 /* Same console register as the upload strip above it; the solid border says

@@ -17,10 +17,11 @@ const getTeamStats = (id) => api.get(`/matches/${id}/team-stats`)
 const deleteMatch = (id) => api.delete(`/matches/${id}`)
 const reparseMatch = (id) => api.post(`/matches/${id}/reparse`)
 const updateMatchTeam = (id, teamId) => api.patch(`/matches/${id}`, { team_id: teamId })
-const uploadDemo = (file, teamId, platform) => {
+const uploadDemo = (file, teamId, platform, playedAt) => {
   const form = new FormData()
   form.append('demo', file)
   form.append('platform', platform)
+  if (playedAt) form.append('played_at', playedAt)
   if (teamId) form.append('team_id', teamId)
   return api.postForm('/matches', form)
 }
@@ -271,11 +272,11 @@ export function useUploadDemo(onUploaded) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
 
-  const upload = useCallback(async (file, teamId, platform) => {
+  const upload = useCallback(async (file, teamId, platform, playedAt) => {
     setUploading(true)
     setError(null)
     try {
-      const match = await uploadDemo(file, teamId, platform)
+      const match = await uploadDemo(file, teamId, platform, playedAt)
       onUploaded?.(match)
       return match
     } catch (e) {
