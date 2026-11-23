@@ -232,6 +232,27 @@ local study page and would be indefensible exposed: a model runtime with no auth
 compute endpoint. Recorded here rather than quietly fixed, because the shortcut is only safe
 while the deployment story stays "one laptop".
 
+### FACEIT: an external system that gives facts, not files
+
+FACEIT's Data API is reached by the **api only** (`FaceitApi` contract, `HttpFaceitApi`), never
+the browser: its key is a server-side key by FACEIT's rules. It earns no service of its own — a
+few cached reads per page load is ordinary request/response work, the "different noun" case from
+the guiding principle. What shaped the design is what FACEIT *won't* give: the Data API hands over
+facts (who you are from your Steam ID, your matches, their start times and maps) but not demo
+files — those sit behind an application-only Downloads API. So the integration assists the upload
+instead of replacing it: the panel says which matches are missing and links each one's room, and
+the upload form fills in what the demo can't say (it has no wall-clock time anywhere). It is
+**optional per instance** — a clone has no `FACEIT_API_KEY`, and without one the panel says sync
+is off while uploads work unchanged.
+
+FACEIT's download is a `.dem.zst`, and *where* it gets unpacked was a boundary question: in the
+worker's parse sandbox (where untrusted bytes already go), or at upload. Upload won, because the
+stored object is read by more than the parser — "watch in game" downloads it for CS2's `playdemo`,
+which can't read `.zst`. Unpacking before storage keeps the stored object a plain `.dem`, so the
+worker, the queue contract and the download path don't change at all. The isolation idea still
+holds: the `zstd` CLI runs in its own process, output capped, the way the worker re-execs a
+child for the parse.
+
 ### Sync vs async
 
 Parsing takes seconds-to-minutes. A synchronous Laravel→Go call would hang and time out.
@@ -337,7 +358,7 @@ not inside the services.
 | Layer | Where | What it proves |
 |---|---|---|
 | Contract tests | `contracts/*.json` + a test on each side | The wire format. The producer asserts **exact bytes** (it defines the canonical serialization); the consumer asserts the fixture decodes. Break either side and that side's suite goes red — the "change both sides in the same commit" rule, machine-enforced. |
-| Feature tests | `api/tests/Feature` | The domain docs as assertions: the 403-not-404 authorization matrix, upload gating, content-hash dedup, team reassignment. In-memory SQLite; every external system (`DemoStorage`, `ParseQueue`, `SearchIndex`) replaced by a fake bound over its interface in the base `TestCase`. |
+| Feature tests | `api/tests/Feature` | The domain docs as assertions: the 403-not-404 authorization matrix, upload gating, content-hash dedup, team reassignment. In-memory SQLite; every external system (`DemoStorage`, `DemoUnpacker`, `ParseQueue`, `SearchIndex`, `FaceitApi`, …) replaced by a fake bound over its interface in the base `TestCase`. |
 | Unit tables | Go `*_test.go` | Pure logic as a spec — the notifier's `message()` rendering, event marshaling (omitempty behavior is contract). |
 | CI | `.github/workflows/` | Per-service jobs with **path filters** (the monorepo's promised middle path: independent test runs, atomic commits kept). One workflow per service — `api` (Pint + phpunit), `frontend` (lint + build), `worker` / `notifier` / `realtime` (vet + test) — plus `infra` (terraform fmt + validate, no cloud account). `contracts/**` is in every service's trigger paths *that speak a fixture*, so a fixture change runs every suite that decodes it (realtime and infra carry none, so they're excluded). |
 
