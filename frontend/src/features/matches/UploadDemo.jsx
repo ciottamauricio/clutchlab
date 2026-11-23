@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { useUploadDemo, useUploadTeams } from './api'
+import { useFaceitMatch, useUploadDemo, useUploadTeams } from './api'
 import { t } from '../../lib/i18n'
 import { guessFaceitMatchId, guessPlatform, guessPlayedAt } from './demoFilename'
 
@@ -29,7 +29,12 @@ export default function UploadDemo({ onUploaded }) {
 
   const effectiveTeamId = teamId ?? defaultTeamId
   const effectivePlatform = platform ?? guessPlatform(file?.name)
-  const effectivePlayedAt = playedAt ?? toLocalInput(guessPlayedAt(file?.name))
+  // A FACEIT file name carries its match id but not its time; FACEIT knows the time.
+  const faceitMatchId = guessFaceitMatchId(file?.name)
+  const faceitMatch = useFaceitMatch(faceitMatchId)
+  const guessedPlayedAt = guessPlayedAt(file?.name) || faceitMatch?.started_at || ''
+  const effectivePlayedAt = playedAt ?? toLocalInput(guessedPlayedAt)
+  const playedFromFaceit = playedAt === null && !guessPlayedAt(file?.name) && Boolean(faceitMatch?.started_at)
   const ready = file && effectivePlatform && effectivePlayedAt
 
   const resetGuesses = () => {
@@ -51,7 +56,7 @@ export default function UploadDemo({ onUploaded }) {
         platform: effectivePlatform,
         playedAt: new Date(effectivePlayedAt).toISOString(),
         teamId: effectiveTeamId || null,
-        externalId: effectivePlatform === 'faceit' ? guessFaceitMatchId(file.name) : '',
+        externalId: effectivePlatform === 'faceit' ? faceitMatchId : '',
       })
     }
   }
@@ -81,6 +86,7 @@ export default function UploadDemo({ onUploaded }) {
           max={toLocalInput(new Date())}
           onChange={(e) => setPlayedAt(e.target.value)}
         />
+        {playedFromFaceit && <span className="upload-hint">from FACEIT</span>}
       </label>
       {uploadable.length > 0 && (
         <select value={effectiveTeamId} onChange={(e) => setTeamId(e.target.value)} aria-label="Team">

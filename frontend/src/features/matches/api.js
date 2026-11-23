@@ -13,6 +13,7 @@ const listMatches = (player, month, day, page) => {
 }
 const getMatch = (id) => api.get(`/matches/${id}`)
 const listFaceitMatches = (refresh) => api.get(`/faceit/matches${refresh ? '?refresh=1' : ''}`)
+const getFaceitMatch = (id) => api.get(`/faceit/matches/${encodeURIComponent(id)}`)
 const getKillPositions = (id) => api.get(`/matches/${id}/kill-positions`)
 const getClutches = (id) => api.get(`/matches/${id}/clutches`)
 const getTeamStats = (id) => api.get(`/matches/${id}/team-stats`)
@@ -313,6 +314,27 @@ export function useFaceitMatches() {
   const reload = useCallback(() => load(false), [load])
 
   return { ...state, busy, refresh, reload }
+}
+
+// One FACEIT match's { started_at, map } (GET /faceit/matches/{id}), for the upload form to fill in
+// a FACEIT demo's time. null while there's no id, while asking, and when FACEIT can't say (off,
+// down, unknown match): the form then asks the user, as it always has, so no error is surfaced.
+export function useFaceitMatch(faceitMatchId) {
+  const [match, setMatch] = useState(null)
+
+  useEffect(() => {
+    setMatch(null)
+    if (!faceitMatchId) return
+    let active = true
+    getFaceitMatch(faceitMatchId)
+      .then((m) => active && setMatch(m))
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [faceitMatchId])
+
+  return match
 }
 
 export function useUploadDemo(onUploaded) {
