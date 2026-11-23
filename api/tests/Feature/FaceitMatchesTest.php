@@ -11,6 +11,7 @@ use Tests\TestCase;
 
 // Spec 001 AC-11 to AC-16: the FACEIT panel's list — latest finished FACEIT matches, score and
 // result from the user's team, marked in Clutchlab or missing, cached, and honest when off or down.
+// AC-24, AC-25: one FACEIT match's start time and map, for the upload form.
 class FaceitMatchesTest extends TestCase
 {
     use RefreshDatabase;
@@ -163,5 +164,56 @@ class FaceitMatchesTest extends TestCase
     public function test_it_needs_a_login(): void
     {
         $this->getJson('/api/faceit/matches')->assertUnauthorized();
+    }
+
+    private function one(string $id)
+    {
+        Sanctum::actingAs($this->me);
+
+        return $this->getJson("/api/faceit/matches/{$id}");
+    }
+
+    public function test_one_match_gives_its_start_and_map(): void
+    {
+        $this->one(self::M1)
+            ->assertOk()
+            ->assertJsonPath('data.faceit_match_id', self::M1)
+            ->assertJsonPath('data.started_at', '2026-11-21T17:18:03.000000Z')
+            ->assertJsonPath('data.map', 'de_ancient');
+    }
+
+    public function test_a_finished_match_is_asked_once_and_a_running_one_each_time(): void
+    {
+        $this->one(self::M1)->assertOk();
+        $this->one(self::M1)->assertOk();
+        $this->one(self::M3)->assertOk();
+        $this->one(self::M3)->assertOk();
+
+        $this->assertSame([['match', self::M1], ['match', self::M3], ['match', self::M3]], $this->faceit->calls);
+    }
+
+    public function test_an_unknown_match_is_not_found(): void
+    {
+        $this->one('1-44444444-4444-4444-4444-444444444444')
+            ->assertNotFound()
+            ->assertJsonPath('message', 'faceit.match_not_found');
+    }
+
+    public function test_one_match_when_sync_is_off_or_faceit_is_down(): void
+    {
+        $this->faceit->configured = false;
+        $this->one(self::M1)->assertStatus(503)->assertJsonPath('message', 'faceit.disabled');
+
+        $this->faceit->configured = true;
+        $this->faceit->unavailable = true;
+        $this->one(self::M1)->assertStatus(503)->assertJsonPath('message', 'faceit.unavailable');
+    }
+
+    public function test_a_malformed_id_never_reaches_faceit(): void
+    {
+        $this->one('1-nope')->assertNotFound();
+        $this->one('..%2F..%2Fplayers')->assertNotFound();
+
+        $this->assertSame([], $this->faceit->calls);
     }
 }

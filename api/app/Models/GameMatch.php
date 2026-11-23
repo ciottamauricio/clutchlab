@@ -20,8 +20,11 @@ class GameMatch extends Model
     // Where the match was played, chosen by the uploader. `steam` is Valve's own matchmaking.
     public const PLATFORMS = ['steam', 'faceit', 'gamersclub', 'other'];
 
-    // A FACEIT match id (`1-<uuid>`, lower case), as FACEIT's API and its file names write it.
-    public const FACEIT_MATCH_ID = '/^1-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/';
+    // A FACEIT match id (`1-<uuid>`, lower case), as FACEIT's API and its file names write it. The
+    // bare body is what a route's where() takes; the anchored one is the validation rule's.
+    public const FACEIT_MATCH_ID_BODY = '1-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}';
+
+    public const FACEIT_MATCH_ID = '/^'.self::FACEIT_MATCH_ID_BODY.'$/';
 
     protected function casts(): array
     {

@@ -196,6 +196,7 @@ upload rights (owner/igl) on the team, or being the uploader.
 | POST | `/matches/{match}/reparse` | re-enqueue the stored demo | uploader or owner/igl; resets to `queued`; throttled 30/min; `ReparseMatchAction` |
 | PATCH | `/matches/{match}` | move a match between private and a team | body `team_id` (int = share, null = private); manage bar (uploader/owner/igl); target team needs `uploadMatch` or `match.invalid_team`; `UpdateMatchTeamAction` |
 | DELETE | `/matches/{match}` | delete a match | uploader or owner/igl (403 otherwise); 204; `DeleteMatchAction` |
+| GET | `/faceit/matches/{faceitMatchId}` | one FACEIT match's `{ faceit_match_id, started_at, map }` | for the upload form; id format checked by the route; throttled 30/min; 404 `faceit.match_not_found`, 503 `faceit.disabled` / `faceit.unavailable`; `GetFaceitMatchAction` |
 | GET | `/faceit/matches` | the FACEIT panel | `{ data: { account: {player_id, nickname} \| null, reason, matches: [{ faceit_match_id, started_at, map, competition, score: {own, opponent}, result, room_url, clutchlab: {id, status} \| null }] } }`; `?refresh=1` skips the 5-minute copy; throttled 20/min; 503 `faceit.disabled` / `faceit.unavailable` (see FACEIT); `ListFaceitMatchesAction` |
 
 Responses use `MatchResource` / `MatchPlayerStatResource` (wrapped in `data`).
@@ -254,7 +255,7 @@ demo — dedup is by sha256 of the file content, unique per uploader), and
 **FACEIT** (`/faceit/*`): `faceit.disabled` (503, no `FACEIT_API_KEY` on this instance),
 `faceit.unavailable` (503, FACEIT timed out, refused the key, rate-limited or errored),
 `faceit.no_steam_id` / `faceit.not_found` (200, as `reason` with `account: null`),
-`faceit.invalid_refresh` (422).
+`faceit.invalid_refresh` (422), `faceit.match_not_found` (404, one match).
 
 ## Authorization & ownership
 
@@ -308,6 +309,13 @@ finished match is asked once and kept (`faceit:match:{id}`), and if FACEIT can't
 then the row shows without one instead of failing the panel. No key on the instance: 503
 `faceit.disabled`, and the panel says sync is off. FACEIT failing on the account or the list: 503
 `faceit.unavailable`, logged as one warning line, the rest of the page unaffected.
+
+**One match** (`GetFaceitMatchAction`, `GET /faceit/matches/{faceitMatchId}`): a FACEIT match's
+start time and map, so the upload form can fill in when a FACEIT demo was played. The id's format
+is checked by the route (`GameMatch::FACEIT_MATCH_ID_BODY`), so a malformed one never reaches
+FACEIT. Cached for good once FACEIT says finished; a running match is asked each time. Unknown to
+FACEIT: 404 `faceit.match_not_found`. Upload never depends on it: the form falls back to asking
+the user, and the api doesn't check a stated time against FACEIT.
 
 ## Known limitations (intentional — future steps)
 

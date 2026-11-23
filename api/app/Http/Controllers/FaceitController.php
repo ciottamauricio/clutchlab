@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Faceit\GetFaceitMatchAction;
 use App\Actions\Faceit\ListFaceitMatchesAction;
 use App\Contracts\FaceitApi;
 use App\Faceit\FaceitUnavailable;
 use App\Http\Requests\ListFaceitMatchesRequest;
 use App\Http\Resources\FaceitMatchResource;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 
@@ -32,6 +34,33 @@ class FaceitController extends Controller
             'account' => $panel['account'],
             'reason' => $panel['reason'],
             'matches' => FaceitMatchResource::collection($panel['matches'])->resolve($request),
+        ]]);
+    }
+
+    // One FACEIT match's start time and map, for the upload form to fill in a FACEIT demo's time.
+    // The id's format is checked by the route, so a malformed one never reaches here or FACEIT.
+    public function show(string $faceitMatchId, FaceitApi $faceit, GetFaceitMatchAction $action): JsonResponse
+    {
+        if (! $faceit->configured()) {
+            return response()->json(['message' => 'faceit.disabled'], 503);
+        }
+
+        try {
+            $match = $action->execute($faceitMatchId);
+        } catch (FaceitUnavailable $e) {
+            Log::warning('faceit.unavailable', ['reason' => $e->getMessage()]);
+
+            return response()->json(['message' => 'faceit.unavailable'], 503);
+        }
+
+        if ($match === null) {
+            return response()->json(['message' => 'faceit.match_not_found'], 404);
+        }
+
+        return response()->json(['data' => [
+            'faceit_match_id' => $match['faceit_match_id'],
+            'started_at' => $match['started_at'] ? CarbonImmutable::createFromTimestampUTC($match['started_at']) : null,
+            'map' => $match['map'],
         ]]);
     }
 }
