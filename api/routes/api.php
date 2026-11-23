@@ -8,6 +8,7 @@ use App\Http\Controllers\AwardsController;
 use App\Http\Controllers\DocsController;
 use App\Http\Controllers\Dora\DoraMetricsController;
 use App\Http\Controllers\Dora\InternalDeploymentController;
+use App\Http\Controllers\FaceitController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\ProfileController;
@@ -41,6 +42,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/matches', [MatchController::class, 'index']);
     Route::post('/matches', [MatchController::class, 'store'])->middleware('throttle:30,1');
+    // The FACEIT panel. Throttled because each call may reach FACEIT (its limits are unpublished);
+    // the list itself is cached for 5 minutes.
+    Route::get('/faceit/matches', [FaceitController::class, 'index'])->middleware('throttle:20,1');
     Route::get('/matches/{match}', [MatchController::class, 'show']);
     Route::get('/matches/{match}/kill-positions', [MatchController::class, 'killPositions']);
     Route::get('/matches/{match}/clutches', [MatchController::class, 'clutches']);
