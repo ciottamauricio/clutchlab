@@ -6,11 +6,11 @@ use App\Contracts\FaceitApi;
 use App\Contracts\FaceitUnavailable;
 use App\Models\GameMatch;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\Repository as Cache;
 
 // The FACEIT panel: the user's latest finished FACEIT matches, each marked with the Clutchlab match
-// filed under it (external_id) when the user can see one — theirs or a teammate's.
+// filed under it (external_id) when the user can see one — theirs or a teammate's. This class does
+// the I/O (account, cache, FACEIT, database); each row's rules are FaceitMatchRow's.
 class ListFaceitMatchesAction
 {
     public function __construct(
@@ -45,19 +45,26 @@ class ListFaceitMatchesAction
         );
         $finished = array_values(array_filter($recent, fn ($m) => $m['finished']));
 
-        $inClutchlab = $this->visibleMatches($user, array_column($finished, 'faceit_match_id'));
+        $visible = $this->visibleMatches($user, array_column($finished, 'faceit_match_id'));
 
         return [
             'account' => ['player_id' => $playerId, 'nickname' => $lookup->account->nickname],
             'reason' => null,
-            'matches' => array_map(fn ($m) => $this->row($m, $playerId, $inClutchlab), $finished),
+            'matches' => array_map(fn ($m) => FaceitMatchRow::build(
+                $m,
+                $playerId,
+                $user->id,
+                $visible[$m['faceit_match_id']] ?? [],
+                $this->map($m['faceit_match_id']),
+            ), $finished),
         ];
     }
 
     /**
-     * The user's own upload wins over a teammate's when both are filed under one FACEIT match.
+     * The Clutchlab matches the user can see — theirs or a team's they're in — filed under each of
+     * these FACEIT matches. Which one a row shows is FaceitMatchRow's rule.
      *
-     * @return array<string, GameMatch>
+     * @return array<string, list<array{id: int, user_id: int, status: string}>>
      */
     private function visibleMatches(User $user, array $faceitIds): array
     {
@@ -69,32 +76,13 @@ class ListFaceitMatchesAction
             ->where('platform', 'faceit')
             ->whereIn('external_id', $faceitIds)
             ->get(['id', 'user_id', 'status', 'external_id'])
-            ->sortBy(fn (GameMatch $m) => $m->user_id === $user->id ? 1 : 0)
-            ->keyBy('external_id')
+            ->groupBy('external_id')
+            ->map(fn ($group) => $group->map(fn (GameMatch $m) => [
+                'id' => $m->id,
+                'user_id' => $m->user_id,
+                'status' => $m->status,
+            ])->values()->all())
             ->all();
-    }
-
-    private function row(array $match, string $playerId, array $inClutchlab): array
-    {
-        // FACEIT's factions are teams, not sides: the user's is the one listing them.
-        $side = match (true) {
-            in_array($playerId, $match['factions']['faction1'], true) => 'faction1',
-            in_array($playerId, $match['factions']['faction2'], true) => 'faction2',
-            default => null,
-        };
-        $other = $side === 'faction1' ? 'faction2' : 'faction1';
-        $clutchlab = $inClutchlab[$match['faceit_match_id']] ?? null;
-
-        return [
-            'faceit_match_id' => $match['faceit_match_id'],
-            'started_at' => $match['started_at'] ? CarbonImmutable::createFromTimestampUTC($match['started_at']) : null,
-            'map' => $this->map($match['faceit_match_id']),
-            'competition' => $match['competition'],
-            'score' => $side ? ['own' => $match['score'][$side], 'opponent' => $match['score'][$other]] : null,
-            'result' => $side && $match['winner'] ? ($match['winner'] === $side ? 'win' : 'loss') : null,
-            'room_url' => $match['room_url'],
-            'clutchlab' => $clutchlab ? ['id' => $clutchlab->id, 'status' => $clutchlab->status] : null,
-        ];
     }
 
     // The map is a detail on top of the list: if FACEIT can't give it right now, the row shows
