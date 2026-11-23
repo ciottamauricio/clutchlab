@@ -290,6 +290,17 @@ FACEIT through `App\Contracts\FaceitApi` (`App\Faceit\HttpFaceitApi`); the brows
 FACEIT's Data API does not hand out demo files (that needs its application-only Downloads API), so
 a missing match is fetched by the user from its FACEIT room and uploaded.
 
+**Panel** (`frontend/src/features/matches/FaceitPanel.jsx`): on the matches page, between the
+upload strip and the list, shown only to users who may upload (its point is bringing demos in).
+It **starts folded** to one line — the FACEIT nickname and how many of the latest matches aren't
+in Clutchlab yet, with Refresh and Show — so the matches list isn't pushed down on every visit;
+Show lists the rows. Each row: when it was played, map, score and W/L from the user's team. A row
+in Clutchlab opens that match on the page (with its status when not parsed yet); a missing row has
+**Get demo ↗** (its FACEIT room, where FACEIT offers the download) and **Upload**, which files the
+chosen `.dem` / `.dem.zst` as `platform = faceit` with FACEIT's start time and match id, so nothing
+is asked again. Every state is said, never hidden: checking, the reason there's no account, FACEIT
+not answering, and on a keyless instance that FACEIT sync is off.
+
 **Account** (`FindFaceitAccountAction`, table `faceit_accounts`): found from the Steam ID on the
 user's profile (`GET /players?game=cs2&game_player_id=`), never typed. Stored with the Steam ID it
 was found for; when the profile's Steam ID changes (an admin sets it) the mismatch triggers a new

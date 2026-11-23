@@ -76,15 +76,14 @@ function FaceitRow({ match, teamId, onOpenMatch, onUploaded }) {
   )
 }
 
-// The user's latest FACEIT matches and which are still missing from Clutchlab (spec 001). Open
-// while something is missing, folded to its one-line summary otherwise; the user may flip it.
+// The user's latest FACEIT matches and which are still missing from Clutchlab (spec 001). Starts
+// folded to its one-line summary, which carries the missing count; Show lists them.
 export default function FaceitPanel({ onOpenMatch, onUploaded }) {
   const { status, account, reason, matches, error, busy, refresh, reload } = useFaceitMatches()
   const { defaultTeamId } = useUploadTeams()
-  const [open, setOpen] = useState(null)
+  const [open, setOpen] = useState(false)
 
   const missing = matches.filter((m) => !m.clutchlab).length
-  const isOpen = open ?? missing > 0
   const listed = status === 'ready' && account && matches.length > 0
 
   const handleUploaded = (match) => {
@@ -121,15 +120,15 @@ export default function FaceitPanel({ onOpenMatch, onUploaded }) {
               {busy ? 'Checking…' : 'Refresh'}
             </button>
             {listed && (
-              <button type="button" className="link-btn" onClick={() => setOpen(!isOpen)} aria-expanded={isOpen}>
-                {isOpen ? 'Hide' : 'Show'}
+              <button type="button" className="link-btn" onClick={() => setOpen(!open)} aria-expanded={open}>
+                {open ? 'Hide' : 'Show'}
               </button>
             )}
           </span>
         )}
       </div>
       {error && <p className="error fc-note">{t(error)}</p>}
-      {listed && isOpen && (
+      {listed && open && (
         <ul className="fc-list">
           {matches.map((match) => (
             <FaceitRow
