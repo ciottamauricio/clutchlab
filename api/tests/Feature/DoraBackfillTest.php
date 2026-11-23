@@ -21,6 +21,19 @@ class DoraBackfillTest extends TestCase
 
     protected $seed = true;
 
+    // The fixtures below are GitHub runs from a fixed day, and the backfill only imports runs
+    // inside its window (90 days back from now). Against the real clock they aged out of the
+    // window on 2026-11-18 and every test that expects an import failed, with no code change.
+    // So "now" is pinned a few days after the fixtures: the window holds them, forever.
+    private const NOW = '2026-08-25T00:00:00Z';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->travelTo(self::NOW);
+    }
+
     private function workflowRun(array $payload): array
     {
         return array_merge([
