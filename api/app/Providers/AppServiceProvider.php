@@ -6,6 +6,7 @@ use Anthropic\Client as AnthropicClient;
 use App\Authorization\PermissionCatalog;
 use App\Contracts\AnalystLlm;
 use App\Contracts\DemoStorage;
+use App\Contracts\DemoUnpacker;
 use App\Contracts\DeploymentHistory;
 use App\Contracts\DocRetriever;
 use App\Contracts\DocsLlm;
@@ -42,6 +43,7 @@ use App\Services\DbPermissionService;
 use App\Services\Dora\GithubDeploymentHistory;
 use App\Services\Dora\MetricsCalculator;
 use App\Storage\S3DemoStorage;
+use App\Storage\ZstdCliUnpacker;
 use App\Telemetry\Tracing;
 use Illuminate\Http\Client\Factory as Http;
 use Illuminate\Support\Facades\Gate;
@@ -57,6 +59,10 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(DemoStorage::class, fn () => new S3DemoStorage(Storage::disk('s3')));
+        $this->app->bind(DemoUnpacker::class, fn () => new ZstdCliUnpacker(
+            (int) config('clutch.max_unpacked_demo_kb') * 1024,
+            timeoutSeconds: 300,
+        ));
         $this->app->bind(ParseQueue::class, RedisParseQueue::class);
         $this->app->bind(EventBus::class, RedisEventBus::class);
         $this->app->bind(EventSubscriber::class, RedisEventSubscriber::class);

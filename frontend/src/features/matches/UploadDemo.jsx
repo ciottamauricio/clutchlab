@@ -60,7 +60,7 @@ export default function UploadDemo({ onUploaded }) {
       <input
         ref={inputRef}
         type="file"
-        accept=".dem"
+        accept=".dem,.zst"
         onChange={(e) => {
           setFile(e.target.files?.[0] ?? null)
           resetGuesses()

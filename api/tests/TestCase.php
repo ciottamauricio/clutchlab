@@ -4,6 +4,7 @@ namespace Tests;
 
 use App\Contracts\AnalystLlm;
 use App\Contracts\DemoStorage;
+use App\Contracts\DemoUnpacker;
 use App\Contracts\DocRetriever;
 use App\Contracts\DocsLlm;
 use App\Contracts\EventBus;
@@ -13,6 +14,7 @@ use App\Contracts\SearchIndex;
 use App\Contracts\SemanticRetriever;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Tests\Fakes\FakeDemoStorage;
+use Tests\Fakes\FakeDemoUnpacker;
 use Tests\Fakes\FakeDocRetriever;
 use Tests\Fakes\FakeRoundRetriever;
 use Tests\Fakes\FakeSearchIndex;
@@ -27,6 +29,8 @@ abstract class TestCase extends BaseTestCase
     // Every external system sits behind an interface (house rule), so tests swap all
     // of them for in-memory fakes here — no Redis, MinIO, or Meilisearch is ever hit.
     protected FakeDemoStorage $demoStorage;
+
+    protected FakeDemoUnpacker $demoUnpacker;
 
     protected SpyParseQueue $parseQueue;
 
@@ -53,6 +57,7 @@ abstract class TestCase extends BaseTestCase
         }
 
         $this->demoStorage = new FakeDemoStorage;
+        $this->demoUnpacker = new FakeDemoUnpacker;
         $this->parseQueue = new SpyParseQueue;
         $this->eventBus = new SpyEventBus;
         $this->analystLlm = new SpyAnalystLlm;
@@ -62,6 +67,7 @@ abstract class TestCase extends BaseTestCase
         $this->docsLlm = new SpyDocsLlm;
 
         $this->app->instance(DemoStorage::class, $this->demoStorage);
+        $this->app->instance(DemoUnpacker::class, $this->demoUnpacker);
         $this->app->instance(ParseQueue::class, $this->parseQueue);
         $this->app->instance(EventBus::class, $this->eventBus);
         $this->app->instance(SearchIndex::class, new FakeSearchIndex);

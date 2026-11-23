@@ -20,7 +20,9 @@ class UploadDemoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'demo' => ['required', 'file', 'extensions:dem', 'max:'.config('clutch.max_demo_kb'), function ($attr, $value, $fail) {
+            // .zst for FACEIT's room download (.dem.zst); whether a file is packed is decided by
+            // its bytes in the action, so the name only has to be one of these.
+            'demo' => ['required', 'file', 'extensions:dem,zst', 'max:'.config('clutch.max_demo_kb'), function ($attr, $value, $fail) {
                 // A teamless (private) upload still requires the caller to be an uploader
                 // somewhere — a user who can't upload to any team can't upload at all. Team
                 // uploads carry their own per-team check on `team_id` below. Admins bypass.

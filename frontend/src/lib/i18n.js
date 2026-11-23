@@ -16,8 +16,9 @@ const MESSAGES = {
 
   'demo.required': 'Please choose a .dem file',
   'demo.invalid': 'That upload is not a valid file',
-  'demo.wrong_extension': 'Only .dem files are accepted',
+  'demo.wrong_extension': 'Only .dem or .dem.zst files are accepted',
   'demo.file_too_large': 'That demo is too large (max 1 GB)',
+  'demo.unpacked_too_large': 'That demo is too large once unpacked (max 2 GB)',
   'demo.storage_failed': 'Uploading to storage failed',
   'match.invalid_team': "You can't upload to that team",
   'match.upload_forbidden': "You don't have permission to upload matches",

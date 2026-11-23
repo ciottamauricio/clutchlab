@@ -14,8 +14,9 @@ Authorization & ownership).
 
 ## Ubiquitous language
 
-- **Demo** — a `.dem` recording of a CS2 match, uploaded by the user. Stored as an
-  object in MinIO/S3, never in the database.
+- **Demo** — a `.dem` recording of a CS2 match, uploaded by the user, either plain or
+  packed with zstd (FACEIT's room download is a `.dem.zst`). Stored as an object in MinIO/S3,
+  always unpacked, never in the database.
 - **Match** — a row in `matches`: the tracked lifecycle of one uploaded demo. The
   Eloquent model is `GameMatch` because `Match` is a reserved word in PHP.
 - **Parse** — the Go worker reading the demo and extracting stats.
@@ -91,7 +92,9 @@ Transition rules:
 1. **One upload ⇒ exactly one `matches` row (status `queued`) and exactly one enqueued
    parse job.** (`app/Actions/UploadDemoAction.php`)
 2. `demo_key` is unique and is the only identifier shared with the worker. The demo
-   object lives in the `demos` bucket as `<uuid>.dem`.
+   object lives in the `demos` bucket as `<uuid>.dem`, and is always a plain demo: a packed
+   upload is unpacked before it is stored (see Validation), so the worker, the download and
+   "watch in game" (CS2's `playdemo` can't read `.zst`) only ever see a `.dem`.
 3. The queue payload is the cross-language contract `{ "match_id": int, "demo_key": string }`.
    Change it on **both** sides in the same commit (Laravel `app/Queue/RedisParseQueue.php`,
    Go `worker/main.go` `Job`).
@@ -139,11 +142,22 @@ Transition rules:
 
 - required
 - must be a file
-- extension must be `dem` (`extensions:dem`)
-- max size `config('clutch.max_demo_kb')` = **512000 KB (500 MB)**
+- extension must be `dem` or `zst` (`extensions:dem,zst`)
+- max size `config('clutch.max_demo_kb')` = **1048576 KB (1 GB)**
 
 Emitted codes (never prose): `demo.required`, `demo.invalid`, `demo.wrong_extension`,
 `demo.file_too_large`. A storage failure surfaces `demo.storage_failed`.
+
+**Packed demos** (`UploadDemoAction`, behind `DemoUnpacker`): a file whose first bytes are the
+zstd magic (`28 b5 2f fd`) is unpacked before it is stored, whatever its name — a `.dem.zst`,
+or a `.zst` saved as `.dem`. `ZstdCliUnpacker` runs the `zstd` CLI (installed in the api image)
+in its own process and streams its output to a temp file, stopping past
+`config('clutch.max_unpacked_demo_kb')` = **2097152 KB (2 GB)**: the CLI has no output cap, and
+a few KB of zstd can unpack to gigabytes. Codes, on `demo`: `demo.invalid` (not a readable zstd
+archive) and `demo.unpacked_too_large`. Nothing is stored or enqueued when unpacking fails.
+`content_hash` is the hash of the uploaded bytes, so the same match as `.dem` and as `.dem.zst`
+are two different contents. What the file unpacks to is still checked by the parser
+(`parse_failed_corrupt` if it isn't a demo).
 
 `platform` field: required, one of `GameMatch::PLATFORMS`. Codes: `match.platform_required`,
 `match.invalid_platform`.
@@ -151,8 +165,8 @@ Emitted codes (never prose): `demo.required`, `demo.invalid`, `demo.wrong_extens
 `played_at` field: optional, a date-time (ISO 8601; an offset is honored and stored as UTC),
 not in the future. Code: `match.invalid_played_at`.
 
-Infra limits that must stay **≥** this size: nginx `client_max_body_size` (512M) and
-PHP `upload_max_filesize` / `post_max_size` (512M, set in `api/php.ini`).
+Infra limits that must stay **≥** the upload size: nginx `client_max_body_size` (1024M) and
+PHP `upload_max_filesize` / `post_max_size` (1024M, set in `api/php.ini`).
 
 ## API surface
 
@@ -163,7 +177,7 @@ upload rights (owner/igl) on the team, or being the uploader.
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
 | GET | `/matches` | list matches the caller can see, most recently **played** first (null `played_at` last, then by upload time) | own uploads + their teams' matches; **paginated 10/page** (`{ data, links, meta }`, `?page=`); optional `?player=` narrows to matches whose scoreboard contains that player name (case-insensitive substring; invalid value → `match.invalid_player_filter`); optional `?month=YYYY-MM` / `?day=YYYY-MM-DD` narrow to matches **played** in that calendar month / day (they intersect; undated matches only appear unfiltered; invalid values → `match.invalid_month` / `match.invalid_day`) |
-| POST | `/matches` | upload a demo | multipart `demo` + required `platform`; optional `played_at`, `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
+| POST | `/matches` | upload a demo | multipart `demo` (`.dem` or zstd-packed `.dem.zst`, stored unpacked) + required `platform`; optional `played_at`, `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
 | GET | `/matches/{match}` | match detail + players | visible only (403 otherwise); players by kills desc |
 | GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | visible only; see [heatmap.md](heatmap.md) |
 | GET | `/matches/{match}/clutches` | clutches grouped by clutcher/round | visible only; each `{ round, size, killer_name, kills[] }` |

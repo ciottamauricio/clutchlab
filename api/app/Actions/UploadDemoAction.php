@@ -3,18 +3,23 @@
 namespace App\Actions;
 
 use App\Contracts\DemoStorage;
+use App\Contracts\DemoUnpacker;
 use App\Contracts\ParseQueue;
 use App\Models\GameMatch;
 use App\Models\User;
+use App\Storage\DemoUnpackFailed;
 use App\Telemetry\Tracing;
 use Carbon\CarbonInterface;
+use Illuminate\Http\File;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
 use OpenTelemetry\API\Trace\SpanKind;
 
 class UploadDemoAction
 {
     public function __construct(
         private DemoStorage $storage,
+        private DemoUnpacker $unpacker,
         private ParseQueue $queue,
         private Tracing $tracing,
     ) {}
@@ -30,7 +35,7 @@ class UploadDemoAction
         $scope = $span->activate();
 
         try {
-            $key = $this->storage->store($file);
+            $key = $this->storePlain($file);
             $filename = $file->getClientOriginalName();
 
             $match = $owner->matches()->create([
@@ -53,6 +58,28 @@ class UploadDemoAction
         } finally {
             $scope->detach();
             $span->end();
+        }
+    }
+
+    // Storage only ever holds a plain .dem (invariant 2), so a packed upload is unpacked first and
+    // only the unpacked demo is stored. Unpack failures reach the client as a field error on `demo`,
+    // like the other demo.* codes.
+    private function storePlain(UploadedFile $file): string
+    {
+        if (! $this->unpacker->handles($file->getRealPath())) {
+            return $this->storage->store($file);
+        }
+
+        try {
+            $plain = $this->unpacker->unpack($file->getRealPath());
+        } catch (DemoUnpackFailed $e) {
+            throw ValidationException::withMessages(['demo' => $e->getMessage()]);
+        }
+
+        try {
+            return $this->storage->store(new File($plain));
+        } finally {
+            @unlink($plain);
         }
     }
 }

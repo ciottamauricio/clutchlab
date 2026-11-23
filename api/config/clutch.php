@@ -20,6 +20,10 @@ return [
     // Hard cap on uploaded demo size, in kilobytes (validation rule + nginx/php limits).
     'max_demo_kb' => env('MAX_DEMO_KB', 1048576),
 
+    // Cap on a packed upload (.dem.zst) once unpacked, in kilobytes. Above the upload cap because
+    // the demo inside is ~1.4× the archive, and a long 128-tick demo passes 700 MB.
+    'max_unpacked_demo_kb' => env('MAX_UNPACKED_DEMO_KB', 2097152),
+
     // Meilisearch (search read model), shared with the Go worker (the writer).
     'meili' => [
         'host' => env('MEILI_HOST', 'http://meilisearch:7700'),
