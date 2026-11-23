@@ -2,8 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Faceit\FaceitSyncOff;
 use App\Actions\Faceit\FindFaceitAccountAction;
-use App\Faceit\FaceitUnavailable;
+use App\Contracts\FaceitUnavailable;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -108,5 +109,17 @@ class FindFaceitAccountTest extends TestCase
 
         $this->expectException(FaceitUnavailable::class);
         $this->find($this->userWithSteamId(self::STEAM));
+    }
+
+    public function test_without_a_key_sync_is_off_before_any_other_reason(): void
+    {
+        $this->faceit->configured = false;
+
+        try {
+            $this->find($this->userWithSteamId(null));
+            $this->fail('expected FaceitSyncOff');
+        } catch (FaceitSyncOff) {
+            $this->assertSame([], $this->faceit->calls);
+        }
     }
 }

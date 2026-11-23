@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Faceit\FaceitSyncOff;
 use App\Actions\Faceit\GetFaceitMatchAction;
 use App\Actions\Faceit\ListFaceitMatchesAction;
-use App\Contracts\FaceitApi;
-use App\Faceit\FaceitUnavailable;
+use App\Contracts\FaceitUnavailable;
 use App\Http\Requests\ListFaceitMatchesRequest;
 use App\Http\Resources\FaceitMatchResource;
 use Carbon\CarbonImmutable;
@@ -14,20 +14,14 @@ use Illuminate\Support\Facades\Log;
 
 class FaceitController extends Controller
 {
-    public function index(ListFaceitMatchesRequest $request, FaceitApi $faceit, ListFaceitMatchesAction $action): JsonResponse
+    public function index(ListFaceitMatchesRequest $request, ListFaceitMatchesAction $action): JsonResponse
     {
-        // No key on this instance: the panel says FACEIT sync is off, instead of a failure.
-        if (! $faceit->configured()) {
-            return response()->json(['message' => 'faceit.disabled'], 503);
-        }
-
         try {
             $panel = $action->execute($request->user(), $request->boolean('refresh'));
+        } catch (FaceitSyncOff) {
+            return $this->syncOff();
         } catch (FaceitUnavailable $e) {
-            // An outage on FACEIT's side, not a bug here: one line for Loki, no stack trace.
-            Log::warning('faceit.unavailable', ['reason' => $e->getMessage()]);
-
-            return response()->json(['message' => 'faceit.unavailable'], 503);
+            return $this->unavailable($e);
         }
 
         return response()->json(['data' => [
@@ -39,18 +33,14 @@ class FaceitController extends Controller
 
     // One FACEIT match's start time and map, for the upload form to fill in a FACEIT demo's time.
     // The id's format is checked by the route, so a malformed one never reaches here or FACEIT.
-    public function show(string $faceitMatchId, FaceitApi $faceit, GetFaceitMatchAction $action): JsonResponse
+    public function show(string $faceitMatchId, GetFaceitMatchAction $action): JsonResponse
     {
-        if (! $faceit->configured()) {
-            return response()->json(['message' => 'faceit.disabled'], 503);
-        }
-
         try {
             $match = $action->execute($faceitMatchId);
+        } catch (FaceitSyncOff) {
+            return $this->syncOff();
         } catch (FaceitUnavailable $e) {
-            Log::warning('faceit.unavailable', ['reason' => $e->getMessage()]);
-
-            return response()->json(['message' => 'faceit.unavailable'], 503);
+            return $this->unavailable($e);
         }
 
         if ($match === null) {
@@ -62,5 +52,19 @@ class FaceitController extends Controller
             'started_at' => $match['started_at'] ? CarbonImmutable::createFromTimestampUTC($match['started_at']) : null,
             'map' => $match['map'],
         ]]);
+    }
+
+    // No key on this instance: the panel says FACEIT sync is off, instead of a failure.
+    private function syncOff(): JsonResponse
+    {
+        return response()->json(['message' => 'faceit.disabled'], 503);
+    }
+
+    // An outage on FACEIT's side, not a bug here: one line for Loki, no stack trace.
+    private function unavailable(FaceitUnavailable $e): JsonResponse
+    {
+        Log::warning('faceit.unavailable', ['reason' => $e->getMessage()]);
+
+        return response()->json(['message' => 'faceit.unavailable'], 503);
     }
 }

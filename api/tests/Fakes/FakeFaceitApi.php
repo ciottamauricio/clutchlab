@@ -3,7 +3,7 @@
 namespace Tests\Fakes;
 
 use App\Contracts\FaceitApi;
-use App\Faceit\FaceitUnavailable;
+use App\Contracts\FaceitUnavailable;
 
 // In-memory FACEIT: tests fill $players / $recent / $matches, flip $configured or $unavailable,
 // and read $calls to see what would have reached FACEIT.

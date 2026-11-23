@@ -3,7 +3,7 @@
 namespace App\Actions\Faceit;
 
 use App\Contracts\FaceitApi;
-use App\Faceit\FaceitUnavailable;
+use App\Contracts\FaceitUnavailable;
 use Illuminate\Contracts\Cache\Repository as Cache;
 
 // One FACEIT match's details (start time, map). A finished match never changes, so it is asked
@@ -18,10 +18,14 @@ class GetFaceitMatchAction
     /**
      * @return array{faceit_match_id: string, started_at: ?int, finished: bool, map: ?string}|null
      *
-     * @throws FaceitUnavailable
+     * @throws FaceitSyncOff|FaceitUnavailable
      */
     public function execute(string $faceitMatchId): ?array
     {
+        if (! $this->faceit->configured()) {
+            throw new FaceitSyncOff;
+        }
+
         $key = "faceit:match:{$faceitMatchId}";
         $cached = $this->cache->get($key);
         if (is_array($cached)) {

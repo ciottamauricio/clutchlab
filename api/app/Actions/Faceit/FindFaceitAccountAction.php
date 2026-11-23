@@ -3,8 +3,7 @@
 namespace App\Actions\Faceit;
 
 use App\Contracts\FaceitApi;
-use App\Faceit\AccountLookup;
-use App\Faceit\FaceitUnavailable;
+use App\Contracts\FaceitUnavailable;
 use App\Models\FaceitAccount;
 use App\Models\User;
 use Illuminate\Contracts\Cache\Repository as Cache;
@@ -23,9 +22,15 @@ class FindFaceitAccountAction
         private Cache $cache,
     ) {}
 
-    /** @throws FaceitUnavailable */
+    /** @throws FaceitSyncOff|FaceitUnavailable */
     public function execute(User $user): AccountLookup
     {
+        // Checked first, so a user without a Steam ID on a keyless instance hears "sync is off",
+        // the real reason, rather than "add a Steam ID".
+        if (! $this->faceit->configured()) {
+            throw new FaceitSyncOff;
+        }
+
         $steamId = (string) $user->steam_id;
         $stored = FaceitAccount::where('user_id', $user->id)->first();
 

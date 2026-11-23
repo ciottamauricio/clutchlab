@@ -2,8 +2,6 @@
 
 namespace App\Contracts;
 
-use App\Storage\DemoUnpackFailed;
-
 // Some platforms hand out demos compressed (FACEIT's room download is a .dem.zst). Storage only
 // ever holds a plain .dem, because "watch in game" downloads it for CS2's playdemo, which can't
 // read a compressed file — so a packed upload is unpacked before it is stored.

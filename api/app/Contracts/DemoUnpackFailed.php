@@ -1,10 +1,11 @@
 <?php
 
-namespace App\Storage;
+namespace App\Contracts;
 
 use RuntimeException;
 
-// Carries the code the client sees (demo.invalid, demo.unpacked_too_large); never prose.
+// DemoUnpacker's failure, beside the port so the use case never imports from an adapter. Carries
+// the code the client sees (demo.invalid, demo.unpacked_too_large); never prose.
 class DemoUnpackFailed extends RuntimeException
 {
     public static function invalid(): self

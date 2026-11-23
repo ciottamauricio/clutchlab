@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Faceit;
+namespace App\Actions\Faceit;
 
 use App\Models\FaceitAccount;
 

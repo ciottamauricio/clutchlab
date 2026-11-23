@@ -2,8 +2,6 @@
 
 namespace App\Contracts;
 
-use App\Faceit\FaceitUnavailable;
-
 // FACEIT's Data API, reduced to the three reads the FACEIT panel needs, with answers normalized to
 // the fields Clutchlab uses (times as unix seconds). Server-side only: the key is a server key by
 // FACEIT's rules, and a clone of the repo has none — configured() says whether this instance does.

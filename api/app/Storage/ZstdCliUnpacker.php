@@ -3,6 +3,7 @@
 namespace App\Storage;
 
 use App\Contracts\DemoUnpacker;
+use App\Contracts\DemoUnpackFailed;
 use RuntimeException;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;

@@ -2,7 +2,7 @@
 
 namespace Tests\Unit;
 
-use App\Storage\DemoUnpackFailed;
+use App\Contracts\DemoUnpackFailed;
 use App\Storage\ZstdCliUnpacker;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\ExecutableFinder;

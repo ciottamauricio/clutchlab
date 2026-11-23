@@ -3,7 +3,7 @@
 namespace App\Actions\Faceit;
 
 use App\Contracts\FaceitApi;
-use App\Faceit\FaceitUnavailable;
+use App\Contracts\FaceitUnavailable;
 use App\Models\GameMatch;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -23,6 +23,7 @@ class ListFaceitMatchesAction
     /**
      * @return array{account: ?array{player_id: string, nickname: string}, reason: ?string, matches: list<array>}
      *
+     * @throws FaceitSyncOff when this instance has no FACEIT key (decided by FindFaceitAccountAction)
      * @throws FaceitUnavailable when FACEIT can't give the account or the list
      */
     public function execute(User $user, bool $refresh = false): array

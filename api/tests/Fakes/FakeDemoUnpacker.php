@@ -3,7 +3,7 @@
 namespace Tests\Fakes;
 
 use App\Contracts\DemoUnpacker;
-use App\Storage\DemoUnpackFailed;
+use App\Contracts\DemoUnpackFailed;
 
 // Stand-in for the zstd CLI. A file counts as packed when it starts with the zstd magic, as with the
 // real one; "unpacking" prefixes the remaining bytes with "unpacked:" so a test can tell which file

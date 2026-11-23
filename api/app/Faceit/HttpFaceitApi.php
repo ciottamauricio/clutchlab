@@ -3,6 +3,7 @@
 namespace App\Faceit;
 
 use App\Contracts\FaceitApi;
+use App\Contracts\FaceitUnavailable;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as Http;
 

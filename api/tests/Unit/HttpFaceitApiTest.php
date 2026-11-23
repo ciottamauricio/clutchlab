@@ -2,7 +2,7 @@
 
 namespace Tests\Unit;
 
-use App\Faceit\FaceitUnavailable;
+use App\Contracts\FaceitUnavailable;
 use App\Faceit\HttpFaceitApi;
 use Illuminate\Http\Client\Factory as Http;
 use Illuminate\Http\Client\Request;
