@@ -273,6 +273,23 @@ private to its uploader. Enforced by `GameMatchPolicy`:
 Cross-match analytics (awards, search, player catalog, team stats) are still scoped to the
 caller's **own uploads** for now; re-scoping them to team visibility is the next step.
 
+## FACEIT
+
+The FACEIT panel on the matches page lists the user's latest FACEIT matches and which are already
+in Clutchlab. **Optional and per instance:** it needs the instance's own FACEIT API key
+(`FACEIT_API_KEY`, a "Server side" key from developers.faceit.com); a clone of the repo has none,
+and without it the panel says FACEIT sync is off while everything else works. The api reaches
+FACEIT through `App\Contracts\FaceitApi` (`App\Faceit\HttpFaceitApi`); the browser never does.
+FACEIT's Data API does not hand out demo files (that needs its application-only Downloads API), so
+a missing match is fetched by the user from its FACEIT room and uploaded.
+
+**Account** (`FindFaceitAccountAction`, table `faceit_accounts`): found from the Steam ID on the
+user's profile (`GET /players?game=cs2&game_player_id=`), never typed. Stored with the Steam ID it
+was found for; when the profile's Steam ID changes (an admin sets it) the mismatch triggers a new
+lookup, and a removed Steam ID drops the account. "No account for this Steam ID" is believed for 5
+minutes (cache `faceit:none:{steam_id}`). Without an account the panel shows why, as a code:
+`faceit.no_steam_id` or `faceit.not_found`.
+
 ## Known limitations (intentional — future steps)
 
 - **Crash mid-parse:** if the worker dies after setting `parsing` but before a terminal
