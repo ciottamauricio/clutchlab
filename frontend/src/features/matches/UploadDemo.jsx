@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useUploadDemo } from './api'
 import { useTeams } from '../teams/api'
 import { t } from '../../lib/i18n'
-import { guessPlatform, guessPlayedAt } from './demoFilename'
+import { guessFaceitMatchId, guessPlatform, guessPlayedAt } from './demoFilename'
 
 // Only these team roles may file a match under a team (mirrors TeamPolicy::uploadMatch).
 const CAN_UPLOAD = new Set(['owner', 'igl'])
@@ -51,7 +51,12 @@ export default function UploadDemo({ onUploaded }) {
   const submit = (e) => {
     e.preventDefault()
     if (ready) {
-      upload(file, effectiveTeamId || null, effectivePlatform, new Date(effectivePlayedAt).toISOString())
+      upload(file, {
+        platform: effectivePlatform,
+        playedAt: new Date(effectivePlayedAt).toISOString(),
+        teamId: effectiveTeamId || null,
+        externalId: effectivePlatform === 'faceit' ? guessFaceitMatchId(file.name) : '',
+      })
     }
   }
 

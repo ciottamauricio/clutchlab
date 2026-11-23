@@ -30,6 +30,8 @@ class MatchResource extends JsonResource
             // steam | faceit | gamersclub | other — a code the frontend labels; null for
             // matches uploaded before the platform was asked for, under an unrecognized name.
             'platform' => $this->platform,
+            // The platform's own id for the match (FACEIT's `1-<uuid>`); null when not stated.
+            'external_id' => $this->external_id,
             'team' => $this->whenLoaded('team', fn () => $this->team?->only('id', 'name')),
             'uploaded_by' => $this->whenLoaded('owner', fn () => $this->owner?->name),
             // When the match was actually played (UTC, from the demo filename); null when the

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 // "Match" is a reserved word in PHP, so the model is GameMatch on the `matches` table.
-#[Fillable(['original_filename', 'demo_key', 'content_hash', 'status', 'team_id', 'played_at', 'platform'])]
+#[Fillable(['original_filename', 'demo_key', 'content_hash', 'status', 'team_id', 'played_at', 'platform', 'external_id'])]
 class GameMatch extends Model
 {
     use HasFactory;
@@ -19,6 +19,9 @@ class GameMatch extends Model
 
     // Where the match was played, chosen by the uploader. `steam` is Valve's own matchmaking.
     public const PLATFORMS = ['steam', 'faceit', 'gamersclub', 'other'];
+
+    // A FACEIT match id (`1-<uuid>`, lower case), as FACEIT's API and its file names write it.
+    public const FACEIT_MATCH_ID = '/^1-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/';
 
     protected function casts(): array
     {

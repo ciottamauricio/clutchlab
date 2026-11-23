@@ -30,6 +30,7 @@ const MESSAGES = {
   'match.platform_required': 'Please choose where the match was played',
   'match.invalid_platform': 'That platform is not supported',
   'match.invalid_played_at': "Pick when the match was played (it can't be in the future)",
+  'match.invalid_external_id': "That FACEIT match id isn't valid",
 
   'platform.steam': 'Steam matchmaking',
   'platform.faceit': 'FACEIT',

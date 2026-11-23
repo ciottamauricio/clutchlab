@@ -2,10 +2,12 @@
 // way, so the name is a decent first guess — only a guess: it pre-fills the upload form and
 // the uploader confirms or changes it.
 
+const FACEIT_NAME = /^(1-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})/i
+
 const PLATFORM_PATTERNS = [
   ['gamersclub', /^\d{4}-\d{2}-\d{2}__\d{4}__/],
   ['steam', /^match730_/],
-  ['faceit', /^1-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}/i],
+  ['faceit', FACEIT_NAME],
 ]
 
 export function guessPlatform(filename) {
@@ -18,4 +20,11 @@ export function guessPlatform(filename) {
 export function guessPlayedAt(filename) {
   const m = /(\d{4})-(\d{2})-(\d{2})__(\d{2})(\d{2})/.exec(filename ?? '')
   return m ? `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00Z` : ''
+}
+
+// FACEIT names its downloads after the match (`1-<uuid>-1-1.dem[.zst]`): the id the upload states
+// as `external_id`, so a match is known as that FACEIT match. Returns '' when the name lacks it.
+export function guessFaceitMatchId(filename) {
+  const m = FACEIT_NAME.exec(filename ?? '')
+  return m ? m[1].toLowerCase() : ''
 }

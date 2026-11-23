@@ -46,6 +46,19 @@ class UploadDemoRequest extends FormRequest
             // Optional: only Gamers Club names carry the date, so other demos need it stated.
             // Absent, the action falls back to the filename's date.
             'played_at' => ['nullable', 'date', 'before_or_equal:now'],
+            // Optional: which FACEIT match this is. Stated by the uploader (the form reads it from
+            // FACEIT's file name), and what tells a FACEIT match is already in — a .dem and the
+            // .dem.zst of one match have different bytes, so content_hash can't.
+            'external_id' => ['bail', 'nullable', 'string', 'prohibited_unless:platform,faceit',
+                'regex:'.GameMatch::FACEIT_MATCH_ID, function ($attr, $value, $fail) {
+                    $exists = $this->user()->matches()
+                        ->where('platform', 'faceit')
+                        ->where('external_id', $value)
+                        ->exists();
+                    if ($exists) {
+                        $fail('match.duplicate');
+                    }
+                }],
             // Optional: file the match under a team so the whole team can see it. Must be a
             // team the caller may upload to; null keeps the match private.
             'team_id' => ['nullable', 'integer', function ($attr, $value, $fail) {
@@ -69,6 +82,9 @@ class UploadDemoRequest extends FormRequest
             'demo.max' => 'demo.file_too_large',
             'platform.required' => 'match.platform_required',
             'platform.in' => 'match.invalid_platform',
+            'external_id.string' => 'match.invalid_external_id',
+            'external_id.prohibited_unless' => 'match.invalid_external_id',
+            'external_id.regex' => 'match.invalid_external_id',
             'played_at.date' => 'match.invalid_played_at',
             'played_at.before_or_equal' => 'match.invalid_played_at',
             'team_id.integer' => 'match.invalid_team',

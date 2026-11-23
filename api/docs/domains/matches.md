@@ -36,6 +36,7 @@ Authorization & ownership).
 | user_id | fk users, nullable | api | the uploader (null for legacy pre-auth rows) |
 | team_id | fk teams, nullable | api | the team the match is shared with; null = private to the uploader |
 | platform | string(20), nullable | api | `steam` / `faceit` / `gamersclub` / `other` (`GameMatch::PLATFORMS`), chosen at upload. Null only for rows that predate the column and whose filename matched no platform's naming pattern in the backfill. |
+| external_id | string(64), nullable | api | the platform's own id for the match: FACEIT's `1-<uuid>` (`GameMatch::FACEIT_MATCH_ID`), stated at upload. Unique per `(user_id, platform, external_id)`. Backfilled for FACEIT rows from FACEIT's file name. |
 | original_filename | string | api | client-provided name; display only |
 | demo_key | string, unique | api | S3 object key `<uuid>.dem` |
 | content_hash | string(64), nullable | api | sha256 of the uploaded demo's bytes; `unique(user_id, content_hash)` so a user can't upload the same demo twice. Null for legacy pre-hash rows. |
@@ -135,6 +136,12 @@ Transition rules:
     played time (pre-filled from a Gamers Club name) and sends it as `played_at`; the API
     keeps it optional, normalizes it to UTC, and falls back to
     `GameMatch::playedAtFromFilename` when it's absent.
+14. **A FACEIT match is known by its FACEIT id, not its bytes.** The `.dem` and the `.dem.zst`
+    of one FACEIT match have different contents, so `content_hash` can't tell they're the
+    same match. The upload states `external_id` (the form reads it from FACEIT's file name,
+    `1-<uuid>-1-1.dem[.zst]`), and an uploader can't file the same FACEIT match twice
+    (`match.duplicate`, also a unique index). Another user may. The id is what marks a FACEIT
+    match as already in Clutchlab.
 
 ## Validation (boundary) — `app/Http/Requests/UploadDemoRequest.php`
 
@@ -165,6 +172,10 @@ are two different contents. What the file unpacks to is still checked by the par
 `played_at` field: optional, a date-time (ISO 8601; an offset is honored and stored as UTC),
 not in the future. Code: `match.invalid_played_at`.
 
+`external_id` field: optional, a FACEIT match id, only with `platform=faceit`. Codes:
+`match.invalid_external_id` (wrong format or platform), `match.duplicate` (the uploader already has
+that FACEIT match).
+
 Infra limits that must stay **≥** the upload size: nginx `client_max_body_size` (1024M) and
 PHP `upload_max_filesize` / `post_max_size` (1024M, set in `api/php.ini`).
 
@@ -177,7 +188,7 @@ upload rights (owner/igl) on the team, or being the uploader.
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
 | GET | `/matches` | list matches the caller can see, most recently **played** first (null `played_at` last, then by upload time) | own uploads + their teams' matches; **paginated 10/page** (`{ data, links, meta }`, `?page=`); optional `?player=` narrows to matches whose scoreboard contains that player name (case-insensitive substring; invalid value → `match.invalid_player_filter`); optional `?month=YYYY-MM` / `?day=YYYY-MM-DD` narrow to matches **played** in that calendar month / day (they intersect; undated matches only appear unfiltered; invalid values → `match.invalid_month` / `match.invalid_day`) |
-| POST | `/matches` | upload a demo | multipart `demo` (`.dem` or zstd-packed `.dem.zst`, stored unpacked) + required `platform`; optional `played_at`, `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
+| POST | `/matches` | upload a demo | multipart `demo` (`.dem` or zstd-packed `.dem.zst`, stored unpacked) + required `platform`; optional `played_at`, `external_id` (FACEIT match id), `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
 | GET | `/matches/{match}` | match detail + players | visible only (403 otherwise); players by kills desc |
 | GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | visible only; see [heatmap.md](heatmap.md) |
 | GET | `/matches/{match}/clutches` | clutches grouped by clutcher/round | visible only; each `{ round, size, killer_name, kills[] }` |
@@ -236,7 +247,8 @@ runaway resource use, isolation handles a crash or exploit. OS-level lockdown of
 `match.invalid_team` (team the caller can't upload to), `match.upload_forbidden` (caller
 isn't an uploader anywhere), `match.duplicate` (caller has already uploaded this exact
 demo — dedup is by sha256 of the file content, unique per uploader), and
-`match.platform_required` / `match.invalid_platform` / `match.invalid_played_at`.
+`match.platform_required` / `match.invalid_platform` / `match.invalid_played_at` /
+`match.invalid_external_id`.
 
 ## Authorization & ownership
 

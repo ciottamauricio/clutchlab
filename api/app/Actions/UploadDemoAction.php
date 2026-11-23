@@ -24,8 +24,15 @@ class UploadDemoAction
         private Tracing $tracing,
     ) {}
 
-    public function execute(UploadedFile $file, User $owner, string $platform, ?CarbonInterface $playedAt = null, ?int $teamId = null, ?string $contentHash = null): GameMatch
-    {
+    public function execute(
+        UploadedFile $file,
+        User $owner,
+        string $platform,
+        ?string $externalId = null,
+        ?CarbonInterface $playedAt = null,
+        ?int $teamId = null,
+        ?string $contentHash = null,
+    ): GameMatch {
         // The root span for the whole upload → parse → notify flow. Store, create, and
         // enqueue run inside it, and push() injects this span's traceparent into the job
         // so the worker's parse becomes a child — one waterfall across three services.
@@ -45,6 +52,7 @@ class UploadDemoAction
                 'status' => 'queued',
                 'team_id' => $teamId,
                 'platform' => $platform,
+                'external_id' => $externalId,
                 // Eloquent writes a datetime's wall clock as-is, so normalize to UTC first —
                 // the browser sends the player's local time with its offset.
                 'played_at' => $playedAt?->toImmutable()->utc() ?? GameMatch::playedAtFromFilename($filename),

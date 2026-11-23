@@ -13,19 +13,20 @@ use Tests\TestCase;
 // Upload rules from api/docs/domains/matches.md: codes not sentences, invariant 1
 // (one upload ⇒ one row + one enqueued job), content-hash dedup scoped per uploader, and
 // the uploader's required platform choice and optional played date, and packed (.dem.zst) uploads
-// stored unpacked.
+// stored unpacked, and the FACEIT match a demo is (external_id).
 class UploadDemoTest extends TestCase
 {
     use RefreshDatabase;
 
     protected $seed = true;
 
-    private function upload(string $name = 'game.dem', string $content = 'DEMOBYTES', ?string $platform = 'faceit', ?string $playedAt = null)
+    private function upload(string $name = 'game.dem', string $content = 'DEMOBYTES', ?string $platform = 'faceit', ?string $playedAt = null, ?string $externalId = null)
     {
         return $this->postJson('/api/matches', array_filter([
             'demo' => UploadedFile::fake()->createWithContent($name, $content),
             'platform' => $platform,
             'played_at' => $playedAt,
+            'external_id' => $externalId,
         ]));
     }
 
@@ -223,5 +224,56 @@ class UploadDemoTest extends TestCase
         $this->assertDatabaseCount('matches', 0);
         $this->assertSame([], $this->demoStorage->stored);
         $this->assertCount(0, $this->parseQueue->pushed);
+    }
+
+    private const FACEIT_ID = '1-3dec19fc-88c7-421f-8080-b90d23f2f1f9';
+
+    public function test_the_faceit_match_id_is_stored_and_returned(): void
+    {
+        Sanctum::actingAs($this->uploader());
+
+        $this->upload(self::FACEIT_ID.'-1-1.dem', externalId: self::FACEIT_ID)
+            ->assertCreated()
+            ->assertJsonPath('data.external_id', self::FACEIT_ID);
+
+        $this->assertDatabaseHas('matches', ['platform' => 'faceit', 'external_id' => self::FACEIT_ID]);
+    }
+
+    public function test_a_malformed_or_non_faceit_match_id_is_refused_with_a_code(): void
+    {
+        Sanctum::actingAs($this->uploader());
+
+        $this->upload('a.dem', 'A', externalId: 'not-a-faceit-id')
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.external_id.0', 'match.invalid_external_id');
+        $this->upload('b.dem', 'B', platform: 'steam', externalId: self::FACEIT_ID)
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.external_id.0', 'match.invalid_external_id');
+
+        $this->assertDatabaseCount('matches', 0);
+    }
+
+    public function test_the_same_faceit_match_from_another_file_is_a_duplicate(): void
+    {
+        Sanctum::actingAs($this->uploader());
+
+        $this->upload(self::FACEIT_ID.'-1-1.dem', 'PLAIN', externalId: self::FACEIT_ID)->assertCreated();
+        $this->upload(self::FACEIT_ID.'-1-1.dem.zst', FakeDemoUnpacker::MAGIC.'PACKED', externalId: self::FACEIT_ID)
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.external_id.0', 'match.duplicate');
+
+        $this->assertDatabaseCount('matches', 1);
+        $this->assertCount(1, $this->parseQueue->pushed);
+    }
+
+    public function test_another_user_may_upload_the_same_faceit_match(): void
+    {
+        Sanctum::actingAs($this->uploader());
+        $this->upload('a.dem', 'A', externalId: self::FACEIT_ID)->assertCreated();
+
+        Sanctum::actingAs($this->uploader());
+        $this->upload('b.dem', 'B', externalId: self::FACEIT_ID)->assertCreated();
+
+        $this->assertDatabaseCount('matches', 2);
     }
 }

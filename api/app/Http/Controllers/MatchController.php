@@ -66,10 +66,11 @@ class MatchController extends Controller
         $match = $action->execute(
             $request->file('demo'),
             $request->user(),
-            $request->validated('platform'),
-            $request->date('played_at'),
-            $request->integer('team_id') ?: null,
-            $request->contentHash(),
+            platform: $request->validated('platform'),
+            externalId: $request->validated('external_id'),
+            playedAt: $request->date('played_at'),
+            teamId: $request->integer('team_id') ?: null,
+            contentHash: $request->contentHash(),
         );
 
         return (new MatchResource($match))->response()->setStatusCode(201);
