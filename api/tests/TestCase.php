@@ -8,6 +8,7 @@ use App\Contracts\DemoUnpacker;
 use App\Contracts\DocRetriever;
 use App\Contracts\DocsLlm;
 use App\Contracts\EventBus;
+use App\Contracts\FaceitApi;
 use App\Contracts\ParseQueue;
 use App\Contracts\RoundRetriever;
 use App\Contracts\SearchIndex;
@@ -16,6 +17,7 @@ use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Tests\Fakes\FakeDemoStorage;
 use Tests\Fakes\FakeDemoUnpacker;
 use Tests\Fakes\FakeDocRetriever;
+use Tests\Fakes\FakeFaceitApi;
 use Tests\Fakes\FakeRoundRetriever;
 use Tests\Fakes\FakeSearchIndex;
 use Tests\Fakes\FakeSemanticRetriever;
@@ -31,6 +33,8 @@ abstract class TestCase extends BaseTestCase
     protected FakeDemoStorage $demoStorage;
 
     protected FakeDemoUnpacker $demoUnpacker;
+
+    protected FakeFaceitApi $faceit;
 
     protected SpyParseQueue $parseQueue;
 
@@ -58,6 +62,7 @@ abstract class TestCase extends BaseTestCase
 
         $this->demoStorage = new FakeDemoStorage;
         $this->demoUnpacker = new FakeDemoUnpacker;
+        $this->faceit = new FakeFaceitApi;
         $this->parseQueue = new SpyParseQueue;
         $this->eventBus = new SpyEventBus;
         $this->analystLlm = new SpyAnalystLlm;
@@ -68,6 +73,7 @@ abstract class TestCase extends BaseTestCase
 
         $this->app->instance(DemoStorage::class, $this->demoStorage);
         $this->app->instance(DemoUnpacker::class, $this->demoUnpacker);
+        $this->app->instance(FaceitApi::class, $this->faceit);
         $this->app->instance(ParseQueue::class, $this->parseQueue);
         $this->app->instance(EventBus::class, $this->eventBus);
         $this->app->instance(SearchIndex::class, new FakeSearchIndex);

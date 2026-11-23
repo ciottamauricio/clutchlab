@@ -32,6 +32,18 @@ return [
 
     // Claude, behind the AnalystLlm contract. No key → the analyst endpoint degrades
     // with analyst.unavailable instead of erroring at boot.
+    // FACEIT's Data API, for the FACEIT panel. Optional: the key is each instance's own
+    // ("Server side" key from developers.faceit.com); empty means FACEIT sync is off and the panel
+    // says so. Uploads, platform and played time never need it.
+    'faceit' => [
+        'key' => env('FACEIT_API_KEY', ''),
+        'api' => env('FACEIT_API', 'https://open.faceit.com/data/v4'),
+        'timeout' => (int) env('FACEIT_TIMEOUT', 10),
+        // How long a player's list is kept before FACEIT is asked again, and how many it holds.
+        'list_ttl' => 300,
+        'list_size' => 20,
+    ],
+
     'anthropic' => [
         'key' => env('ANTHROPIC_API_KEY', ''),
         'model' => env('ANTHROPIC_MODEL', 'claude-opus-4-8'),
