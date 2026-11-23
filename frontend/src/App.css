@@ -566,6 +566,138 @@
   color: var(--text-dim);
 }
 
+/* ---------- FACEIT panel (matches page): latest FACEIT matches, in Clutchlab or missing ---------- */
+
+.faceit {
+  padding: 12px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  margin-bottom: 32px;
+}
+
+.fc-head {
+  display: flex;
+  align-items: center;
+  gap: 6px 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.fc-label {
+  font: 500 11px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.fc-summary strong {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.fc-head-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 14px;
+}
+
+.fc-note {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.fc-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.fc-row {
+  display: grid;
+  grid-template-columns: 9.5rem 6.5rem 5.5rem 1fr;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.fc-row:last-child {
+  border-bottom: none;
+}
+
+.fc-when {
+  font: 400 12px var(--mono);
+  color: var(--text-dim);
+}
+
+.fc-map {
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.fc-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 400 12px var(--mono);
+}
+
+.fc-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fc-link {
+  color: var(--ct);
+  text-decoration: none;
+}
+
+.fc-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* A quiet outline button: the row's action, not the page's (the upload strip owns the filled one). */
+.fc-btn {
+  font-size: 12px;
+  padding: 3px 10px;
+  color: var(--text-h);
+  background: transparent;
+  border-color: var(--border-strong);
+}
+
+.fc-btn:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--text-dim);
+}
+
+.fc-error {
+  grid-column: 1 / -1;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .fc-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .fc-when,
+  .fc-actions,
+  .fc-error {
+    grid-column: 1 / -1;
+  }
+
+  .fc-actions {
+    justify-content: flex-start;
+  }
+}
+
 /* ---------- Ask the analyst (RAG panel on the matches page) ---------- */
 
 /* Same console register as the upload strip above it; the solid border says

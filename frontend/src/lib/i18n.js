@@ -32,6 +32,13 @@ const MESSAGES = {
   'match.invalid_played_at': "Pick when the match was played (it can't be in the future)",
   'match.invalid_external_id': "That FACEIT match id isn't valid",
 
+  'faceit.disabled': 'FACEIT sync is off: it needs your own FACEIT API key (FACEIT_API_KEY in .env, see the README).',
+  'faceit.unavailable': "FACEIT isn't answering right now. Try again in a few minutes.",
+  'faceit.no_steam_id': "There's no Steam ID on your profile yet, so your FACEIT account can't be found. Ask an admin to add it.",
+  'faceit.not_found': 'No FACEIT account uses the Steam ID on your profile.',
+  'faceit.match_not_found': "FACEIT doesn't know that match",
+  'faceit.invalid_refresh': 'That refresh request is invalid',
+
   'platform.steam': 'Steam matchmaking',
   'platform.faceit': 'FACEIT',
   'platform.gamersclub': 'Gamers Club',

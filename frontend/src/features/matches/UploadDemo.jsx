@@ -1,11 +1,8 @@
 import { useRef, useState } from 'react'
-import { useUploadDemo } from './api'
-import { useTeams } from '../teams/api'
+import { useUploadDemo, useUploadTeams } from './api'
 import { t } from '../../lib/i18n'
 import { guessFaceitMatchId, guessPlatform, guessPlayedAt } from './demoFilename'
 
-// Only these team roles may file a match under a team (mirrors TeamPolicy::uploadMatch).
-const CAN_UPLOAD = new Set(['owner', 'igl'])
 // Where a match can be played (mirrors GameMatch::PLATFORMS); labels via t('platform.<code>').
 const PLATFORMS = ['steam', 'faceit', 'gamersclub', 'other']
 
@@ -28,10 +25,9 @@ export default function UploadDemo({ onUploaded }) {
   const [platform, setPlatform] = useState(null)
   const [playedAt, setPlayedAt] = useState(null)
   const inputRef = useRef(null)
-  const { teams } = useTeams()
+  const { uploadable, defaultTeamId } = useUploadTeams()
 
-  const uploadable = teams.filter((team) => CAN_UPLOAD.has(team.my_role))
-  const effectiveTeamId = teamId ?? (uploadable[0] ? String(uploadable[0].id) : '')
+  const effectiveTeamId = teamId ?? defaultTeamId
   const effectivePlatform = platform ?? guessPlatform(file?.name)
   const effectivePlayedAt = playedAt ?? toLocalInput(guessPlayedAt(file?.name))
   const ready = file && effectivePlatform && effectivePlayedAt

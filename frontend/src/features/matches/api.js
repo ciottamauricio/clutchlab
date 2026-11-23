@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, tokenStore } from '../../lib/api'
+import { useTeams } from '../teams/api'
 
 const listMatches = (player, month, day, page) => {
   const params = new URLSearchParams()
@@ -11,6 +12,7 @@ const listMatches = (player, month, day, page) => {
   return api.getPage(`/matches${qs ? `?${qs}` : ''}`)
 }
 const getMatch = (id) => api.get(`/matches/${id}`)
+const listFaceitMatches = (refresh) => api.get(`/faceit/matches${refresh ? '?refresh=1' : ''}`)
 const getKillPositions = (id) => api.get(`/matches/${id}/kill-positions`)
 const getClutches = (id) => api.get(`/matches/${id}/clutches`)
 const getTeamStats = (id) => api.get(`/matches/${id}/team-stats`)
@@ -268,6 +270,49 @@ export function useDeleteMatch(onDeleted) {
   }, [onDeleted])
 
   return { remove, deletingId, error }
+}
+
+// Only these team roles may file a match under a team (mirrors TeamPolicy::uploadMatch). An
+// upload goes to the first such team unless the user picks another, or private when there is none.
+const CAN_UPLOAD = new Set(['owner', 'igl'])
+
+export function useUploadTeams() {
+  const { teams } = useTeams()
+  const uploadable = teams.filter((team) => CAN_UPLOAD.has(team.my_role))
+  return { uploadable, defaultTeamId: uploadable[0] ? String(uploadable[0].id) : '' }
+}
+
+// The FACEIT panel's list (GET /faceit/matches). status: 'loading' | 'ready' | 'off' (this instance
+// has no FACEIT key) | 'error' (FACEIT unavailable; a list already shown stays, with the error).
+// refresh() asks FACEIT again; reload() re-reads the cached list, enough after an upload since the
+// "in Clutchlab" marks are computed fresh on every call.
+export function useFaceitMatches() {
+  const [state, setState] = useState({ status: 'loading', account: null, reason: null, matches: [], error: null })
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async (refresh) => {
+    setBusy(true)
+    try {
+      const data = await listFaceitMatches(refresh)
+      setState({ status: 'ready', account: data?.account ?? null, reason: data?.reason ?? null, matches: data?.matches ?? [], error: null })
+    } catch (e) {
+      const code = e.code ?? 'error.unknown'
+      setState((s) => code === 'faceit.disabled'
+        ? { status: 'off', account: null, reason: null, matches: [], error: null }
+        : { ...s, status: s.status === 'ready' ? 'ready' : 'error', error: code })
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load(false)
+  }, [load])
+
+  const refresh = useCallback(() => load(true), [load])
+  const reload = useCallback(() => load(false), [load])
+
+  return { ...state, busy, refresh, reload }
 }
 
 export function useUploadDemo(onUploaded) {
