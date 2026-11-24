@@ -1,7 +1,9 @@
 name: notifier
 
 on:
+  # main only: a feature branch runs CI through its pull request, not on every push.
   push:
+    branches: [main]
     paths: ["notifier/**", "contracts/**", ".github/workflows/notifier.yml"]
   pull_request:
     paths: ["notifier/**", "contracts/**", ".github/workflows/notifier.yml"]

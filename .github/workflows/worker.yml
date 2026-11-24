@@ -1,7 +1,9 @@
 name: worker
 
 on:
+  # main only: a feature branch runs CI through its pull request, not on every push.
   push:
+    branches: [main]
     paths: ["worker/**", "contracts/**", ".github/workflows/worker.yml"]
   pull_request:
     paths: ["worker/**", "contracts/**", ".github/workflows/worker.yml"]

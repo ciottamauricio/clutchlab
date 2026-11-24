@@ -4,7 +4,9 @@ name: infra
 # formatted and internally valid. No cloud account and no backend — `validate` needs
 # neither. Each cloud dir is its own matrix leg.
 on:
+  # main only: a feature branch runs CI through its pull request, not on every push.
   push:
+    branches: [main]
     paths: ["infra/**", ".github/workflows/infra.yml"]
   pull_request:
     paths: ["infra/**", ".github/workflows/infra.yml"]

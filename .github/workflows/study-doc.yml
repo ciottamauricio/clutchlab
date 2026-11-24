@@ -5,7 +5,9 @@
 name: study-doc
 
 on:
+  # main only: a feature branch runs CI through its pull request, not on every push.
   push:
+    branches: [main]
     paths:
       - "frontend/src/features/study/tradeoffs.js"
       - "frontend/src/features/study/pitches.js"

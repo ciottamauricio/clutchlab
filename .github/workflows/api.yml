@@ -4,7 +4,9 @@
 name: api
 
 on:
+  # main only: a feature branch runs CI through its pull request, not on every push.
   push:
+    branches: [main]
     paths: ["api/**", "contracts/**", ".github/workflows/api.yml"]
   pull_request:
     paths: ["api/**", "contracts/**", ".github/workflows/api.yml"]

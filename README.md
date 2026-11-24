@@ -124,7 +124,8 @@ docker compose run --rm notifier go test ./...
 
 The highest-leverage tests are the **wire-contract fixtures** in [`contracts/`](contracts/):
 the producer asserts it emits exactly those bytes, each consumer asserts it decodes them —
-in whatever language it speaks. CI runs per service with path filters; touching
+in whatever language it speaks. CI runs per service with path filters, on pull requests
+and on pushes to `main`; touching
 `contracts/**` re-runs every suite that speaks the channel.
 
 ## `infra/` — the same architecture, written for the cloud
