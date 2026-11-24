@@ -3,8 +3,10 @@
 namespace App\Http\Requests;
 
 use App\Contracts\PermissionService;
+use App\Models\GameMatch;
 use App\Models\Team;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UploadDemoRequest extends FormRequest
 {
@@ -18,7 +20,9 @@ class UploadDemoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'demo' => ['required', 'file', 'extensions:dem', 'max:'.config('clutch.max_demo_kb'), function ($attr, $value, $fail) {
+            // .zst for FACEIT's room download (.dem.zst); whether a file is packed is decided by
+            // its bytes in the action, so the name only has to be one of these.
+            'demo' => ['required', 'file', 'extensions:dem,zst', 'max:'.config('clutch.max_demo_kb'), function ($attr, $value, $fail) {
                 // A teamless (private) upload still requires the caller to be an uploader
                 // somewhere — a user who can't upload to any team can't upload at all. Team
                 // uploads carry their own per-team check on `team_id` below. Admins bypass.
@@ -38,6 +42,23 @@ class UploadDemoRequest extends FormRequest
                     $fail('match.duplicate');
                 }
             }],
+            'platform' => ['required', Rule::in(GameMatch::PLATFORMS)],
+            // Optional: only Gamers Club names carry the date, so other demos need it stated.
+            // Absent, the action falls back to the filename's date.
+            'played_at' => ['nullable', 'date', 'before_or_equal:now'],
+            // Optional: which FACEIT match this is. Stated by the uploader (the form reads it from
+            // FACEIT's file name), and what tells a FACEIT match is already in — a .dem and the
+            // .dem.zst of one match have different bytes, so content_hash can't.
+            'external_id' => ['bail', 'nullable', 'string', 'prohibited_unless:platform,faceit',
+                'regex:'.GameMatch::FACEIT_MATCH_ID, function ($attr, $value, $fail) {
+                    $exists = $this->user()->matches()
+                        ->where('platform', 'faceit')
+                        ->where('external_id', $value)
+                        ->exists();
+                    if ($exists) {
+                        $fail('match.duplicate');
+                    }
+                }],
             // Optional: file the match under a team so the whole team can see it. Must be a
             // team the caller may upload to; null keeps the match private.
             'team_id' => ['nullable', 'integer', function ($attr, $value, $fail) {
@@ -59,6 +80,13 @@ class UploadDemoRequest extends FormRequest
             'demo.file' => 'demo.invalid',
             'demo.extensions' => 'demo.wrong_extension',
             'demo.max' => 'demo.file_too_large',
+            'platform.required' => 'match.platform_required',
+            'platform.in' => 'match.invalid_platform',
+            'external_id.string' => 'match.invalid_external_id',
+            'external_id.prohibited_unless' => 'match.invalid_external_id',
+            'external_id.regex' => 'match.invalid_external_id',
+            'played_at.date' => 'match.invalid_played_at',
+            'played_at.before_or_equal' => 'match.invalid_played_at',
             'team_id.integer' => 'match.invalid_team',
             'match.upload_forbidden' => 'match.upload_forbidden',
             'match.duplicate' => 'match.duplicate',

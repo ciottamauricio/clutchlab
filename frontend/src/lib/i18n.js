@@ -16,8 +16,9 @@ const MESSAGES = {
 
   'demo.required': 'Please choose a .dem file',
   'demo.invalid': 'That upload is not a valid file',
-  'demo.wrong_extension': 'Only .dem files are accepted',
+  'demo.wrong_extension': 'Only .dem or .dem.zst files are accepted',
   'demo.file_too_large': 'That demo is too large (max 1 GB)',
+  'demo.unpacked_too_large': 'That demo is too large once unpacked (max 2 GB)',
   'demo.storage_failed': 'Uploading to storage failed',
   'match.invalid_team': "You can't upload to that team",
   'match.upload_forbidden': "You don't have permission to upload matches",
@@ -26,6 +27,22 @@ const MESSAGES = {
   'match.invalid_month': 'That month filter is invalid',
   'match.invalid_day': 'That day filter is invalid',
   'match.invalid_page': 'That page does not exist',
+  'match.platform_required': 'Please choose where the match was played',
+  'match.invalid_platform': 'That platform is not supported',
+  'match.invalid_played_at': "Pick when the match was played (it can't be in the future)",
+  'match.invalid_external_id': "That FACEIT match id isn't valid",
+
+  'faceit.disabled': 'FACEIT sync is off: it needs your own FACEIT API key (FACEIT_API_KEY in .env, see the README).',
+  'faceit.unavailable': "FACEIT isn't answering right now. Try again in a few minutes.",
+  'faceit.no_steam_id': "There's no Steam ID on your profile yet, so your FACEIT account can't be found. Ask an admin to add it.",
+  'faceit.not_found': 'No FACEIT account uses the Steam ID on your profile.',
+  'faceit.match_not_found': "FACEIT doesn't know that match",
+  'faceit.invalid_refresh': 'That refresh request is invalid',
+
+  'platform.steam': 'Steam matchmaking',
+  'platform.faceit': 'FACEIT',
+  'platform.gamersclub': 'Gamers Club',
+  'platform.other': 'Other',
   'tactic.invalid_team': "You can only share with a team you belong to",
 
   'training.invalid_team': "You can't schedule trainings for that team",

@@ -4,6 +4,7 @@ namespace App\Storage;
 
 use App\Contracts\DemoStorage;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Http\File;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -13,7 +14,7 @@ class S3DemoStorage implements DemoStorage
 {
     public function __construct(private Filesystem $disk) {}
 
-    public function store(UploadedFile $file): string
+    public function store(File|UploadedFile $file): string
     {
         $key = Str::uuid().'.dem';
 

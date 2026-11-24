@@ -14,14 +14,17 @@ Authorization & ownership).
 
 ## Ubiquitous language
 
-- **Demo** — a `.dem` recording of a CS2 match, uploaded by the user. Stored as an
-  object in MinIO/S3, never in the database.
+- **Demo** — a `.dem` recording of a CS2 match, uploaded by the user, either plain or
+  packed with zstd (FACEIT's room download is a `.dem.zst`). Stored as an object in MinIO/S3,
+  always unpacked, never in the database.
 - **Match** — a row in `matches`: the tracked lifecycle of one uploaded demo. The
   Eloquent model is `GameMatch` because `Match` is a reserved word in PHP.
 - **Parse** — the Go worker reading the demo and extracting stats.
 - **Player stat** — one row per player per match in `match_player_stats`.
 - **demo_key** — the S3 object key of the stored demo (`<uuid>.dem`); also the value
   that joins the web tier to the worker via the queue.
+- **Platform** — where the match was played: `steam` (Valve's own matchmaking),
+  `faceit`, `gamersclub`, or `other`. Chosen by the uploader, never read from the demo.
 
 ## Entities
 
@@ -32,6 +35,8 @@ Authorization & ownership).
 | id | bigint | api | |
 | user_id | fk users, nullable | api | the uploader (null for legacy pre-auth rows) |
 | team_id | fk teams, nullable | api | the team the match is shared with; null = private to the uploader |
+| platform | string(20), nullable | api | `steam` / `faceit` / `gamersclub` / `other` (`GameMatch::PLATFORMS`), chosen at upload. Null only for rows that predate the column and whose filename matched no platform's naming pattern in the backfill. |
+| external_id | string(64), nullable | api | the platform's own id for the match: FACEIT's `1-<uuid>` (`GameMatch::FACEIT_MATCH_ID`), stated at upload. Unique per `(user_id, platform, external_id)`. Backfilled for FACEIT rows from FACEIT's file name. |
 | original_filename | string | api | client-provided name; display only |
 | demo_key | string, unique | api | S3 object key `<uuid>.dem` |
 | content_hash | string(64), nullable | api | sha256 of the uploaded demo's bytes; `unique(user_id, content_hash)` so a user can't upload the same demo twice. Null for legacy pre-hash rows. |
@@ -45,7 +50,7 @@ Authorization & ownership).
 | duration_seconds | float, nullable | worker | play time only: first round's freezetime-end to the last round's end (excludes warmup/post-game) |
 | knife_round_winner | string(2), nullable | worker | stable side (`CT`/`T`) that won the pre-match knife round; `null` if none |
 | parsed_at | timestamp, nullable | worker | set on success |
-| played_at | timestamp, nullable | api | when the match was played (UTC), parsed from the filename's `YYYY-MM-DD__HHMM` prefix at upload; filterable/sortable |
+| played_at | timestamp, nullable | api | when the match was played (UTC): the uploader's stated time, else the filename's `YYYY-MM-DD__HHMM` prefix (Gamers Club names); filterable/sortable. Null hides a match from every month/day view. |
 | created_at / updated_at | timestamps | api + worker | |
 
 ### `MatchPlayerStat` — table `match_player_stats` (`app/Models/MatchPlayerStat.php`)
@@ -88,7 +93,9 @@ Transition rules:
 1. **One upload ⇒ exactly one `matches` row (status `queued`) and exactly one enqueued
    parse job.** (`app/Actions/UploadDemoAction.php`)
 2. `demo_key` is unique and is the only identifier shared with the worker. The demo
-   object lives in the `demos` bucket as `<uuid>.dem`.
+   object lives in the `demos` bucket as `<uuid>.dem`, and is always a plain demo: a packed
+   upload is unpacked before it is stored (see Validation), so the worker, the download and
+   "watch in game" (CS2's `playdemo` can't read `.zst`) only ever see a `.dem`.
 3. The queue payload is the cross-language contract `{ "match_id": int, "demo_key": string }`.
    Change it on **both** sides in the same commit (Laravel `app/Queue/RedisParseQueue.php`,
    Go `worker/main.go` `Job`).
@@ -118,6 +125,23 @@ Transition rules:
     stack that queued together — per team, never pooled across teams). `null` otherwise,
     and always `null` off the list endpoint. Computed by
     `app/Actions/Matches/ComputeViewerResultsAction.php`; presentation-only, never stored.
+12. **The uploader states the platform.** It is required on upload and stored as given: the
+    demo itself doesn't say where it was played, and a filename can be renamed. The frontend
+    pre-selects a guess from the filename's shape (`features/matches/platform.js`) — Gamers
+    Club `YYYY-MM-DD__HHMM__…`, Valve `match730_…`, FACEIT `1-<uuid>-…` — but the API never
+    infers it.
+13. **The uploader states when it was played, the filename is the fallback.** Only Gamers
+    Club names carry the date; FACEIT and Valve names don't, and an undated match is
+    invisible in the list's default current-month view. So the upload form requires a
+    played time (pre-filled from a Gamers Club name) and sends it as `played_at`; the API
+    keeps it optional, normalizes it to UTC, and falls back to
+    `GameMatch::playedAtFromFilename` when it's absent.
+14. **A FACEIT match is known by its FACEIT id, not its bytes.** The `.dem` and the `.dem.zst`
+    of one FACEIT match have different contents, so `content_hash` can't tell they're the
+    same match. The upload states `external_id` (the form reads it from FACEIT's file name,
+    `1-<uuid>-1-1.dem[.zst]`), and an uploader can't file the same FACEIT match twice
+    (`match.duplicate`, also a unique index). Another user may. The id is what marks a FACEIT
+    match as already in Clutchlab.
 
 ## Validation (boundary) — `app/Http/Requests/UploadDemoRequest.php`
 
@@ -125,14 +149,35 @@ Transition rules:
 
 - required
 - must be a file
-- extension must be `dem` (`extensions:dem`)
-- max size `config('clutch.max_demo_kb')` = **512000 KB (500 MB)**
+- extension must be `dem` or `zst` (`extensions:dem,zst`)
+- max size `config('clutch.max_demo_kb')` = **1048576 KB (1 GB)**
 
 Emitted codes (never prose): `demo.required`, `demo.invalid`, `demo.wrong_extension`,
 `demo.file_too_large`. A storage failure surfaces `demo.storage_failed`.
 
-Infra limits that must stay **≥** this size: nginx `client_max_body_size` (512M) and
-PHP `upload_max_filesize` / `post_max_size` (512M, set in `api/php.ini`).
+**Packed demos** (`UploadDemoAction`, behind `DemoUnpacker`): a file whose first bytes are the
+zstd magic (`28 b5 2f fd`) is unpacked before it is stored, whatever its name — a `.dem.zst`,
+or a `.zst` saved as `.dem`. `ZstdCliUnpacker` runs the `zstd` CLI (installed in the api image)
+in its own process and streams its output to a temp file, stopping past
+`config('clutch.max_unpacked_demo_kb')` = **2097152 KB (2 GB)**: the CLI has no output cap, and
+a few KB of zstd can unpack to gigabytes. Codes, on `demo`: `demo.invalid` (not a readable zstd
+archive) and `demo.unpacked_too_large`. Nothing is stored or enqueued when unpacking fails.
+`content_hash` is the hash of the uploaded bytes, so the same match as `.dem` and as `.dem.zst`
+are two different contents. What the file unpacks to is still checked by the parser
+(`parse_failed_corrupt` if it isn't a demo).
+
+`platform` field: required, one of `GameMatch::PLATFORMS`. Codes: `match.platform_required`,
+`match.invalid_platform`.
+
+`played_at` field: optional, a date-time (ISO 8601; an offset is honored and stored as UTC),
+not in the future. Code: `match.invalid_played_at`.
+
+`external_id` field: optional, a FACEIT match id, only with `platform=faceit`. Codes:
+`match.invalid_external_id` (wrong format or platform), `match.duplicate` (the uploader already has
+that FACEIT match).
+
+Infra limits that must stay **≥** the upload size: nginx `client_max_body_size` (1024M) and
+PHP `upload_max_filesize` / `post_max_size` (1024M, set in `api/php.ini`).
 
 ## API surface
 
@@ -143,7 +188,7 @@ upload rights (owner/igl) on the team, or being the uploader.
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
 | GET | `/matches` | list matches the caller can see, most recently **played** first (null `played_at` last, then by upload time) | own uploads + their teams' matches; **paginated 10/page** (`{ data, links, meta }`, `?page=`); optional `?player=` narrows to matches whose scoreboard contains that player name (case-insensitive substring; invalid value → `match.invalid_player_filter`); optional `?month=YYYY-MM` / `?day=YYYY-MM-DD` narrow to matches **played** in that calendar month / day (they intersect; undated matches only appear unfiltered; invalid values → `match.invalid_month` / `match.invalid_day`) |
-| POST | `/matches` | upload a demo | multipart `demo`; optional `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
+| POST | `/matches` | upload a demo | multipart `demo` (`.dem` or zstd-packed `.dem.zst`, stored unpacked) + required `platform`; optional `played_at`, `external_id` (FACEIT match id), `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
 | GET | `/matches/{match}` | match detail + players | visible only (403 otherwise); players by kills desc |
 | GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | visible only; see [heatmap.md](heatmap.md) |
 | GET | `/matches/{match}/clutches` | clutches grouped by clutcher/round | visible only; each `{ round, size, killer_name, kills[] }` |
@@ -151,6 +196,8 @@ upload rights (owner/igl) on the team, or being the uploader.
 | POST | `/matches/{match}/reparse` | re-enqueue the stored demo | uploader or owner/igl; resets to `queued`; throttled 30/min; `ReparseMatchAction` |
 | PATCH | `/matches/{match}` | move a match between private and a team | body `team_id` (int = share, null = private); manage bar (uploader/owner/igl); target team needs `uploadMatch` or `match.invalid_team`; `UpdateMatchTeamAction` |
 | DELETE | `/matches/{match}` | delete a match | uploader or owner/igl (403 otherwise); 204; `DeleteMatchAction` |
+| GET | `/faceit/matches/{faceitMatchId}` | one FACEIT match's `{ faceit_match_id, started_at, map }` | for the upload form; id format checked by the route; throttled 30/min; 404 `faceit.match_not_found`, 503 `faceit.disabled` / `faceit.unavailable`; `GetFaceitMatchAction` |
+| GET | `/faceit/matches` | the FACEIT panel | `{ data: { account: {player_id, nickname} \| null, reason, matches: [{ faceit_match_id, started_at, map, competition, score: {own, opponent}, result, room_url, clutchlab: {id, status} \| null }] } }`; `?refresh=1` skips the 5-minute copy; throttled 20/min; 503 `faceit.disabled` / `faceit.unavailable` (see FACEIT); `ListFaceitMatchesAction` |
 
 Responses use `MatchResource` / `MatchPlayerStatResource` (wrapped in `data`).
 `players` is present only when the relation is loaded (the detail endpoint).
@@ -200,8 +247,15 @@ runaway resource use, isolation handles a crash or exploit. OS-level lockdown of
 
 **Upload / reassignment** (HTTP 422/500): the `demo.*` codes under Validation, plus
 `match.invalid_team` (team the caller can't upload to), `match.upload_forbidden` (caller
-isn't an uploader anywhere), and `match.duplicate` (caller has already uploaded this exact
-demo — dedup is by sha256 of the file content, unique per uploader).
+isn't an uploader anywhere), `match.duplicate` (caller has already uploaded this exact
+demo — dedup is by sha256 of the file content, unique per uploader), and
+`match.platform_required` / `match.invalid_platform` / `match.invalid_played_at` /
+`match.invalid_external_id`.
+
+**FACEIT** (`/faceit/*`): `faceit.disabled` (503, no `FACEIT_API_KEY` on this instance),
+`faceit.unavailable` (503, FACEIT timed out, refused the key, rate-limited or errored),
+`faceit.no_steam_id` / `faceit.not_found` (200, as `reason` with `account: null`),
+`faceit.invalid_refresh` (422), `faceit.match_not_found` (404, one match).
 
 ## Authorization & ownership
 
@@ -225,6 +279,54 @@ private to its uploader. Enforced by `GameMatchPolicy`:
 
 Cross-match analytics (awards, search, player catalog, team stats) are still scoped to the
 caller's **own uploads** for now; re-scoping them to team visibility is the next step.
+
+## FACEIT
+
+The FACEIT panel on the matches page lists the user's latest FACEIT matches and which are already
+in Clutchlab. **Optional and per instance:** it needs the instance's own FACEIT API key
+(`FACEIT_API_KEY`, a "Server side" key from developers.faceit.com); a clone of the repo has none,
+and without it the panel says FACEIT sync is off while everything else works. The api reaches
+FACEIT through `App\Contracts\FaceitApi` (`App\Faceit\HttpFaceitApi`); the browser never does.
+FACEIT's Data API does not hand out demo files (that needs its application-only Downloads API), so
+a missing match is fetched by the user from its FACEIT room and uploaded.
+
+**Panel** (`frontend/src/features/matches/FaceitPanel.jsx`): on the matches page, between the
+upload strip and the list, shown only to users who may upload (its point is bringing demos in).
+It **starts folded** to one line — the FACEIT nickname and how many of the latest matches aren't
+in Clutchlab yet, with Refresh and Show — so the matches list isn't pushed down on every visit;
+Show lists the rows. Each row: when it was played, map, score and W/L from the user's team. A row
+in Clutchlab opens that match on the page (with its status when not parsed yet); a missing row has
+**Get demo ↗** (its FACEIT room, where FACEIT offers the download) and **Upload**, which files the
+chosen `.dem` / `.dem.zst` as `platform = faceit` with FACEIT's start time and match id, so nothing
+is asked again. Every state is said, never hidden: checking, the reason there's no account, FACEIT
+not answering, and on a keyless instance that FACEIT sync is off.
+
+**Account** (`FindFaceitAccountAction`, table `faceit_accounts`): found from the Steam ID on the
+user's profile (`GET /players?game=cs2&game_player_id=`), never typed. Stored with the Steam ID it
+was found for; when the profile's Steam ID changes (an admin sets it) the mismatch triggers a new
+lookup, and a removed Steam ID drops the account. "No account for this Steam ID" is believed for 5
+minutes (cache `faceit:none:{steam_id}`). Without an account the panel shows why, as a code:
+`faceit.no_steam_id` or `faceit.not_found`.
+
+**List** (`ListFaceitMatchesAction`, `GET /faceit/matches`): the user's latest 20 FACEIT CS2
+matches (`clutch.faceit.list_size`), only the finished ones, newest first. Score and result are
+from the user's FACEIT team — the faction listing their player id — not from the demo's sides,
+which swap at the half. A row is **in Clutchlab** when a match the user can see (their own, or a
+team's they belong to) has `platform = faceit` and that `external_id`, the user's own upload
+winning over a teammate's; otherwise it is missing, and the row links its FACEIT room. The list is
+kept 5 minutes per player (`faceit:history:{player_id}`, `clutch.faceit.list_ttl`) unless
+`refresh` asks again. A row's map needs one more call per match (`GetFaceitMatchAction`); a
+finished match is asked once and kept (`faceit:match:{id}`), and if FACEIT can't give the map just
+then the row shows without one instead of failing the panel. No key on the instance: 503
+`faceit.disabled`, and the panel says sync is off. FACEIT failing on the account or the list: 503
+`faceit.unavailable`, logged as one warning line, the rest of the page unaffected.
+
+**One match** (`GetFaceitMatchAction`, `GET /faceit/matches/{faceitMatchId}`): a FACEIT match's
+start time and map, so the upload form can fill in when a FACEIT demo was played. The id's format
+is checked by the route (`GameMatch::FACEIT_MATCH_ID_BODY`), so a malformed one never reaches
+FACEIT. Cached for good once FACEIT says finished; a running match is asked each time. Unknown to
+FACEIT: 404 `faceit.match_not_found`. Upload never depends on it: the form falls back to asking
+the user, and the api doesn't check a stated time against FACEIT.
 
 ## Known limitations (intentional — future steps)
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import UploadDemo from '../features/matches/UploadDemo'
+import FaceitPanel from '../features/matches/FaceitPanel'
 import MatchList from '../features/matches/MatchList'
 import MatchDashboard from '../features/matches/MatchDashboard'
 import { DateStrip, Pager } from '../features/matches/ArchiveNav'
@@ -94,6 +95,7 @@ export default function DashboardPage() {
   return (
     <>
       {user?.can_upload && <UploadDemo onUploaded={handleUploaded} />}
+      {user?.can_upload && <FaceitPanel onOpenMatch={setSelectedId} onUploaded={handleUploaded} />}
       {canAsk && <AskAnalyst onOpenMatch={setSelectedId} />}
       {deleteError && <p className="error">{t(deleteError)}</p>}
       <div className="layout">

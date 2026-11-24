@@ -6,12 +6,14 @@ use Anthropic\Client as AnthropicClient;
 use App\Authorization\PermissionCatalog;
 use App\Contracts\AnalystLlm;
 use App\Contracts\DemoStorage;
+use App\Contracts\DemoUnpacker;
 use App\Contracts\DeploymentHistory;
 use App\Contracts\DocRetriever;
 use App\Contracts\DocsLlm;
 use App\Contracts\EmbeddingClient;
 use App\Contracts\EventBus;
 use App\Contracts\EventSubscriber;
+use App\Contracts\FaceitApi;
 use App\Contracts\ParseQueue;
 use App\Contracts\PermissionService;
 use App\Contracts\RoundRetriever;
@@ -24,6 +26,7 @@ use App\Events\Subscribers\EmbedParsedMatch;
 use App\Events\Subscribers\EventHandler;
 use App\Events\Subscribers\RecordParseFailed;
 use App\Events\Subscribers\RecordParseSucceeded;
+use App\Faceit\HttpFaceitApi;
 use App\Llm\AnthropicAnalyst;
 use App\Llm\AnthropicDocsExplainer;
 use App\Llm\HashEmbeddings;
@@ -42,6 +45,7 @@ use App\Services\DbPermissionService;
 use App\Services\Dora\GithubDeploymentHistory;
 use App\Services\Dora\MetricsCalculator;
 use App\Storage\S3DemoStorage;
+use App\Storage\ZstdCliUnpacker;
 use App\Telemetry\Tracing;
 use Illuminate\Http\Client\Factory as Http;
 use Illuminate\Support\Facades\Gate;
@@ -57,6 +61,16 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(DemoStorage::class, fn () => new S3DemoStorage(Storage::disk('s3')));
+        $this->app->bind(FaceitApi::class, fn () => new HttpFaceitApi(
+            $this->app->make(Http::class),
+            config('clutch.faceit.api'),
+            (string) config('clutch.faceit.key'),
+            (int) config('clutch.faceit.timeout'),
+        ));
+        $this->app->bind(DemoUnpacker::class, fn () => new ZstdCliUnpacker(
+            (int) config('clutch.max_unpacked_demo_kb') * 1024,
+            timeoutSeconds: 300,
+        ));
         $this->app->bind(ParseQueue::class, RedisParseQueue::class);
         $this->app->bind(EventBus::class, RedisEventBus::class);
         $this->app->bind(EventSubscriber::class, RedisEventSubscriber::class);

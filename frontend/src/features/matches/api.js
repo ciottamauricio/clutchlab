@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, tokenStore } from '../../lib/api'
+import { useTeams } from '../teams/api'
 
 const listMatches = (player, month, day, page) => {
   const params = new URLSearchParams()
@@ -11,16 +12,22 @@ const listMatches = (player, month, day, page) => {
   return api.getPage(`/matches${qs ? `?${qs}` : ''}`)
 }
 const getMatch = (id) => api.get(`/matches/${id}`)
+const listFaceitMatches = (refresh) => api.get(`/faceit/matches${refresh ? '?refresh=1' : ''}`)
+const getFaceitMatch = (id) => api.get(`/faceit/matches/${encodeURIComponent(id)}`)
 const getKillPositions = (id) => api.get(`/matches/${id}/kill-positions`)
 const getClutches = (id) => api.get(`/matches/${id}/clutches`)
 const getTeamStats = (id) => api.get(`/matches/${id}/team-stats`)
 const deleteMatch = (id) => api.delete(`/matches/${id}`)
 const reparseMatch = (id) => api.post(`/matches/${id}/reparse`)
 const updateMatchTeam = (id, teamId) => api.patch(`/matches/${id}`, { team_id: teamId })
-const uploadDemo = (file, teamId) => {
+// fields: { platform, playedAt, teamId, externalId } — the facts the uploader states.
+const uploadDemo = (file, { platform, playedAt, teamId, externalId }) => {
   const form = new FormData()
   form.append('demo', file)
+  form.append('platform', platform)
+  if (playedAt) form.append('played_at', playedAt)
   if (teamId) form.append('team_id', teamId)
+  if (externalId) form.append('external_id', externalId)
   return api.postForm('/matches', form)
 }
 
@@ -266,15 +273,79 @@ export function useDeleteMatch(onDeleted) {
   return { remove, deletingId, error }
 }
 
+// Only these team roles may file a match under a team (mirrors TeamPolicy::uploadMatch). An
+// upload goes to the first such team unless the user picks another, or private when there is none.
+const CAN_UPLOAD = new Set(['owner', 'igl'])
+
+export function useUploadTeams() {
+  const { teams } = useTeams()
+  const uploadable = teams.filter((team) => CAN_UPLOAD.has(team.my_role))
+  return { uploadable, defaultTeamId: uploadable[0] ? String(uploadable[0].id) : '' }
+}
+
+// The FACEIT panel's list (GET /faceit/matches). status: 'loading' | 'ready' | 'off' (this instance
+// has no FACEIT key) | 'error' (FACEIT unavailable; a list already shown stays, with the error).
+// refresh() asks FACEIT again; reload() re-reads the cached list, enough after an upload since the
+// "in Clutchlab" marks are computed fresh on every call.
+export function useFaceitMatches() {
+  const [state, setState] = useState({ status: 'loading', account: null, reason: null, matches: [], error: null })
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async (refresh) => {
+    setBusy(true)
+    try {
+      const data = await listFaceitMatches(refresh)
+      setState({ status: 'ready', account: data?.account ?? null, reason: data?.reason ?? null, matches: data?.matches ?? [], error: null })
+    } catch (e) {
+      const code = e.code ?? 'error.unknown'
+      setState((s) => code === 'faceit.disabled'
+        ? { status: 'off', account: null, reason: null, matches: [], error: null }
+        : { ...s, status: s.status === 'ready' ? 'ready' : 'error', error: code })
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load(false)
+  }, [load])
+
+  const refresh = useCallback(() => load(true), [load])
+  const reload = useCallback(() => load(false), [load])
+
+  return { ...state, busy, refresh, reload }
+}
+
+// One FACEIT match's { started_at, map } (GET /faceit/matches/{id}), for the upload form to fill in
+// a FACEIT demo's time. null while there's no id, while asking, and when FACEIT can't say (off,
+// down, unknown match): the form then asks the user, as it always has, so no error is surfaced.
+export function useFaceitMatch(faceitMatchId) {
+  const [match, setMatch] = useState(null)
+
+  useEffect(() => {
+    setMatch(null)
+    if (!faceitMatchId) return
+    let active = true
+    getFaceitMatch(faceitMatchId)
+      .then((m) => active && setMatch(m))
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [faceitMatchId])
+
+  return match
+}
+
 export function useUploadDemo(onUploaded) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
 
-  const upload = useCallback(async (file, teamId) => {
+  const upload = useCallback(async (file, fields) => {
     setUploading(true)
     setError(null)
     try {
-      const match = await uploadDemo(file, teamId)
+      const match = await uploadDemo(file, fields)
       onUploaded?.(match)
       return match
     } catch (e) {

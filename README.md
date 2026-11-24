@@ -87,6 +87,17 @@ docker compose exec api php artisan tinker --execute='
   trainings to your Discord channel; empty means it logs instead.
 - `MAIL_MAILER` — `log` by default (roster emails land in `api/storage/logs`, visible in
   Grafana). Point it at real SMTP to actually send.
+- `FACEIT_API_KEY` — **FACEIT sync only works with your own FACEIT API key**; the repo ships
+  without one. With it, the matches page lists your latest FACEIT matches (found from the Steam ID
+  on your profile), marks which are already in Clutchlab, links each missing one's match room, and
+  fills in a FACEIT demo's time on upload. To get one: log in at
+  [developers.faceit.com](https://developers.faceit.com) with your FACEIT account → **App
+  Studio** → create an app → **API Keys** → create a **Server side** key, then set
+  `FACEIT_API_KEY=` in `.env` and `docker compose up -d` to reload it. Without it the panel just
+  says FACEIT sync is off — uploading demos (FACEIT `.dem.zst` included), the platform and the
+  played time all work the same. FACEIT doesn't hand out demo files with this key (that needs
+  its separate, application-only Downloads API), so the demo itself is still one click and an
+  upload.
 
 The credentials in `.env.example` (Postgres, MinIO, Meilisearch) are local-dev values for
 containers that are never exposed beyond `nginx` — fine for a laptop, replace them for
