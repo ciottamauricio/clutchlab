@@ -32,6 +32,9 @@ jobs:
           coverage: none
       - run: composer install --prefer-dist --no-progress --no-interaction
       - run: ./vendor/bin/pint --test    # style gate: fails on anything `pint` would reformat
+      # Architecture gate (phpstan.neon): app/PlatformSync's layer rules and the ban on Laravel's
+      # functions in its core. Level 0, so it checks dependencies, not types.
+      - run: ./vendor/bin/phpstan analyse --no-progress --memory-limit=1G
       - run: ./vendor/bin/phpunit
 
       # Advisories against the pinned lockfile. Reports without failing: today's 12

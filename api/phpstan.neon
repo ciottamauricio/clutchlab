@@ -1,0 +1,37 @@
+# The architecture check: app/PlatformSync's dependency rule (tests/Architecture), plus a ban on
+# Laravel's functions in the module's core. Level 0 because the layer rules are the point, not
+# type checking; at level 0 the rest of app/ is clean too, so it is analysed whole, which lets the
+# rules see who uses the module's adapters.
+includes:
+    - vendor/phpat/phpat/extension.neon
+    - vendor/spaze/phpstan-disallowed-calls/extension.neon
+
+parameters:
+    level: 0
+    paths:
+        - app
+        - tests/Architecture
+
+    phpat:
+        ignore_built_in_classes: true
+        show_rule_names: true
+
+    # Helpers such as config() and now() reach into Laravel without an import, so no class rule
+    # sees them: every function Laravel defines is refused in the module's core.
+    filesRootDir: %rootDir%/../../..
+    disallowedFunctionCalls:
+        -
+            function: '*'
+            definedIn:
+                - vendor/laravel/framework/*
+            message: 'the module core gets what it needs through its constructor, not from Laravel'
+            allowExceptIn:
+                - app/PlatformSync/Domain/*
+                - app/PlatformSync/Ports/*
+                - app/PlatformSync/Application/*
+
+services:
+    -
+        class: Tests\Architecture\PlatformSyncLayers
+        tags:
+            - phpat.test

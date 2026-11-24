@@ -61,6 +61,11 @@ don't enforce boundaries — the domain docs' invariants do; this is navigation,
 - Unit-test an Action/service by mocking only its injected dependency; never make real
   external calls.
 - Use an in-memory SQLite DB for feature tests.
+- The architecture check is its own command, not part of PHPUnit:
+  `./vendor/bin/phpstan analyse --memory-limit=1G`. It runs PHPStan at level 0 with the layer rules
+  in [`tests/Architecture/`](../tests/Architecture/) (PHPat) and a ban on Laravel's functions
+  (`config()`, `now()`, …) in `app/PlatformSync`'s core, configured in
+  [`phpstan.neon`](../phpstan.neon). The gate and CI run it next to Pint and PHPUnit.
 
 ## Recipe: adding an api feature
 
