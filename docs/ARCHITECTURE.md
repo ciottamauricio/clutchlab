@@ -234,7 +234,7 @@ while the deployment story stays "one laptop".
 
 ### FACEIT: an external system that gives facts, not files
 
-FACEIT's Data API is reached by the **api only** (`FaceitApi` contract, `HttpFaceitApi`), never
+FACEIT's Data API is reached by the **api only** (the `PlatformSync` module's ports, adapter `FaceitDataApi`), never
 the browser: its key is a server-side key by FACEIT's rules. It earns no service of its own — a
 few cached reads per page load is ordinary request/response work, the "different noun" case from
 the guiding principle. What shaped the design is what FACEIT *won't* give: the Data API hands over
@@ -358,7 +358,7 @@ not inside the services.
 | Layer | Where | What it proves |
 |---|---|---|
 | Contract tests | `contracts/*.json` + a test on each side | The wire format. The producer asserts **exact bytes** (it defines the canonical serialization); the consumer asserts the fixture decodes. Break either side and that side's suite goes red — the "change both sides in the same commit" rule, machine-enforced. |
-| Feature tests | `api/tests/Feature` | The domain docs as assertions: the 403-not-404 authorization matrix, upload gating, content-hash dedup, team reassignment. In-memory SQLite; every external system (`DemoStorage`, `DemoUnpacker`, `ParseQueue`, `SearchIndex`, `FaceitApi`, …) replaced by a fake bound over its interface in the base `TestCase`. |
+| Feature tests | `api/tests/Feature` | The domain docs as assertions: the 403-not-404 authorization matrix, upload gating, content-hash dedup, team reassignment. In-memory SQLite; every external system (`DemoStorage`, `DemoUnpacker`, `ParseQueue`, `SearchIndex`, the `PlatformSync` platform ports, …) replaced by a fake bound over its interface in the base `TestCase`. |
 | Unit tables | Go `*_test.go` | Pure logic as a spec — the notifier's `message()` rendering, event marshaling (omitempty behavior is contract). |
 | CI | `.github/workflows/` | Per-service jobs with **path filters** (the monorepo's promised middle path: independent test runs, atomic commits kept), run on pull requests and on pushes to `main`: a feature branch is checked through its PR, not on every push. One workflow per service — `api` (Pint + PHPStan's architecture rules + phpunit), `frontend` (lint + build), `worker` / `notifier` / `realtime` (vet + test) — plus `infra` (terraform fmt + validate, no cloud account). `contracts/**` is in every service's trigger paths *that speak a fixture*, so a fixture change runs every suite that decodes it (realtime and infra carry none, so they're excluded). |
 
