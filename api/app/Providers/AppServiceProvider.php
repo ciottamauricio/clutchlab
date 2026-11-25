@@ -13,7 +13,6 @@ use App\Contracts\DocsLlm;
 use App\Contracts\EmbeddingClient;
 use App\Contracts\EventBus;
 use App\Contracts\EventSubscriber;
-use App\Contracts\FaceitApi;
 use App\Contracts\ParseQueue;
 use App\Contracts\PermissionService;
 use App\Contracts\RoundRetriever;
@@ -26,7 +25,6 @@ use App\Events\Subscribers\EmbedParsedMatch;
 use App\Events\Subscribers\EventHandler;
 use App\Events\Subscribers\RecordParseFailed;
 use App\Events\Subscribers\RecordParseSucceeded;
-use App\Faceit\HttpFaceitApi;
 use App\Llm\AnthropicAnalyst;
 use App\Llm\AnthropicDocsExplainer;
 use App\Llm\HashEmbeddings;
@@ -61,12 +59,6 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(DemoStorage::class, fn () => new S3DemoStorage(Storage::disk('s3')));
-        $this->app->bind(FaceitApi::class, fn () => new HttpFaceitApi(
-            $this->app->make(Http::class),
-            config('clutch.faceit.api'),
-            (string) config('clutch.faceit.key'),
-            (int) config('clutch.faceit.timeout'),
-        ));
         $this->app->bind(DemoUnpacker::class, fn () => new ZstdCliUnpacker(
             (int) config('clutch.max_unpacked_demo_kb') * 1024,
             timeoutSeconds: 300,

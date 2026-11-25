@@ -5,6 +5,11 @@ namespace Tests\Feature;
 use App\Models\GameMatch;
 use App\Models\Team;
 use App\Models\User;
+use App\PlatformSync\Domain\MatchFacts;
+use App\PlatformSync\Domain\PlatformMatchId;
+use App\PlatformSync\Domain\PlatformPlayer;
+use App\PlatformSync\Domain\PlayedMatch;
+use App\PlatformSync\Domain\Team as PlatformTeam;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -34,31 +39,35 @@ class FaceitMatchesTest extends TestCase
 
         $this->me = User::factory()->create();
         $this->me->forceFill(['steam_id' => self::STEAM])->save();
-        $this->faceit->players[self::STEAM] = ['player_id' => self::ME, 'nickname' => 'FiveAlert'];
+        $this->faceit->players[self::STEAM] = new PlatformPlayer(self::ME, 'FiveAlert');
         $this->faceit->recent[self::ME] = [
             $this->recent(self::M3, 1795300000, finished: false),
             $this->recent(self::M2, 1795283000, myFaction: 'faction2', winner: 'faction1', score: [13, 8]),
             $this->recent(self::M1, 1795281483, myFaction: 'faction1', winner: 'faction1', score: [13, 11]),
         ];
         foreach ([self::M1 => 'de_ancient', self::M2 => 'de_dust2', self::M3 => 'de_mirage'] as $id => $map) {
-            $this->faceit->matches[$id] = ['faceit_match_id' => $id, 'started_at' => 1795281483, 'finished' => $id !== self::M3, 'map' => $map];
+            $this->faceit->matches[$id] = new MatchFacts(new PlatformMatchId($id), 1795281483, $id !== self::M3, $map);
         }
     }
 
-    private function recent(string $id, int $startedAt, bool $finished = true, string $myFaction = 'faction1', ?string $winner = 'faction1', array $score = [13, 11]): array
+    private function recent(string $id, int $startedAt, bool $finished = true, string $myFaction = 'faction1', ?string $winner = 'faction1', array $score = [13, 11]): PlayedMatch
     {
-        $other = $myFaction === 'faction1' ? 'faction2' : 'faction1';
+        $team = fn (string $faction) => $faction === $myFaction ? [self::ME, 'mate'] : ['them'];
 
-        return [
-            'faceit_match_id' => $id,
-            'started_at' => $startedAt,
-            'finished' => $finished,
-            'competition' => 'South America 5V5 Queue',
-            'room_url' => "https://www.faceit.com/en/cs2/room/{$id}",
-            'factions' => [$myFaction => [self::ME, 'mate'], $other => ['them']],
-            'winner' => $winner,
-            'score' => ['faction1' => $score[0], 'faction2' => $score[1]],
-        ];
+        return new PlayedMatch(
+            new PlatformMatchId($id),
+            $startedAt,
+            $finished,
+            'South America 5V5 Queue',
+            "https://www.faceit.com/en/cs2/room/{$id}",
+            new PlatformTeam($team('faction1'), $score[0]),
+            new PlatformTeam($team('faction2'), $score[1]),
+            match ($winner) {
+                'faction1' => 1,
+                'faction2' => 2,
+                default => null,
+            },
+        );
     }
 
     private function list(string $query = '')
@@ -136,7 +145,7 @@ class FaceitMatchesTest extends TestCase
 
     public function test_without_a_key_sync_is_off(): void
     {
-        $this->faceit->configured = false;
+        config(['clutch.faceit.key' => '']);
 
         $this->list()->assertStatus(503)->assertJsonPath('message', 'faceit.disabled');
         $this->assertSame([], $this->faceit->calls);
@@ -201,10 +210,10 @@ class FaceitMatchesTest extends TestCase
 
     public function test_one_match_when_sync_is_off_or_faceit_is_down(): void
     {
-        $this->faceit->configured = false;
+        config(['clutch.faceit.key' => '']);
         $this->one(self::M1)->assertStatus(503)->assertJsonPath('message', 'faceit.disabled');
 
-        $this->faceit->configured = true;
+        config(['clutch.faceit.key' => 'test-key-not-real']);
         $this->faceit->unavailable = true;
         $this->one(self::M1)->assertStatus(503)->assertJsonPath('message', 'faceit.unavailable');
     }

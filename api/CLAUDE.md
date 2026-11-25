@@ -39,6 +39,11 @@ changes.** The code follows the doc, not the other way around.
   status `parse_failed_corrupt`). The React frontend maps codes → localized text.
   Never return user-facing prose from here.
 - Ownership violations return **403**, not 404 (once auth exists).
+- **The exception:** `app/PlatformSync/` (FACEIT sync) is built in ports and adapters, as a pilot.
+  Its use cases are in `Application/`, its ports in `Ports/`, and it's wired by
+  `PlatformSyncServiceProvider`. The layers are enforced by `./vendor/bin/phpstan analyse
+  --memory-limit=1G`, which allows no Laravel, Eloquent or helpers in its core. See
+  [`docs/ENGINEERING.md`](docs/ENGINEERING.md).
 
 ## Runtime facts that bite
 

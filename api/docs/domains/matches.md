@@ -196,8 +196,8 @@ upload rights (owner/igl) on the team, or being the uploader.
 | POST | `/matches/{match}/reparse` | re-enqueue the stored demo | uploader or owner/igl; resets to `queued`; throttled 30/min; `ReparseMatchAction` |
 | PATCH | `/matches/{match}` | move a match between private and a team | body `team_id` (int = share, null = private); manage bar (uploader/owner/igl); target team needs `uploadMatch` or `match.invalid_team`; `UpdateMatchTeamAction` |
 | DELETE | `/matches/{match}` | delete a match | uploader or owner/igl (403 otherwise); 204; `DeleteMatchAction` |
-| GET | `/faceit/matches/{faceitMatchId}` | one FACEIT match's `{ faceit_match_id, started_at, map }` | for the upload form; id format checked by the route; throttled 30/min; 404 `faceit.match_not_found`, 503 `faceit.disabled` / `faceit.unavailable`; `GetFaceitMatchAction` |
-| GET | `/faceit/matches` | the FACEIT panel | `{ data: { account: {player_id, nickname} \| null, reason, matches: [{ faceit_match_id, started_at, map, competition, score: {own, opponent}, result, room_url, clutchlab: {id, status} \| null }] } }`; `?refresh=1` skips the 5-minute copy; throttled 20/min; 503 `faceit.disabled` / `faceit.unavailable` (see FACEIT); `ListFaceitMatchesAction` |
+| GET | `/faceit/matches/{faceitMatchId}` | one FACEIT match's `{ faceit_match_id, started_at, map }` | for the upload form; id format checked by the route; throttled 30/min; 404 `faceit.match_not_found`, 503 `faceit.disabled` / `faceit.unavailable`; `PlatformSync` `GetMatch` |
+| GET | `/faceit/matches` | the FACEIT panel | `{ data: { account: {player_id, nickname} \| null, reason, matches: [{ faceit_match_id, started_at, map, competition, score: {own, opponent}, result, room_url, clutchlab: {id, status} \| null }] } }`; `?refresh=1` skips the 5-minute copy; throttled 20/min; 503 `faceit.disabled` / `faceit.unavailable` (see FACEIT); `PlatformSync` `ListMatches` |
 
 Responses use `MatchResource` / `MatchPlayerStatResource` (wrapped in `data`).
 `players` is present only when the relation is loaded (the detail endpoint).
@@ -286,7 +286,8 @@ The FACEIT panel on the matches page lists the user's latest FACEIT matches and 
 in Clutchlab. **Optional and per instance:** it needs the instance's own FACEIT API key
 (`FACEIT_API_KEY`, a "Server side" key from developers.faceit.com); a clone of the repo has none,
 and without it the panel says FACEIT sync is off while everything else works. The api reaches
-FACEIT through `App\Contracts\FaceitApi` (`App\Faceit\HttpFaceitApi`); the browser never does.
+FACEIT through the `app/PlatformSync` module (ports and adapters: its ports `PlatformPlayers` and
+`PlatformMatches`, its FACEIT adapter `Adapters\Faceit\FaceitDataApi`); the browser never does.
 FACEIT's Data API does not hand out demo files (that needs its application-only Downloads API), so
 a missing match is fetched by the user from its FACEIT room and uploaded.
 
@@ -301,27 +302,27 @@ chosen `.dem` / `.dem.zst` as `platform = faceit` with FACEIT's start time and m
 is asked again. Every state is said, never hidden: checking, the reason there's no account, FACEIT
 not answering, and on a keyless instance that FACEIT sync is off.
 
-**Account** (`FindFaceitAccountAction`, table `faceit_accounts`): found from the Steam ID on the
+**Account** (`PlatformSync\Application\FindAccount`, table `faceit_accounts`): found from the Steam ID on the
 user's profile (`GET /players?game=cs2&game_player_id=`), never typed. Stored with the Steam ID it
 was found for; when the profile's Steam ID changes (an admin sets it) the mismatch triggers a new
 lookup, and a removed Steam ID drops the account. "No account for this Steam ID" is believed for 5
-minutes (cache `faceit:none:{steam_id}`). Without an account the panel shows why, as a code:
+minutes (cache `platform_sync:faceit:none:{steam_id}`). Without an account the panel shows why, as a code:
 `faceit.no_steam_id` or `faceit.not_found`.
 
-**List** (`ListFaceitMatchesAction`, `GET /faceit/matches`): the user's latest 20 FACEIT CS2
+**List** (`PlatformSync\Application\ListMatches`, `GET /faceit/matches`): the user's latest 20 FACEIT CS2
 matches (`clutch.faceit.list_size`), only the finished ones, newest first. Score and result are
 from the user's FACEIT team — the faction listing their player id — not from the demo's sides,
 which swap at the half. A row is **in Clutchlab** when a match the user can see (their own, or a
 team's they belong to) has `platform = faceit` and that `external_id`, the user's own upload
 winning over a teammate's; otherwise it is missing, and the row links its FACEIT room. The list is
-kept 5 minutes per player (`faceit:history:{player_id}`, `clutch.faceit.list_ttl`) unless
-`refresh` asks again. A row's map needs one more call per match (`GetFaceitMatchAction`); a
-finished match is asked once and kept (`faceit:match:{id}`), and if FACEIT can't give the map just
+kept 5 minutes per player (`platform_sync:faceit:history:{player_id}`, `clutch.faceit.list_ttl`) unless
+`refresh` asks again. A row's map needs one more call per match (`GetMatch`); a
+finished match is asked once and kept (`platform_sync:faceit:match:{id}`), and if FACEIT can't give the map just
 then the row shows without one instead of failing the panel. No key on the instance: 503
 `faceit.disabled`, and the panel says sync is off. FACEIT failing on the account or the list: 503
 `faceit.unavailable`, logged as one warning line, the rest of the page unaffected.
 
-**One match** (`GetFaceitMatchAction`, `GET /faceit/matches/{faceitMatchId}`): a FACEIT match's
+**One match** (`PlatformSync\Application\GetMatch`, `GET /faceit/matches/{faceitMatchId}`): a FACEIT match's
 start time and map, so the upload form can fill in when a FACEIT demo was played. The id's format
 is checked by the route (`GameMatch::FACEIT_MATCH_ID_BODY`), so a malformed one never reaches
 FACEIT. Cached for good once FACEIT says finished; a running match is asked each time. Unknown to
