@@ -253,6 +253,51 @@ worker, the queue contract and the download path don't change at all. The isolat
 holds: the `zstd` CLI runs in its own process, output capped, the way the worker re-execs a
 child for the parse.
 
+### Inside the api: one module in ports and adapters (a pilot)
+
+The boundaries this project studies are between services. The same question exists one level
+down, between layers inside one service, and there it's much cheaper to draw: no network, no
+contract fixtures, just a rule about which code may depend on which. Most of the api is built in
+the Action style (an Action per operation calling Eloquent and the interfaces in `app/Contracts`)
+and holds its layering by convention. One module, `api/app/PlatformSync/` (FACEIT sync), is built
+in **ports and adapters** instead, so the two shapes can be compared on the same codebase (spec 002;
+the how-to is in `api/docs/ENGINEERING.md`).
+
+- **Domain** holds the values and the panel row's rules. **Application** holds the use cases.
+  **Ports** are interfaces named for what the use cases need, in the module's own types; FACEIT's
+  JSON shapes never get past the adapter.
+- **Persistence and the cache are ports too**, so the use cases run with no database, app or
+  network: their tests take milliseconds and say only what the rules are.
+- The ports are **platform-neutral**, with FACEIT the only adapter. A second platform's sync
+  (Valve matchmaking) should be new adapters, not a new design. That is the bet a later spec gets
+  to test, generalized from one example on purpose.
+- **The dependency rule fails the gate** instead of decaying quietly. PHPStan, at level 0 so it
+  checks dependencies and not types, runs PHPat's layer rules, and in the core refuses every
+  function Laravel defines.
+
+That last part is where PHP differs from the TypeScript project this was modelled on
+(shipment-visibility, whose ESLint `no-restricted-imports` guards its `contracts` and `domain`).
+Two differences:
+- **Laravel couples without imports.** A facade can be a root alias (`\Cache`) or a real-time
+  `Facades\…` class, neither under `Illuminate\`. So the PHP rules are allow-lists, not bans on a
+  namespace. And `config()` or `now()` is a dependency on the framework that no class rule sees at
+  all, hence the function ban.
+- **This check is one layer stricter:** it also guards the use cases, which shipment-visibility's
+  lint doesn't.
+
+What it cost, measured on the FACEIT code:
+- 9 files and ~510 lines became 30 files and ~1,000, before the contract tests and an in-memory
+  adapter per port.
+- Mapping both ways: Eloquent rows to domain values, and domain values to plain arrays for the
+  cache. Laravel's cache unserializes no objects (`serializable_classes` is false) while the tests'
+  array store never serializes, so an object in the cache would have passed every test and broken
+  dev.
+- One extra query per list: the user is loaded by id, because use cases take ids, not models.
+
+The trade is more code for rules you can read and test without Laravel, and a layering a machine
+holds. Whether it pays off beyond one module is the next candidate's question. Stats and awards
+rank first: their counting rules are Postgres SQL repeated across three Actions, with no tests.
+
 ### Sync vs async
 
 Parsing takes seconds-to-minutes. A synchronous Laravel→Go call would hang and time out.

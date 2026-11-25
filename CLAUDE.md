@@ -30,7 +30,9 @@ name**, never `localhost`.
 ## The rules that matter most
 
 - Thin controllers → Form Requests → Action classes; external systems behind interfaces
-  bound in a provider; constructor injection. (See the engineering guide.)
+  bound in a provider; constructor injection. (See the engineering guide.) The exception is
+  `api/app/PlatformSync/`, a ports-and-adapters pilot whose layers PHPStan enforces
+  (`api/docs/ENGINEERING.md`).
 - Backends return **codes, not sentences**; the frontend is the only place that maps
   codes → localized text.
 - The parse queue is a **plain Redis list** with JSON `{ "match_id", "demo_key" }`, shared
