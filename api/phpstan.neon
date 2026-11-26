@@ -1,7 +1,7 @@
-# The architecture check: app/PlatformSync's dependency rule (tests/Architecture), plus a ban on
-# Laravel's functions in the module's core. Level 0 because the layer rules are the point, not
-# type checking; at level 0 the rest of app/ is clean too, so it is analysed whole, which lets the
-# rules see who uses the module's adapters.
+# The architecture check: the dependency rule of app/PlatformSync and app/PlayerStats
+# (tests/Architecture), plus a ban on Laravel's functions in each module's core. Level 0 because the
+# layer rules are the point, not type checking; at level 0 the rest of app/ is clean too, so it is
+# analysed whole, which lets the rules see who uses the modules' adapters.
 includes:
     - vendor/phpat/phpat/extension.neon
     - vendor/spaze/phpstan-disallowed-calls/extension.neon
@@ -29,9 +29,16 @@ parameters:
                 - app/PlatformSync/Domain/*
                 - app/PlatformSync/Ports/*
                 - app/PlatformSync/Application/*
+                - app/PlayerStats/Domain/*
+                - app/PlayerStats/Ports/*
+                - app/PlayerStats/Application/*
 
 services:
     -
         class: Tests\Architecture\PlatformSyncLayers
+        tags:
+            - phpat.test
+    -
+        class: Tests\Architecture\PlayerStatsLayers
         tags:
             - phpat.test
