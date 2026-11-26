@@ -295,8 +295,41 @@ What it cost, measured on the FACEIT code:
 - One extra query per list: the user is loaded by id, because use cases take ids, not models.
 
 The trade is more code for rules you can read and test without Laravel, and a layering a machine
-holds. Whether it pays off beyond one module is the next candidate's question. Stats and awards
-rank first: their counting rules are Postgres SQL repeated across three Actions, with no tests.
+holds.
+
+**The second module, `api/app/PlayerStats/` (spec 004),** tested whether that pays off beyond one
+module. It holds stats and awards. Their counting rules were Postgres SQL copied across three
+Actions and three controller methods (opening kills four times, the latest name four times), with
+no tests: the SQL couldn't run on the sqlite suite.
+
+Its port is a query over the worker's read model, so the counting stays SQL. That changed what
+"defined once" has to mean:
+- **The definition is the domain's PHP:** what an eco weapon is, a leg-dominant kill, a clutch, a
+  tie.
+- **The SQL is a second implementation of it,** held equal by a contract test. The test asks an
+  in-memory adapter (the PHP rules) and the Postgres adapter the same questions over one scenario
+  built from the dev data's corner cases.
+
+That test needs a real Postgres, against a suite that was sqlite-only because tests had wiped the
+dev database twice. Its answer was a **throwaway** server (see Testing the boundaries), not a
+second database on the dev server: Postgres roles are per server, so migrating a test database
+there would have rewritten dev's.
+
+It also kept **the ownership line inside the api.** The analytics adapter is given match ids and
+joins nothing in `public`, and the test runs it with only `analytics` on the `search_path`, so
+Postgres itself refuses the join. Splitting the database onto two servers (phase 3 of "Data
+ownership") becomes an adapter change for these answers.
+
+What it cost:
+- **Size:** about 670 lines (three Actions, five controller queries) became 44 files and ~1,430
+  lines, plus ~340 lines of Resources. That's the same ratio as FACEIT's.
+- **Tests:** ~2,000 lines, where there were none.
+- **One more query per request,** to get the match facts from `public`.
+- **The old answers' quirks,** reproduced on purpose: raw Postgres text in the profile, an empty
+  Steam ID leading an award. They're pinned by tests named for them, and left for a follow-up.
+
+The two modules share one rules class (`tests/Architecture/ModuleLayers.php`). The rest of the api
+stays in the Action style.
 
 ### Sync vs async
 

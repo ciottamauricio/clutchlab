@@ -31,9 +31,11 @@ group their Actions and Requests per domain — `app/Actions/Trainings/`,
 big-bang restructure. Layers stay the top level; the domain is the second level. Folders
 don't enforce boundaries — the domain docs' invariants do; this is navigation, not DDD.
 
-**One exception, on purpose:** `app/PlatformSync/` (FACEIT sync) is built in ports and adapters,
-with its layers enforced by a check, as a pilot to compare with this style on the same codebase.
-See [the module's section](#a-ports-and-adapters-module-appplatformsync) below.
+**Two exceptions, on purpose:** `app/PlatformSync/` (FACEIT sync, spec 002) and `app/PlayerStats/`
+(stats and awards, spec 004) are built in ports and adapters, with their layers enforced by a
+check, to compare with this style on the same codebase. See
+[the modules' section](#a-ports-and-adapters-module-appplatformsync) and
+[the second module](#the-second-module-appplayerstats) below.
 
 ## Worked example — the demo upload (build this shape every time)
 
@@ -86,8 +88,9 @@ and `FaceitMatchResource`. The ports and values are platform-neutral, with FACEI
 adapter.
 
 **The dependency rule is checked, not trusted.** `./vendor/bin/phpstan analyse --memory-limit=1G`
-(the gate and CI) runs PHPat's rules in
-[`tests/Architecture/PlatformSyncLayers.php`](../tests/Architecture/PlatformSyncLayers.php):
+(the gate and CI) runs PHPat's rules, written once in
+[`tests/Architecture/ModuleLayers.php`](../tests/Architecture/ModuleLayers.php) and registered per
+module (`PlatformSyncLayers`, `PlayerStatsLayers`, each naming its namespace and provider):
 1. the domain depends only on itself;
 2. the ports only on the domain;
 3. the use cases only on the domain and the ports;
@@ -97,8 +100,9 @@ adapter.
 The first three rules are allow-lists, so a facade in any form (imported, a root alias, a
 real-time `Facades\…`) fails them like any other outside class. Laravel's helpers (`config()`,
 `now()`, `collect()`…) are functions, so no class rule sees them. [`phpstan.neon`](../phpstan.neon)
-also refuses every function defined under `vendor/laravel/framework` in the domain, ports and
-use cases. What a use case needs from config arrives through its constructor (`SyncSettings`,
+also refuses every function defined under `vendor/laravel/framework` in each module's domain,
+ports and use cases. One module's core can't use the other's either: the allow-lists name only
+the module's own layers. What a use case needs from config arrives through its constructor (`SyncSettings`,
 built by the provider).
 
 How it differs from the Action style:
@@ -140,6 +144,57 @@ Adding a platform (Valve matchmaking, say):
    second platform, not before.
 
 Its routes, controller and codes are its own driving side.
+
+## The second module: `app/PlayerStats/`
+
+Stats and awards (spec 004): the team board, the profile, the awards and their drill-down, the
+players lists, a player's clutches, and the match page's comparison and clutches. The same layers
+and rules as `PlatformSync`, wired by `PlayerStatsServiceProvider`. What's different is that its
+main port is a query over the worker's read model, and its counting stays SQL.
+
+| Layer | Holds |
+|---|---|
+| `Domain/` | every counting and derived rule as plain PHP: `Weapons::ECO`, `HitGroups::legsDominant`, `Clutches::fromKills`, `StatLine` (K/D, HS%), `AwardRules` (floors, top 5), `Ranking` and `TopWeapon` (the tie-breaks), `Outcome`; and the values (`MatchInfo`, `Kill`, `PlayerCounts`…) |
+| `Ports/` | `Matches` and `Rosters` (the api's data, `public`), `MatchEvents` (the worker's, `analytics`) |
+| `Application/` | one use case per answer: `TeamBoard`, `PlayerProfile`, `Awards`, `AwardKills`, `PlayerList`, `PlayerClutches`, `MatchSides`, `MatchClutches`, and `PlayerTotals` (per-player totals over any set of matches, which the board uses and the analyst can) |
+| `Adapters/` | `Eloquent\EloquentMatches`, `Eloquent\EloquentRosters`, `Postgres\PostgresMatchEvents` |
+
+The HTTP side stays as it was: the routes, the controllers' authorization and lenient parameter
+parsing (no Form Requests: a rejecting one would change the answers), and Resources in
+`app/Http/Resources/PlayerStats/` that write each answer's keys and types as before, including the
+profile's raw `tick_rate` and jsonb-text `hitgroups` (`JsonbText`).
+
+**One definition, two implementations, one contract.** A rule is defined once, in the domain.
+`InMemoryMatchEvents` (`tests/Fakes/PlayerStats/`) counts with those PHP rules, and the use-case
+tests trust it. `PostgresMatchEvents` counts the same things in SQL, each fragment written once.
+[`MatchEventsContractTest`](../tests/Postgres/PlayerStats/MatchEventsContractTest.php) asks both
+every question over the same scenario and requires the same answers. That test needs Postgres,
+which is why the Postgres suite exists (see Testing below).
+
+**The ownership line, kept inside the api.** `MatchEvents` is given match ids, plus their upload
+order for the latest name, and joins no `public` table. The match facts the answers print (map,
+dates, demo, tick rate) come through `Matches`, and the use case puts them together. The contract
+test runs the Postgres adapter with only `analytics` on the `search_path`, so a join to `matches`
+fails there. When the database split's phase 3 moves `analytics` to its own server, only the
+adapter's connection changes.
+
+Two things that bite:
+- **Numeric Steam IDs turn into ints as array keys.** Values carry their `steamId`, and maps keyed
+  by Steam ID use `'#'.$steamId`.
+- **Names are ordered by the database.** There's no `intl` in the image, and bytewise order
+  differs from `en_US.utf8` for most names. So `MatchEvents::players()` returns them already in
+  the database's order, and the Postgres suite pins it (`NameOrderTest`).
+
+Testing it:
+- **Domain and use cases:** `tests/Unit/PlayerStats/`, on PHPUnit's own `TestCase`, over
+  [`tests/Fixtures/PlayerStats/Scenario.php`](../tests/Fixtures/PlayerStats/Scenario.php) loaded
+  into memory. The scenario holds the data's corner cases (self-kills, bomb kills, team kills,
+  tied openings, ties at every cut); it can also write itself to a database.
+- **Adapters:** `tests/Feature/PlayerStats/` (the `Matches` and `Rosters` contracts, on sqlite)
+  and `tests/Postgres/PlayerStats/` (`MatchEvents`, on Postgres).
+- **The HTTP contract:** `tests/Postgres/Characterization/`, one class per endpoint. These were
+  written against the old code before it moved, and kept their requests and assertions through the
+  switch.
 
 ## Testing (api)
 

@@ -30,9 +30,10 @@ name**, never `localhost`.
 ## The rules that matter most
 
 - Thin controllers → Form Requests → Action classes; external systems behind interfaces
-  bound in a provider; constructor injection. (See the engineering guide.) The exception is
-  `api/app/PlatformSync/`, a ports-and-adapters pilot whose layers PHPStan enforces
-  (`api/docs/ENGINEERING.md`).
+  bound in a provider; constructor injection. (See the engineering guide.) The exceptions are
+  `api/app/PlatformSync/` and `api/app/PlayerStats/`, ports-and-adapters modules whose layers
+  PHPStan enforces (`api/docs/ENGINEERING.md`). SQL that needs Postgres is tested on the
+  throwaway `postgres-test` (`phpunit.pgsql.xml`), never the dev database.
 - Backends return **codes, not sentences**; the frontend is the only place that maps
   codes → localized text.
 - The parse queue is a **plain Redis list** with JSON `{ "match_id", "demo_key" }`, shared

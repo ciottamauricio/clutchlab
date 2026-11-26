@@ -39,11 +39,15 @@ changes.** The code follows the doc, not the other way around.
   status `parse_failed_corrupt`). The React frontend maps codes → localized text.
   Never return user-facing prose from here.
 - Ownership violations return **403**, not 404 (once auth exists).
-- **The exception:** `app/PlatformSync/` (FACEIT sync) is built in ports and adapters, as a pilot.
-  Its use cases are in `Application/`, its ports in `Ports/`, and it's wired by
-  `PlatformSyncServiceProvider`. The layers are enforced by `./vendor/bin/phpstan analyse
-  --memory-limit=1G`, which allows no Laravel, Eloquent or helpers in its core. See
-  [`docs/ENGINEERING.md`](docs/ENGINEERING.md).
+- **The exceptions:** `app/PlatformSync/` (FACEIT sync) and `app/PlayerStats/` (stats and awards)
+  are built in ports and adapters. Their use cases are in `Application/`, their ports in `Ports/`,
+  and each is wired by its own provider (`PlatformSyncServiceProvider`, `PlayerStatsServiceProvider`).
+  The layers are enforced by `./vendor/bin/phpstan analyse --memory-limit=1G`, which allows no
+  Laravel, Eloquent or helpers in their core. A stat or award is counted there, by the rules in
+  `docs/domains/teams-auth.md`, never in a controller. See [`docs/ENGINEERING.md`](docs/ENGINEERING.md).
+- **Postgres-only SQL is tested in `phpunit.pgsql.xml`**, against the throwaway `postgres-test`
+  (`docker compose --profile test up -d postgres-test`). Its tests extend
+  `Tests\Postgres\PostgresTestCase`, never `Tests\TestCase`.
 
 ## Runtime facts that bite
 
