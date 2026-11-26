@@ -29,7 +29,7 @@ class TeamBoardTest extends CharacterizationTestCase
             $this->row(Scenario::P2, 'Two v2', 3, 6, 20, 0.3, 17, 3, 13, 1),
             $this->row(Scenario::P3, 'Three', 0, 0, 0, 0, 0, 0, 0, 0),
             $this->row(Scenario::P4, Scenario::P4, 0, 0, 0, 0, 0, 0, 0, 0),
-        ], $this->tiesBySteamId($this->board(), 'kills'));
+        ], $this->board());
     }
 
     public function test_a_date_range_keeps_only_the_matches_played_in_it(): void
@@ -40,7 +40,7 @@ class TeamBoardTest extends CharacterizationTestCase
             $this->row(Scenario::P2, 'Two', 1, 2, 3, 0.67, 0, 2, 3, 0),
             $this->row(Scenario::P3, 'Three', 0, 0, 0, 0, 0, 0, 0, 0),
             $this->row(Scenario::P4, Scenario::P4, 0, 0, 0, 0, 0, 0, 0, 0),
-        ], $this->tiesBySteamId($this->board(['from' => '2026-11-01']), 'kills'));
+        ], $this->board(['from' => '2026-11-01']));
     }
 
     public function test_the_range_ends_include_their_whole_days(): void

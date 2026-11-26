@@ -3,14 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Actions\AddTeamMemberAction;
-use App\Actions\ComputeTeamStatsAction;
 use App\Actions\CreateTeamAction;
 use App\Http\Requests\AddTeamMemberRequest;
 use App\Http\Requests\AddTeamPlayerRequest;
 use App\Http\Requests\StoreTeamRequest;
+use App\Http\Resources\PlayerStats\BoardRowResource;
 use App\Http\Resources\TeamResource;
 use App\Models\Team;
 use App\Models\User;
+use App\PlayerStats\Application\TeamBoard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -57,15 +58,13 @@ class TeamController extends Controller
         return new TeamResource($team->load(['members', 'players']));
     }
 
-    public function stats(Request $request, Team $team, ComputeTeamStatsAction $action): JsonResponse
+    public function stats(Request $request, Team $team, TeamBoard $board): JsonResponse
     {
         $this->authorize('view', $team);
 
-        return response()->json(['data' => $action->execute(
-            $team,
-            $this->asDate($request->query('from')),
-            $this->asDate($request->query('to')),
-        )]);
+        $rows = $board->execute($team->id, $this->asDate($request->query('from')), $this->asDate($request->query('to')));
+
+        return response()->json(['data' => ['players' => BoardRowResource::collection($rows)->resolve($request)]]);
     }
 
     // Accept a query-string date only in strict Y-m-d form; anything else is ignored (no filter).

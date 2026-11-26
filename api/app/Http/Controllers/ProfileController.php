@@ -3,11 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Actions\ChangePasswordAction;
-use App\Actions\ComputePlayerStatsAction;
 use App\Actions\UpdateProfileAction;
 use App\Http\Requests\ChangePasswordRequest;
 use App\Http\Requests\UpdateProfileRequest;
+use App\Http\Resources\PlayerStats\ProfileResource;
 use App\Http\Resources\UserResource;
+use App\PlayerStats\Application\PlayerProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -27,10 +28,10 @@ class ProfileController extends Controller
 
     // The caller's own profile analytics: aggregate stats, recent form, top weapons, and recent
     // clutches. Stats is null when the account has no linked SteamID.
-    public function stats(Request $request, ComputePlayerStatsAction $action): JsonResponse
+    public function stats(Request $request, PlayerProfile $profile): JsonResponse
     {
-        $data = $action->execute($request->user()) ?? ['stats' => null, 'recent' => [], 'weapons' => [], 'clutches' => []];
+        $user = $request->user();
 
-        return response()->json(['data' => $data]);
+        return response()->json(['data' => (new ProfileResource($profile->execute($user->id, $user->steam_id)))->resolve($request)]);
     }
 }

@@ -83,15 +83,61 @@ the caller's **visible** matches — and stats are aggregated from `kill_events`
   matches (`GameMatch::visibleTo` — own uploads + their teams'), grouped by `steam_id`. Returns
   `{ steam_id, name (most recent), match_count }`. **No separate players table** — the catalog
   is a read projection over match data.
-- **Team stats** (`GET /teams/{team}/stats?from=&to=`): a Postgres aggregation over `kill_events`
-  (`ComputeTeamStatsAction`), scoped to **the team's own matches** (those filed under it) and
-  the roster's `steam_id` set — so every member sees the same board, independent of who's
-  viewing. Optional `from`/`to` (`YYYY-MM-DD`) restrict it to matches **played** in that range
-  (on `matches.played_at`); the UI defaults `from` to the first of the current month. No match
-  in range → empty board. Per player: `games` (matches the player appears in), `kills`, `deaths`, `kd`,
-  `hs_pct`, `entry_kills` (opening kills), `first_deaths` (rounds the player was the opening
-  victim), `clutches` (distinct won 1vN rounds). Analytics live in Postgres; Meilisearch stays
-  the text-search read model only.
+- **Team stats** (`GET /teams/{team}/stats?from=&to=`): the roster's board, scoped to **the
+  team's own matches** (those filed under it) and the roster's `steam_id` set, so every member
+  sees the same board, independent of who's viewing. `PlayerStats` `TeamBoard`.
+  - Optional `from`/`to` (`YYYY-MM-DD`) restrict it to matches **played** in that range (on
+    `matches.played_at`, from `00:00:00` of `from` to `23:59:59` of `to`), so undated matches
+    drop out once a bound is set. A value that isn't a date is ignored. The UI defaults `from`
+    to the first of the current month.
+  - Empty roster or no match in range → an empty board, not the roster with zeroes.
+  - One row per rostered player, including those who never played (all zeroes). Name: the
+    roster nickname, else the latest name, else the Steam ID.
+  - Per player, by the counting rules below: `games`, `kills`, `deaths`, `kd`, `hs_pct`,
+    `entry_kills`, `first_deaths`, `clutches`. Sorted by kills, then Steam ID.
+- **Profile stats** (`GET /profile/stats`): the caller's linked Steam ID over **every match they
+  can see**. `PlayerStats` `PlayerProfile`.
+  - No linked Steam ID → `stats: null` and empty lists. No visible match → all zeroes.
+  - `stats`: the board's line, without a name.
+  - `recent`: the last 10 games the player is on the scoreboard of, by played time (upload time
+    when undated, then the later match), shown oldest first; per game the scoreboard's kills
+    and deaths, `kd`, and `won` (true or false from the player's side, null for a draw or an
+    unknown score or side). Dates are printed as stored (`"2026-06-30 00:57:00"`).
+  - `weapons`: the top 6 by kills, ties by weapon name.
+  - `clutches`: the 8 latest clutches won, by played-else-upload time then round, with their
+    kills. Here `tick_rate` and each kill's `hitgroups` are printed as Postgres stores them (a
+    string, and jsonb's text such as `'{"head": 91}'`); every other answer gives a number and an
+    object. Kept as it was.
+
+### How a player's numbers are counted
+
+Written once, in `app/PlayerStats/` (spec 004): the domain defines each rule in PHP, and the
+Postgres adapter counts the same thing in SQL, held equal by a contract test. The board, the
+profile, the [awards](awards.md) and the [match page](matches.md) all use these definitions.
+The worker sets the flags they read (`opening`, `clutch`, `hitgroups`; see
+[matches.md](matches.md)).
+
+- **Kills** are the `kill_events` rows with the player as killer; **deaths**, as victim;
+  **headshots**, kills flagged `headshot`.
+- **Opening kills** (`entry_kills`) are kills flagged `opening`; **opening deaths**
+  (`first_deaths`, the first-blood award) are deaths flagged `opening`. The worker flags every
+  kill at a round's earliest tick, so a round can have several.
+- **Clutches won** count rounds, not kills: distinct `(match, round)` pairs with a kill flagged
+  `clutch > 0`. The worker keeps that flag only when the clutcher's side won the round.
+- **Games** are the matches the player is on the scoreboard (`match_player_stats`) of.
+- **K/D** is kills per death to two places, or the kills with no deaths; **HS%** is headshots
+  over kills as a whole percentage, 0 with no kills.
+- **The latest name** is the one from the most recently uploaded match in scope; on the same
+  upload second, the higher match id.
+- **Ties**: a ranked list breaks equal values by Steam ID, ascending (spec 004 Q6; before, the
+  order among equals was whatever Postgres returned).
+
+What the data's corner cases count as, known and kept (spec 004 Q7):
+- A **self-kill** (by `world`, or a player's own grenade) counts as a kill *and* a death for the
+  same player, and as an opening kill and an opening death when it opens the round.
+- A **team kill** counts as a kill for the killer.
+- A kill with **no killer** (the bomb) counts under an empty Steam ID, like a player.
+- Analytics live in Postgres; Meilisearch stays the text-search read model only.
 - **Player clutches** (`GET /players/{steamId}/clutches`): every won 1vN the player made across
   the caller's visible matches, grouped by `(match, round)` — the same shape as
   [matches.md](matches.md)'s `clutches`, but each card carries its own `map`/`demo`/`tick_rate`

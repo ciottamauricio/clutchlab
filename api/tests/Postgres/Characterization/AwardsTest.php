@@ -21,21 +21,8 @@ class AwardsTest extends CharacterizationTestCase
     private function awards(array $query = []): array
     {
         Sanctum::actingAs($this->s->owner);
-        $awards = $this->getJson('/api/awards'.($query ? '?'.http_build_query($query) : ''))->assertOk()->json('data.awards');
 
-        return array_map(function (array $award) {
-            $leaders = $award['leaders'];
-            // e2's 11 awp and 11 m4a1 kills tie; Postgres picked either until Q6 said awp.
-            foreach ($leaders as &$l) {
-                if ($award['key'] === 'one_trick' && $l['steam_id'] === Scenario::E2) {
-                    $this->assertContains($l['sub'], ['awp', 'm4a1']);
-                    $l['sub'] = 'awp';
-                }
-            }
-            $award['leaders'] = $award['key'] === 'one_trick' ? $leaders : $this->tiesBySteamId($leaders, 'value');
-
-            return $award;
-        }, $awards);
+        return $this->getJson('/api/awards'.($query ? '?'.http_build_query($query) : ''))->assertOk()->json('data.awards');
     }
 
     private function award(string $key, array $leaders): array
@@ -56,6 +43,7 @@ class AwardsTest extends CharacterizationTestCase
             $this->award('headshot', [[Scenario::P1, 'One', '38%', '26 kills']]),
             $this->award('eco', [[Scenario::E1, 'Eco One', '19'], [Scenario::P2, 'Two v2', '1']]),
             $this->award('clutches', [[Scenario::P1, 'One', '1'], [Scenario::P2, 'Two v2', '1']]),
+            // e2's 11 awp and 11 m4a1 kills tie: the first name, awp (Q6).
             $this->award('one_trick', [['', '', '100%', 'c4'], [Scenario::P1, 'One', '73%', 'ak47'], [Scenario::E2, 'Tied', '50%', 'awp']]),
         ], $this->awards());
     }

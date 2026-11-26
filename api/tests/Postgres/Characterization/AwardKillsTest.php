@@ -56,13 +56,12 @@ class AwardKillsTest extends CharacterizationTestCase
         );
     }
 
-    public function test_a_tied_top_weapon_lists_the_kills_of_one_of_them(): void
+    public function test_a_tied_top_weapon_lists_the_one_the_award_named(): void
     {
         $kills = $this->kills('one_trick', Scenario::E2);
 
-        $this->assertCount(11, $kills);
-        $this->assertCount(1, array_unique(array_column($kills, 'weapon')));
-        $this->assertContains($kills[0]['weapon'], ['awp', 'm4a1']);
+        $this->assertSame($this->rounds('m2', range(1, 21, 2)), $this->where($kills));
+        $this->assertSame(['awp'], array_values(array_unique(array_column($kills, 'weapon'))));
     }
 
     public function test_a_map_narrows_the_kills(): void
