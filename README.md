@@ -118,6 +118,8 @@ anything else.
 ```bash
 docker compose exec api php artisan test        # feature + contract tests (in-memory sqlite)
 docker compose exec api ./vendor/bin/phpstan analyse --memory-limit=1G   # architecture rules (phpstan.neon)
+docker compose --profile test up -d postgres-test                         # once: the throwaway test Postgres
+docker compose exec api ./vendor/bin/phpunit -c phpunit.pgsql.xml         # tests whose SQL needs Postgres
 docker compose exec frontend npm run lint
 docker compose run --rm worker go test ./...
 docker compose run --rm notifier go test ./...

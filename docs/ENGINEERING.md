@@ -46,6 +46,7 @@ MinIO also publish ports so you can attach a GUI.)
 | `ollama` | Local model runtime (chat + embeddings) | (internal 11434) |
 | `ollama-init` | One-shot: pulls the embedding model, then exits | — |
 | `semgrep` | Static analysis, on demand (`tools` profile) | — |
+| `postgres-test` | Throwaway Postgres for the api's `phpunit.pgsql.xml` suite (`test` profile; tmpfs, no volume) | — |
 
 Named volumes `pgdata` / `miniodata` / `ollamadata` persist data across restarts — the
 model weights are pulled once and survive a `down`.

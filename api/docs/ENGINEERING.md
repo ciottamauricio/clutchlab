@@ -148,7 +148,19 @@ Its routes, controller and codes are its own driving side.
 - Mock **interfaces**, not concrete classes.
 - Unit-test an Action/service by mocking only its injected dependency; never make real
   external calls.
-- Use an in-memory SQLite DB for feature tests.
+- Use an in-memory SQLite DB for feature tests. `tests/TestCase` refuses anything else before
+  `RefreshDatabase` migrates (`setUpTraits()`), and again after (the tripwire in `setUp()`).
+- **SQL that needs Postgres** is tested in its own suite, [`phpunit.pgsql.xml`](../phpunit.pgsql.xml)
+  (`tests/Postgres/`), against a throwaway server, never the dev one:
+  ```bash
+  docker compose --profile test up -d postgres-test        # once; tmpfs, gone on stop
+  docker compose exec -T api ./vendor/bin/phpunit -c phpunit.pgsql.xml
+  ```
+  Its tests extend [`Tests\Postgres\PostgresTestCase`](../tests/Postgres/PostgresTestCase.php),
+  not `Tests\TestCase`. Before anything migrates, it asks the server it reached for two things:
+  the database must be `clutchlab_test`, and there must be no `clutchlab` database on that
+  server. If the server isn't up, the suite fails on the connection. CI runs it against a
+  service container with the same image.
 - The architecture check is its own command, not part of PHPUnit:
   `./vendor/bin/phpstan analyse --memory-limit=1G`. It runs PHPStan at level 0 with the layer rules
   in [`tests/Architecture/`](../tests/Architecture/) (PHPat) and a ban on Laravel's functions

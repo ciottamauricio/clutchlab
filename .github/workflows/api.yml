@@ -21,6 +21,20 @@ jobs:
       # Test-only key so the encrypter boots; not a secret (never touches real data).
       # Must decode to exactly 32 bytes for aes-256-cbc.
       APP_KEY: base64:dGVzdHRlc3R0ZXN0dGVzdHRlc3R0ZXN0dGVzdHRlc3Q=
+    # The throwaway Postgres for phpunit.pgsql.xml: the same image and credentials as Compose's
+    # postgres-test (test-only, they guard nothing).
+    services:
+      postgres-test:
+        image: pgvector/pgvector:0.8.7-pg16
+        env:
+          POSTGRES_DB: clutchlab_test
+          POSTGRES_USER: clutch_test
+          POSTGRES_PASSWORD: clutch_test
+        ports: ["5432:5432"]
+        options: >-
+          --tmpfs /var/lib/postgresql/data
+          --health-cmd "pg_isready -U clutch_test -d clutchlab_test"
+          --health-interval 2s --health-timeout 5s --health-retries 15
     steps:
       - uses: actions/checkout@v5
         with:
@@ -28,7 +42,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
-          extensions: pdo_sqlite, sqlite3
+          extensions: pdo_sqlite, sqlite3, pdo_pgsql
           coverage: none
       - run: composer install --prefer-dist --no-progress --no-interaction
       - run: ./vendor/bin/pint --test    # style gate: fails on anything `pint` would reformat
@@ -36,6 +50,10 @@ jobs:
       # functions in its core. Level 0, so it checks dependencies, not types.
       - run: ./vendor/bin/phpstan analyse --no-progress --memory-limit=1G
       - run: ./vendor/bin/phpunit
+      # The job runs on the runner, so the service is on localhost; this lets phpunit.pgsql.xml
+      # name it as Compose does, with one config for both.
+      - run: echo "127.0.0.1 postgres-test" | sudo tee -a /etc/hosts
+      - run: ./vendor/bin/phpunit -c phpunit.pgsql.xml
 
       # Advisories against the pinned lockfile. Reports without failing: today's 12
       # findings (guzzle, commonmark) are transitive Laravel deps no targeted bump
