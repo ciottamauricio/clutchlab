@@ -4,7 +4,13 @@ namespace Tests\Fixtures\PlayerStats;
 
 use App\Models\Team;
 use App\Models\User;
+use App\PlayerStats\Domain\Kill;
+use App\PlayerStats\Domain\MatchInfo;
+use App\PlayerStats\Domain\RosterPlayer;
 use Illuminate\Support\Facades\DB;
+use Tests\Fakes\PlayerStats\InMemoryMatches;
+use Tests\Fakes\PlayerStats\InMemoryMatchEvents;
+use Tests\Fakes\PlayerStats\InMemoryRosters;
 
 // Spec 004's fixture: the cases the dev data showed (AC-2), defined once as plain data so the same
 // matches can be written to a database or loaded into the in-memory adapters. Small enough that
@@ -57,6 +63,23 @@ final class Scenario
     public Team $emptyTeam;
 
     public Team $otherTeam;
+
+    // The same people and teams by id, for both ways of loading the scenario.
+    public int $ownerId;
+
+    public int $outsiderId;
+
+    public int $teamId;
+
+    public int $emptyTeamId;
+
+    public int $otherTeamId;
+
+    public InMemoryMatches $memoryMatches;
+
+    public InMemoryRosters $memoryRosters;
+
+    public InMemoryMatchEvents $memoryEvents;
 
     public function __construct()
     {
@@ -140,6 +163,9 @@ final class Scenario
         $this->otherTeam = Team::create(['name' => 'Other']);
         $this->otherTeam->members()->attach($this->outsider, ['role' => 'owner']);
 
+        [$this->ownerId, $this->outsiderId] = [$this->owner->id, $this->outsider->id];
+        [$this->teamId, $this->emptyTeamId, $this->otherTeamId] = [$this->team->id, $this->emptyTeam->id, $this->otherTeam->id];
+
         $teams = ['team' => $this->team->id, 'other' => $this->otherTeam->id, null => null];
         foreach ($this->matches as $key => $m) {
             $this->ids[$key] = DB::table('matches')->insertGetId([
@@ -172,6 +198,62 @@ final class Scenario
         }
 
         return $this;
+    }
+
+    // The same matches in the in-memory adapters, ids numbered in order.
+    public function intoMemory(): self
+    {
+        [$this->ownerId, $this->outsiderId, $this->teamId, $this->emptyTeamId, $this->otherTeamId] = [1, 2, 10, 11, 12];
+        $this->memoryMatches = new InMemoryMatches;
+        $this->memoryRosters = new InMemoryRosters;
+        $this->memoryEvents = new InMemoryMatchEvents;
+
+        $this->memoryMatches->join($this->ownerId, $this->teamId);
+        $this->memoryMatches->join($this->ownerId, $this->emptyTeamId);
+        $this->memoryMatches->join($this->outsiderId, $this->otherTeamId);
+        foreach ([[self::P1, null], [self::P2, null], [self::P3, 'Three'], [self::P4, null]] as [$id, $nickname]) {
+            $this->memoryRosters->add($this->teamId, new RosterPlayer($id, $nickname));
+        }
+
+        $teams = ['team' => $this->teamId, 'other' => $this->otherTeamId, null => null];
+        $id = 0;
+        foreach ($this->matches as $key => $m) {
+            $this->ids[$key] = ++$id;
+            $this->memoryMatches->file($this->info($key), $m['team'] === 'other' ? $this->outsiderId : $this->ownerId, $teams[$m['team']]);
+        }
+        foreach ($this->scoreboard() as $row) {
+            $this->memoryEvents->line($this->ids[$row['match']], $row['steam_id'], $row['name'], $row['team_side'], $row['kills'], $row['deaths'], $row['assists'], $row['headshots']);
+        }
+        foreach ($this->kills as $k) {
+            $this->memoryEvents->kill($this->domainKill($k));
+        }
+
+        return $this;
+    }
+
+    // A match as the module sees it: dates and numbers in the text Postgres gives back.
+    public function info(string $match): MatchInfo
+    {
+        $m = $this->matches[$match];
+        $text = fn (?float $n) => $n === null ? null : (string) $n;
+
+        return new MatchInfo($this->ids[$match], $m['uploaded'], $m['played'], $m['map'], $text($m['tick']), "{$match}.dem", $text($m['duration']), $m['ct'], $m['t']);
+    }
+
+    /** @return list<Kill> every kill, as the module sees it */
+    public function domainKills(): array
+    {
+        return array_map(fn ($k) => $this->domainKill($k), $this->kills);
+    }
+
+    /** @param  array<string, mixed>  $k */
+    private function domainKill(array $k): Kill
+    {
+        return new Kill(
+            $this->ids[$k['match']], $k['round'], $k['killer_steam_id'], $k['victim_steam_id'], $k['weapon'], $k['headshot'], $k['opening'],
+            $k['clutch'], $k['side'], $k['killer_team'], $k['tick'], $k['hitgroups'] === null ? null : json_decode($k['hitgroups'], true),
+            $k['map'], $k['killer_name'], $k['victim_name'],
+        );
     }
 
     public function id(string $match): int
