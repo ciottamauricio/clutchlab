@@ -191,7 +191,8 @@ upload rights (owner/igl) on the team, or being the uploader.
 | POST | `/matches` | upload a demo | multipart `demo` (`.dem` or zstd-packed `.dem.zst`, stored unpacked) + required `platform`; optional `played_at`, `external_id` (FACEIT match id), `team_id` (owner/igl only); 201; throttled 30/min; rejects a demo the caller already uploaded (`match.duplicate`) |
 | GET | `/matches/{match}` | match detail + players | visible only (403 otherwise); players by kills desc |
 | GET | `/matches/{match}/kill-positions` | kill coordinates for the heatmap | visible only; see [heatmap.md](heatmap.md) |
-| GET | `/matches/{match}/clutches` | clutches grouped by clutcher/round | visible only; each `{ round, size, killer_name, kills[] }` |
+| GET | `/matches/{match}/clutches` | the clutches won in the match, by round | visible only; `{ tick_rate, demo, clutches: [{ round, size, killer_name, killer_steam_id, kills[] }] }`; see Match page stats; `PlayerStats` `MatchClutches` |
+| GET | `/matches/{match}/team-stats` | CT-vs-T comparison | visible only; `{ ct, t }`, each `{ side, name, score, kills, deaths, assists, hs_pct, opening_kills, opening_deaths, clutches }`; see Match page stats; `PlayerStats` `MatchSides` |
 | GET | `/matches/{match}/demo` | download the stored `.dem` | visible only; streamed from storage via `DemoStorage::download` |
 | POST | `/matches/{match}/reparse` | re-enqueue the stored demo | uploader or owner/igl; resets to `queued`; throttled 30/min; `ReparseMatchAction` |
 | PATCH | `/matches/{match}` | move a match between private and a team | body `team_id` (int = share, null = private); manage bar (uploader/owner/igl); target team needs `uploadMatch` or `match.invalid_team`; `UpdateMatchTeamAction` |
@@ -210,6 +211,24 @@ newer analysis (e.g. kill positions added after they were first parsed).
 **Delete** (`DeleteMatchAction`) removes the read-model docs (Meili) and the stored demo,
 then deletes the row; `kill_events` / `round_events` / `match_player_stats` cascade via FK. It
 is the only way to remove a match — there is no soft-delete.
+
+## Match page stats
+
+Counted by the rules in [teams-auth.md](teams-auth.md#how-a-players-numbers-are-counted), in
+`app/PlayerStats/`.
+
+- **Clutches** (`/clutches`): one per round won in a clutch, by round; its size is the round's
+  `clutch` flag (the 1vN), its clutcher the killer, its kills in tick order.
+- **CT vs T** (`/team-stats`), by the stable whole-match sides:
+  - `kills`, `deaths`, `assists` and `hs_pct` are the scoreboard (`match_player_stats`) summed by
+    `team_side`;
+  - `opening_kills` are the kills flagged `opening`, by the killer's team (`killer_team`);
+  - `clutches` are the rounds won in a clutch, by the killer's team;
+  - a side with no name in the demo shows as `Counter-Terrorists` / `Terrorists`, a missing score
+    as 0.
+  - Known and kept (spec 004 Q7): a side's `opening_deaths` are the **other side's** opening
+    kills. That differs from the side's own players' opening deaths when a team kill or a
+    self-kill opens a round.
 
 ## Error codes
 
@@ -277,8 +296,9 @@ private to its uploader. Enforced by `GameMatchPolicy`:
 - The global `admin` passes all of the above (see [teams-auth.md](teams-auth.md)).
 - All match endpoints require a valid bearer token (`auth:sanctum`).
 
-Cross-match analytics (awards, search, player catalog, team stats) are still scoped to the
-caller's **own uploads** for now; re-scoping them to team visibility is the next step.
+Cross-match analytics are scoped to what the caller can see (own uploads + their teams'
+matches): awards, search, the player catalog and profile stats. The team stat board is scoped to
+the team's own matches instead (see [teams-auth.md](teams-auth.md)).
 
 ## FACEIT
 

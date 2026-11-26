@@ -12,11 +12,12 @@ class PlayersTest extends CharacterizationTestCase
     {
         Sanctum::actingAs($user);
 
-        return $this->tiesBySteamId($this->getJson('/api/players')->assertOk()->json('data.players'), 'match_count');
+        return $this->getJson('/api/players')->assertOk()->json('data.players');
     }
 
     public function test_the_list_counts_each_players_visible_matches_and_names_them_by_their_latest(): void
     {
+        // Most-played first, equal counts by Steam ID (Q6).
         $this->assertSame([
             ['steam_id' => Scenario::P1, 'name' => 'One', 'match_count' => 4],
             ['steam_id' => Scenario::E1, 'name' => 'Eco One', 'match_count' => 4],

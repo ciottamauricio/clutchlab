@@ -2,87 +2,26 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\GameMatch;
-use App\Models\KillEvent;
-use App\Models\MatchPlayerStat;
+use App\Http\Resources\PlayerStats\PlayerClutchResource;
+use App\Http\Resources\PlayerStats\PlayerEntryResource;
+use App\PlayerStats\Application\PlayerClutches;
+use App\PlayerStats\Application\PlayerList;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PlayerController extends Controller
 {
-    /**
-     * The catalog of every distinct player seen across the caller's visible matches (their
-     * own uploads + their teams') — the pick list for building a team roster. Derived from
-     * match_player_stats (no separate players table); the display name is the most-recently-
-     * seen one, since demo names drift (clan tags, emojis) but the SteamID64 is stable.
-     */
-    public function index(Request $request): JsonResponse
+    // The catalog of every distinct player seen across the caller's visible matches (their own
+    // uploads + their teams'), the pick list for building a team roster. See teams-auth.md.
+    public function index(Request $request, PlayerList $players): JsonResponse
     {
-        $players = MatchPlayerStat::query()
-            ->whereIn('match_player_stats.match_id', GameMatch::visibleTo($request->user())->pluck('id'))
-            ->join('matches', 'matches.id', '=', 'match_player_stats.match_id')
-            ->groupBy('match_player_stats.steam_id')
-            ->selectRaw(<<<'SQL'
-                match_player_stats.steam_id,
-                (array_agg(match_player_stats.name ORDER BY matches.created_at DESC))[1] AS name,
-                count(DISTINCT match_player_stats.match_id) AS match_count
-                SQL)
-            ->orderByDesc('match_count')
-            ->get();
-
-        return response()->json(['data' => ['players' => $players]]);
+        return response()->json(['data' => ['players' => PlayerEntryResource::collection($players->seenBy($request->user()->id))->resolve($request)]]);
     }
 
-    /**
-     * Every clutch this player won across the caller's visible matches, grouped by round like
-     * MatchController@clutches but spanning matches — each carries its own match/demo/tick so
-     * the "watch in game" jump works. Scoped to the matches the caller may see.
-     */
-    public function clutches(Request $request, string $steamId): JsonResponse
+    // Every clutch this player won across the caller's visible matches, each carrying its own
+    // match/demo/tick so the "watch in game" jump works.
+    public function clutches(Request $request, string $steamId, PlayerClutches $clutches): JsonResponse
     {
-        $clutches = KillEvent::query()
-            ->join('matches', 'matches.id', '=', 'kill_events.match_id')
-            ->whereIn('kill_events.match_id', GameMatch::visibleTo($request->user())->pluck('id'))
-            ->where('kill_events.killer_steam_id', $steamId)
-            ->where('kill_events.clutch', '>', 0)
-            ->orderBy('kill_events.match_id')
-            ->orderBy('kill_events.round')
-            ->orderBy('kill_events.tick')
-            ->get([
-                'kill_events.match_id',
-                'matches.map_name',
-                'matches.original_filename',
-                'matches.tick_rate',
-                'kill_events.round',
-                'kill_events.clutch',
-                'kill_events.killer_name',
-                'kill_events.victim_name',
-                'kill_events.weapon',
-                'kill_events.side',
-                'kill_events.headshot',
-                'kill_events.tick',
-                'kill_events.hitgroups',
-            ])
-            ->groupBy(fn ($k) => $k->match_id.'-'.$k->round)
-            ->map(fn ($kills) => [
-                'match_id' => (int) $kills->first()->match_id,
-                'map' => $kills->first()->map_name,
-                'demo' => $kills->first()->original_filename,
-                'tick_rate' => (float) $kills->first()->tick_rate,
-                'round' => (int) $kills->first()->round,
-                'size' => (int) $kills->first()->clutch,
-                'killer_name' => $kills->first()->killer_name,
-                'kills' => $kills->map(fn ($k) => [
-                    'victim_name' => $k->victim_name,
-                    'weapon' => $k->weapon,
-                    'side' => $k->side,
-                    'headshot' => $k->headshot,
-                    'tick' => $k->tick,
-                    'hitgroups' => $k->hitgroups,
-                ])->values(),
-            ])
-            ->values();
-
-        return response()->json(['data' => ['clutches' => $clutches]]);
+        return response()->json(['data' => ['clutches' => PlayerClutchResource::collection($clutches->execute($request->user()->id, $steamId))->resolve($request)]]);
     }
 }

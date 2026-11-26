@@ -12,7 +12,11 @@ use App\Http\Requests\ListMatchesRequest;
 use App\Http\Requests\UpdateMatchRequest;
 use App\Http\Requests\UploadDemoRequest;
 use App\Http\Resources\MatchResource;
+use App\Http\Resources\PlayerStats\MatchClutchResource;
+use App\Http\Resources\PlayerStats\SideResource;
 use App\Models\GameMatch;
+use App\PlayerStats\Application\MatchClutches;
+use App\PlayerStats\Application\MatchSides;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -138,82 +142,31 @@ class MatchController extends Controller
         return $storage->download($match->demo_key, $match->original_filename);
     }
 
-    // Clutches in the match: one per round where a player was last alive on their team,
-    // grouped as { round, size, killer, kills[] } with the clutcher's kills in kill order.
-    public function clutches(Request $request, GameMatch $match): JsonResponse
+    // Clutches in the match: one per round won by a player left last alive on their team, with
+    // the clutcher's kills in kill order. See matches.md.
+    public function clutches(Request $request, GameMatch $match, MatchClutches $clutches): JsonResponse
     {
         $this->authorize('view', $match);
-
-        $clutches = $match->killEvents()
-            ->where('clutch', '>', 0)
-            ->orderBy('round')
-            ->orderBy('tick')
-            ->get(['round', 'clutch', 'killer_name', 'killer_steam_id', 'victim_name', 'weapon', 'side', 'headshot', 'tick', 'hitgroups'])
-            ->groupBy('round')
-            ->map(fn ($kills, $round) => [
-                'round' => (int) $round,
-                'size' => $kills->first()->clutch,
-                'killer_name' => $kills->first()->killer_name,
-                'killer_steam_id' => $kills->first()->killer_steam_id,
-                'kills' => $kills->map(fn ($k) => [
-                    'victim_name' => $k->victim_name,
-                    'weapon' => $k->weapon,
-                    'side' => $k->side,
-                    'headshot' => $k->headshot,
-                    'tick' => $k->tick,
-                    'hitgroups' => $k->hitgroups,
-                ])->values(),
-            ])
-            ->values();
 
         return response()->json(['data' => [
             'tick_rate' => $match->tick_rate,
             'demo' => $match->original_filename,
-            'clutches' => $clutches,
+            'clutches' => MatchClutchResource::collection($clutches->execute($match->id))->resolve($request),
         ]]);
     }
 
     // Side-by-side comparison of the match's two teams (CT vs T): scoreboard totals plus the
-    // opening-duel and clutch stats that only kill_events carries. Teams are the stable
-    // whole-match sides (killer_team / team_side), so the numbers are steady across the half.
-    public function teamStats(Request $request, GameMatch $match): JsonResponse
+    // opening-duel and clutch stats that only kill_events carries, by the stable whole-match
+    // sides. See matches.md.
+    public function teamStats(Request $request, GameMatch $match, MatchSides $sides): JsonResponse
     {
         $this->authorize('view', $match);
 
-        $board = $match->playerStats()
-            ->selectRaw('team_side, sum(kills) kills, sum(deaths) deaths, sum(assists) assists, sum(headshots) headshots')
-            ->groupBy('team_side')->get()->keyBy('team_side');
-
-        $opening = $match->killEvents()->where('opening', true)
-            ->selectRaw('killer_team, count(*) c')->groupBy('killer_team')->pluck('c', 'killer_team');
-
-        $clutches = $match->killEvents()->where('clutch', '>', 0)
-            ->selectRaw('killer_team, count(DISTINCT round) c')->groupBy('killer_team')->pluck('c', 'killer_team');
-
-        // Each opening kill is one team's opener and the other team's opening death, so a
-        // team's opening deaths are the opposing team's opening kills.
-        $team = function (string $side, string $other, ?string $name, ?int $score) use ($board, $opening, $clutches) {
-            $b = $board[$side] ?? null;
-            $kills = (int) ($b->kills ?? 0);
-            $headshots = (int) ($b->headshots ?? 0);
-
-            return [
-                'side' => $side,
-                'name' => $name ?: ($side === 'CT' ? 'Counter-Terrorists' : 'Terrorists'),
-                'score' => (int) $score,
-                'kills' => $kills,
-                'deaths' => (int) ($b->deaths ?? 0),
-                'assists' => (int) ($b->assists ?? 0),
-                'hs_pct' => $kills > 0 ? (int) round($headshots / $kills * 100) : 0,
-                'opening_kills' => (int) ($opening[$side] ?? 0),
-                'opening_deaths' => (int) ($opening[$other] ?? 0),
-                'clutches' => (int) ($clutches[$side] ?? 0),
-            ];
-        };
+        $lines = $sides->execute($match->id);
 
         return response()->json(['data' => [
-            'ct' => $team('CT', 'T', $match->ct_name, $match->score_ct),
-            't' => $team('T', 'CT', $match->t_name, $match->score_t),
+            'ct' => (new SideResource($lines['CT'], 'CT', $match->ct_name, $match->score_ct))->resolve($request),
+            't' => (new SideResource($lines['T'], 'T', $match->t_name, $match->score_t))->resolve($request),
         ]]);
     }
 

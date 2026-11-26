@@ -21,17 +21,6 @@ abstract class CharacterizationTestCase extends PostgresTestCase
         $this->s = (new Scenario)->intoDatabase();
     }
 
-    // Before spec 004 the order among equal values was whatever Postgres returned; Q6 defines it
-    // (the value descending, then Steam ID ascending). Until the switch, the tests compare tied
-    // rows in that order whatever order they came in.
-    /** @param list<array<string, mixed>> $rows */
-    protected function tiesBySteamId(array $rows, string $field): array
-    {
-        usort($rows, fn ($a, $b) => [(float) $b[$field], $a['steam_id']] <=> [(float) $a[$field], $b['steam_id']]);
-
-        return $rows;
-    }
-
     /** @return array<string, mixed> one drill-down or clutch kill, as the answers write it */
     protected function kill(string $victim, string $weapon, int $tick, bool $headshot = false, ?array $hitgroups = null, string $side = 'CT'): array
     {

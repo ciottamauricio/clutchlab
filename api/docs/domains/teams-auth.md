@@ -81,8 +81,10 @@ the caller's **visible** matches — and stats are aggregated from `kill_events`
 
 - **Catalog** (`GET /players`): derived from `match_player_stats` over the caller's visible
   matches (`GameMatch::visibleTo` — own uploads + their teams'), grouped by `steam_id`. Returns
-  `{ steam_id, name (most recent), match_count }`. **No separate players table** — the catalog
-  is a read projection over match data.
+  `{ steam_id, name (latest), match_count (games) }`, most-played first, equal counts by Steam
+  ID. **No separate players table** — the catalog is a read projection over match data.
+  `PlayerStats` `PlayerList::seenBy`. The admin's pick list (`GET /admin/players`) is the same
+  over **every** match, in name order as the database collates names (`PlayerList::all`).
 - **Team stats** (`GET /teams/{team}/stats?from=&to=`): the roster's board, scoped to **the
   team's own matches** (those filed under it) and the roster's `steam_id` set, so every member
   sees the same board, independent of who's viewing. `PlayerStats` `TeamBoard`.
@@ -141,8 +143,11 @@ What the data's corner cases count as, known and kept (spec 004 Q7):
 - **Player clutches** (`GET /players/{steamId}/clutches`): every won 1vN the player made across
   the caller's visible matches, grouped by `(match, round)` — the same shape as
   [matches.md](matches.md)'s `clutches`, but each card carries its own `map`/`demo`/`tick_rate`
-  so the "watch in game" jump works across matches. Powers the clickable clutch cell on the
-  stat board.
+  so the "watch in game" jump works across matches. By match, then round. Powers the clickable
+  clutch cell on the stat board. `PlayerStats` `PlayerClutches`.
+  - Known and kept (spec 004 Q7): the list spans **every visible match, all time**, while the
+    cell it opens from counts the team's matches in the board's date range, so the dialog can
+    list more clutches than the cell shows.
 - Stats need `kill_events.victim_steam_id` (present since the Step 4 search read model) so
   death-side metrics key on the victim's stable id, not the name.
 
@@ -280,7 +285,7 @@ rostered ids performed in the team's games, and every member sees the same numbe
 | GET | `/api/admin/users` | list every user (role, linked SteamID, teams) |
 | PATCH | `/api/admin/users/{user}` | set a user's global `role` and/or `steam_id` |
 | DELETE | `/api/admin/users/{user}` | delete a user (not yourself); memberships/tokens go, uploaded matches survive ownerless |
-| GET | `/api/admin/players` | catalog of players (SteamID64 + name) seen across all matches — the pick list for linking |
+| GET | `/api/admin/players` | catalog of players (SteamID64 + latest name + match count) seen across all matches, by name — the pick list for linking |
 | GET | `/api/admin/permissions` | the grant matrix: ability catalog, roles per scope, current grants |
 | PUT | `/api/admin/permissions` | replace one `(scope, role)`'s grants (`{ scope, role, keys[] }`) |
 
