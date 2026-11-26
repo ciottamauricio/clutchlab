@@ -88,4 +88,17 @@ abstract class TestCase extends BaseTestCase
         $this->app->instance(DocRetriever::class, $this->docRetriever);
         $this->app->instance(DocsLlm::class, $this->docsLlm);
     }
+
+    // The tripwire above runs after parent::setUp(), and parent::setUp() is where RefreshDatabase
+    // runs migrate:fresh: on a leaked connection the wipe would already be done. setUpTraits() is
+    // what calls it, so this checks first. Not beforeRefreshingDatabase(): RefreshDatabase's own
+    // empty copy of that method would replace this one in every test class that uses the trait.
+    protected function setUpTraits()
+    {
+        if (config('database.default') !== 'sqlite' || config('database.connections.sqlite.database') !== ':memory:') {
+            self::fail('Tests resolved "'.config('database.default').'" ('.config('database.connections.'.config('database.default').'.database').') instead of in-memory sqlite — refusing to migrate it.');
+        }
+
+        return parent::setUpTraits();
+    }
 }

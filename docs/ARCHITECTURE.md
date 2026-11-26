@@ -417,7 +417,12 @@ Two hard-won rules about tests and environments:
   `env()` reads `$_SERVER` before `$_ENV`; PHPUnit's `<env>` (even `force="true"`) never
   touches `$_SERVER`. Without `<server>` overrides in `phpunit.xml`, `RefreshDatabase`
   migrate:freshes the **real** Postgres — it happened. `tests/TestCase` now hard-fails on
-  any non-sqlite connection; keep both defenses forever.
+  any non-sqlite connection; keep both defenses forever. Mind the order, though: that tripwire
+  runs after `parent::setUp()`, and `parent::setUp()` is where `RefreshDatabase` migrates, so
+  on its own it would only report a wipe already done. `TestCase::setUpTraits()` checks for
+  in-memory sqlite before the migration (spec 004). It isn't `beforeRefreshingDatabase()`,
+  because the trait's own empty copy of that method would replace it in every test class that
+  uses it.
 - **Lockfiles remember their platform.** `package-lock.json` written in the musl (Alpine)
   dev container makes `npm ci` on a glibc runner skip every native binding (npm/cli#4828);
   the frontend workflow installs each musl package's gnu twin at the locked version.
